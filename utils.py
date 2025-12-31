@@ -60,7 +60,7 @@ import json
 from tensordict import TensorDict, from_dict
 from torch import Tensor
 from torchtyping import TensorType
-from typing import Callable
+from typing import Callable, Dict, List
 # import inference
 
 
@@ -78,7 +78,7 @@ params:
 """
 def make_instance(
         ma: int, ops_per_job: int, jobs: int, min_proc: int, max_proc: int
-) -> TensorDict:
+) -> Tuple[FJSPEnv, TensorDict, Dict]:
 
     generator_params = {
         "num_jobs": jobs,
@@ -97,7 +97,58 @@ def make_instance(
         stepwise_reward=True
     )
     td = env.reset(batch_size=[1])
-    return td
+    return env, td, generator_params
+
+
+
+
+def map_index_to_action(r_i, op_i, generator_params):
+    job_size = generator_params["num_jobs"]
+    ma_size = generator_params["num_machines"]
+
+    return (op_i + 1) + (r_i // job_size) * ma_size
+
+
+
+# HERSAN
+def apply_fcfs(env: FJSPEnv, td: TensorDict, generator_params: Dict
+               ) -> Tuple[TensorDict, List]:
+
+    actions = []
+    ma_range = generator_params["num_machines"]
+
+    # inneholder en liste for hver maskin, en liste inneholder sekvensen for hver op assigned til maskinen, i format [x,x]
+    assignments = []
+    while not td['done'].all():
+        min_proc_time = 100
+        action_i = 0
+
+        rma_i = 0
+        opma_i = 0
+        
+        ready_indexes = [i for i, val in enumerate(td['is_ready'][0]) if val]
+        for r_i in ready_indexes:
+            for op_i in range(ma_range):
+                v = td['proc_times'][0][op_i][r_i]
+                is_not_busy = td['busy_until'][0][op_i] <= td['time'][0]
+                if v < min_proc_time and is_not_busy:
+                    min_proc_time = v
+                    action_i = map_index_to_action(r_i, op_i, generator_params)
+                    # adding action taken, to assignment
+                    rma_i = r_i # operasjon
+                    opma_i = op_i # maskin
+        
+
+        assignments.append((opma_i, rma_i))
+
+
+        actions.append(action_i)
+        td['action'] = torch.tensor([action_i])
+        td = env.step(td)['next']
+    # print("actions during FCFS")
+    # print(actions)
+
+    return td, assignments
 
 
 
@@ -110,8 +161,9 @@ def save_instance():
 
 
 # weights = td["proc_times"][0]  # shape (2, 4)
-def encode_image(td: TensorDict, num_groups: int, output_prefix: str):
+def encode_image(td: TensorDict, num_groups: int, output_prefix: str, assignments: list | None = None,):
    # weights shape: (num_cnodes, num_anodes)
+
     weights = td['proc_times'][0]
     num_cnodes, num_anodes = weights.shape
 
@@ -135,7 +187,7 @@ def encode_image(td: TensorDict, num_groups: int, output_prefix: str):
             anode_to_group[a_idx] = (g_idx, idx_in_group)
 
     markers = ['o', 's', '^', 'D', 'P', 'X', '*', 'v']
-
+    
     # For each Cnode → one image
     for i in range(num_cnodes):
         cnode_name = f"{i}"
@@ -156,6 +208,9 @@ def encode_image(td: TensorDict, num_groups: int, output_prefix: str):
                 radius * np.cos(theta),
                 radius * np.sin(theta)
             ])
+        
+        
+
 
         # Draw
         plt.figure(figsize=(8, 8))
@@ -209,14 +264,21 @@ def encode_image(td: TensorDict, num_groups: int, output_prefix: str):
 
         print(f"Image saved: {filename}")
 
+    if assignments:
+        return assignments_coordinates
 
 
 
 
-td = make_instance(4,4,4,5,20)
-print(td["proc_times"])
-encode_image(td, 4, 'procs')
 
+env, td, generator_params = make_instance(4,4,4,5,20)
+
+td, assignments = apply_fcfs(env, td, generator_params)
+print(assignments)
+
+# print(td["proc_times"])
+assignments_coordinates = encode_image(td, 4, 'procs', assignments)
+print(assignments_coordinates)
 
 
 
