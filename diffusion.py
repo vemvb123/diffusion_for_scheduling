@@ -50,7 +50,7 @@ dataset has: image of machine relations (1 for each machinbe)
 model outputs: set of coordinates, to one of the coordinates for an operation, where each coordinate in sequence gives the assignment order
 target: ideal coordinates
 '''
-def adj_diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
+def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
     # TODO finn ut av mengde parametere i en modell med ett lag, og hvordan bruke flere lag
 
     # TODO: Import dataset

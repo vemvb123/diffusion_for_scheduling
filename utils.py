@@ -159,7 +159,7 @@ def save_instance():
 
 
 
-def encode_image(td: TensorDict, num_groups: int, output_prefix: str, assignments: list | None = None,):
+def encode_image(td: TensorDict, num_groups: int, output_prefix: str, img_size: int,assignments: list | None = None,):
 
     assignment_coordinates = [[0, 0, 0] for _ in range(len(assignments))]
 
@@ -267,6 +267,7 @@ def encode_image(td: TensorDict, num_groups: int, output_prefix: str, assignment
 # 2) load buffer into PIL and convert to grayscale
         buf.seek(0)
         img = Image.open(buf).convert("L")  # "L" = grayscale
+        img = img.resize((img_size, img_size), Image.BILINEAR)
 
 # 3) save grayscale image
         filename = f"{output_prefix}_{i}.png"
@@ -278,76 +279,58 @@ def encode_image(td: TensorDict, num_groups: int, output_prefix: str, assignment
 
 
 
+from torchvision.io import read_image
 
 class ImageCoordinateDataset(Dataset):
-    def __init__(self):
-        # store channel sizes from the initial embeddings
-        self.td = td
-        self.env = env
+    def __init__(self, root_dir, transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
 
-        self.C_op = op_emb.size(1)
-        self.C_ma = ma_emb.size(1)
-
-        # store original heights (before padding) assuming width unchanged
-        self.H = op_emb.size(2)
-
-        self.op_emb = self.reshape_data(op_emb)
-        self.ma_emb = self.reshape_data(ma_emb)
-
-
-    def reshape_data(self, x_emb):
-        x_emb = x_emb.unsqueeze(1)
-        x = x_emb.detach().clone()
-        x = x.squeeze(0)
-        return x
-
-
-    def decomposition_instance(self, sample_data):
-        """
-        data_instance : Tensor of shape [B, 1, C_op + C_ma, H] or [B, C_op + C_ma, H] (depending on whether
-        the middle dimension 1 is kept).
-        This returns:
-          op_rec : shape [B, C_op, H]
-          ma_rec : shape [B, C_ma, H]
-        """
-        # If there is a singleton dimension at dim=1 (the “1”), remove it.
-        if sample_data.dim() == 4 and sample_data.size(1) == 1:
-            # from [B,1,channels,H] → [B,channels,H]
-            sample_data = sample_data.squeeze(1)
-
-        # split channels
-        op_rec, ma_rec = torch.split(sample_data, [self.C_op, self.C_ma], dim=1)
-
-        # Crop spatial dimension if needed (in your case height =16 for both so likely no crop)
-        op_rec = op_rec[:, :, :self.H]
-        ma_rec = ma_rec[:, :, :self.H]
-
-        return op_rec, ma_rec
-
-
+        # Find all *coords*.pt files — one per instance
+        self.instances = sorted([
+            f for f in os.listdir(root_dir)
+            if f.startswith("coords_") and f.endswith(".pt")
+        ])
 
     def __len__(self):
-        return self.op_emb.size(0)
+        return len(self.instances)
 
+    
 
     def __getitem__(self, idx):
-        op = self.op_emb[idx]
-        ma = self.ma_emb[idx]
-        
-        # Pad the smaller embedding to match the larger one
-        if op.shape[2] < ma.shape[2]:
-            padding = (0, 0, 0, ma.shape[2] - op.shape[2])  # Pad height
-            op = torch.nn.functional.pad(op, padding)
-        elif ma.shape[2] < op.shape[2]:
-            padding = (0, 0, 0, op.shape[2] - ma.shape[2])  # Pad height
-            ma = torch.nn.functional.pad(ma, padding)
-        
-        # Concatenate along the channel dimension
-        combined = torch.cat([op, ma], dim=1)
-        
-        return combined
+        # Get the coords file name, e.g., coords_444_3.pt
+        coords_filename = self.instances[idx]
+        coords_path = os.path.join(self.root_dir, coords_filename)
 
+        # Load coordinates tensor
+        coords = torch.load(coords_path)  # e.g., shape [16, 3]
 
+        # Split into columns: (col1, col2, col3)
+        col1 = coords[:, 0]
+        col2 = coords[:, 1]
+        col3 = coords[:, 2]
+
+        # Extract the instance index number from the file name
+        # e.g., "coords_444_3.pt" → "3"
+        instance_idx = coords_filename.split("_")[-1].replace(".pt", "")
+
+        # Load the 4 associated image files
+        img_tensors = []
+        for i in range(4):
+            image_name = f"img_444_{instance_idx}_{i}.png"
+            image_path = os.path.join(self.root_dir, image_name)
+
+            image = read_image(image_path)  # Returns (C, H, W) — C=1 if grayscale
+            if self.transform:
+                image = self.transform(image)
+
+            img_tensors.append(image)
+
+        # Pack images into a tuple
+        images = tuple(img_tensors)
+
+        # Return as ((img1, img2, img3, img4), (col1, col2, col3))
+        return images, (col1, col2, col3)
 
 
 def tensordict_to_dict(td):
@@ -376,15 +359,16 @@ def make_dataset(n):
         # fa target fra instance 
         td_target, assignments = apply_fcfs(env, td.copy(), generator_params)
         # lage bilder og koordinater for instanse, der du kaller bilda noe spesifikt
-        assignments_coordinates = encode_image(td, 4, f'img_444_{i}', assignments)
+        assignments_coordinates = encode_image(td, 4, f'{dataset_folder}/img_444_{i}', 128, assignments)
+
         # lagre json med: td, og optimale td koords
         td.set('opt_assignment', td_target['ma_assignment'])
-        td.set('opt_actions', assignments)
+        td.set('opt_actions', torch.tensor(assignments).unsqueeze(0))
         plain_dict = tensordict_to_dict(td.copy())
-        with open(f"{dataset_folder}/td_444_{i}", "w") as f:
+        with open(f"{dataset_folder}/td_444_{i}.json", "w") as f:
             json.dump(plain_dict, f, indent=4)
         # lagre coords i en json, med visse navn
-        torch.save(assignments_coordinates, f'{dataset_folder}/coords_444_{i}.pt')
+        torch.save(assignments_coordinates.unsqueeze(0), f'{dataset_folder}/coords_444_{i}.pt')
         
         logging.info(f'Made instance {i}')
 
@@ -393,27 +377,38 @@ def make_dataset(n):
 
 
 
+'''
 
 env, td, generator_params = make_instance(4,4,4,5,20)
 td_fcfs, assignments = apply_fcfs(env, td.copy(), generator_params)
 print(assignments)
 
+
+
+
 print(td["proc_times"])
-assignments_coordinates = encode_image(td, 4, 'procs', assignments)
+assignments_coordinates = encode_image(td, 4, 'procs', 64, assignments)
+print(assignments_coordinates)
 
-
-
-
-if assignments_coordinates is not None:
-    print(assignments_coordinates)
-    print('')
-    print(assignments)
-
-print(assignments_coordinates[i])
-
-
-
+'''
 make_dataset(5)
+
+dataset = ImageCoordinateDataset("tmp_dataset/img_coords_dataset")
+loader = DataLoader(dataset, batch_size=3, shuffle=True)
+
+for batch in loader:
+    (imgs1, imgs2, imgs3, imgs4), (col1, col2, col3) = batch
+
+    print("col1 shape:", col1.shape)
+    print(col1)
+    break
+
+
+# (img1, img2, img3, img4), (col1, col2, col3) = dataset[3]
+
+# print(img1.shape)   # e.g., (1, H, W)
+# print(col1.shape)   # e.g., (16,)
+
 
 
 
