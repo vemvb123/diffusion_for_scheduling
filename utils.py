@@ -210,7 +210,7 @@ def encode_image(td: TensorDict, num_groups: int, output_prefix: str, img_size: 
                 x,
                 y 
             ])
-            print( (i,j) )
+            # print( (i,j) )
             if (i, j) in assignments:
                 index = assignments.index( (i,j) )
                 min_val = -5 
@@ -306,9 +306,13 @@ class ImageCoordinateDataset(Dataset):
         coords = torch.load(coords_path)  # e.g., shape [16, 3]
 
         # Split into columns: (col1, col2, col3)
-        col1 = coords[:, 0]
-        col2 = coords[:, 1]
-        col3 = coords[:, 2]
+
+        col1 = coords[:, 0].unsqueeze(1)  # shape: (num_points, 1)
+        col2 = coords[:, 1].unsqueeze(1)
+        col3 = coords[:, 2].unsqueeze(1)
+        # col1 = coords[:, 0]
+        # col2 = coords[:, 1]
+        # col3 = coords[:, 2]
 
         # Extract the instance index number from the file name
         # e.g., "coords_444_3.pt" → "3"
@@ -391,7 +395,7 @@ assignments_coordinates = encode_image(td, 4, 'procs', 64, assignments)
 print(assignments_coordinates)
 
 '''
-make_dataset(5)
+# make_dataset(5)
 
 dataset = ImageCoordinateDataset("tmp_dataset/img_coords_dataset")
 loader = DataLoader(dataset, batch_size=3, shuffle=True)
@@ -400,6 +404,7 @@ for batch in loader:
     (imgs1, imgs2, imgs3, imgs4), (col1, col2, col3) = batch
 
     print("col1 shape:", col1.shape)
+    print("img1 shape:", imgs1.shape)
     print(col1)
     break
 
