@@ -271,6 +271,123 @@ def encode_image(td: TensorDict, num_groups: int, output_prefix: str, assignment
 
 
 
+
+
+class ImageCoordinateDataset(Dataset):
+    def __init__(self):
+        # store channel sizes from the initial embeddings
+        self.td = td
+        self.env = env
+
+        self.C_op = op_emb.size(1)
+        self.C_ma = ma_emb.size(1)
+
+        # store original heights (before padding) assuming width unchanged
+        self.H = op_emb.size(2)
+
+        self.op_emb = self.reshape_data(op_emb)
+        self.ma_emb = self.reshape_data(ma_emb)
+
+
+    def reshape_data(self, x_emb):
+        x_emb = x_emb.unsqueeze(1)
+        x = x_emb.detach().clone()
+        x = x.squeeze(0)
+        return x
+
+
+    def decomposition_instance(self, sample_data):
+        """
+        data_instance : Tensor of shape [B, 1, C_op + C_ma, H] or [B, C_op + C_ma, H] (depending on whether
+        the middle dimension 1 is kept).
+        This returns:
+          op_rec : shape [B, C_op, H]
+          ma_rec : shape [B, C_ma, H]
+        """
+        # If there is a singleton dimension at dim=1 (the “1”), remove it.
+        if sample_data.dim() == 4 and sample_data.size(1) == 1:
+            # from [B,1,channels,H] → [B,channels,H]
+            sample_data = sample_data.squeeze(1)
+
+        # split channels
+        op_rec, ma_rec = torch.split(sample_data, [self.C_op, self.C_ma], dim=1)
+
+        # Crop spatial dimension if needed (in your case height =16 for both so likely no crop)
+        op_rec = op_rec[:, :, :self.H]
+        ma_rec = ma_rec[:, :, :self.H]
+
+        return op_rec, ma_rec
+
+
+
+    def __len__(self):
+        return self.op_emb.size(0)
+
+
+    def __getitem__(self, idx):
+        op = self.op_emb[idx]
+        ma = self.ma_emb[idx]
+        
+        # Pad the smaller embedding to match the larger one
+        if op.shape[2] < ma.shape[2]:
+            padding = (0, 0, 0, ma.shape[2] - op.shape[2])  # Pad height
+            op = torch.nn.functional.pad(op, padding)
+        elif ma.shape[2] < op.shape[2]:
+            padding = (0, 0, 0, op.shape[2] - ma.shape[2])  # Pad height
+            ma = torch.nn.functional.pad(ma, padding)
+        
+        # Concatenate along the channel dimension
+        combined = torch.cat([op, ma], dim=1)
+        
+        return combined
+
+
+
+
+def tensordict_to_dict(td):
+    """Convert a TensorDict to a plain Python dict."""
+    result = {}
+    for key in td.keys():
+        value = td[key]
+        # if it's a tensor — convert to list
+        if hasattr(value, "tolist"):
+            result[key] = value.tolist()
+        else:
+            result[key] = value
+    return result
+
+
+
+
+def make_dataset(n):
+
+    dataset_folder = 'tmp_dataset/img_coords_dataset'
+    os.makedirs(dataset_folder, exist_ok=True)
+
+    for i in range(n):
+        # lag instanse
+        env, td, generator_params = make_instance(4,4,4,5,20)
+        # fa target fra instance 
+        td_target, assignments = apply_fcfs(env, td.copy(), generator_params)
+        # lage bilder og koordinater for instanse, der du kaller bilda noe spesifikt
+        assignments_coordinates = encode_image(td, 4, f'img_444_{i}', assignments)
+        # lagre json med: td, og optimale td koords
+        td.set('opt_assignment', td_target['ma_assignment'])
+        td.set('opt_actions', assignments)
+        plain_dict = tensordict_to_dict(td.copy())
+        with open(f"{dataset_folder}/td_444_{i}", "w") as f:
+            json.dump(plain_dict, f, indent=4)
+        # lagre coords i en json, med visse navn
+        torch.save(assignments_coordinates, f'{dataset_folder}/coords_444_{i}.pt')
+        
+        logging.info(f'Made instance {i}')
+
+
+
+
+
+
+
 env, td, generator_params = make_instance(4,4,4,5,20)
 
 td, assignments = apply_fcfs(env, td, generator_params)
@@ -279,6 +396,9 @@ print(assignments)
 # print(td["proc_times"])
 assignments_coordinates = encode_image(td, 4, 'procs', assignments)
 print(assignments_coordinates)
+
+
+make_dataset(5)
 
 
 
