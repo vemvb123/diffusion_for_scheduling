@@ -159,11 +159,11 @@ def save_instance():
 
 
 
-
-# weights = td["proc_times"][0]  # shape (2, 4)
 def encode_image(td: TensorDict, num_groups: int, output_prefix: str, assignments: list | None = None,):
-   # weights shape: (num_cnodes, num_anodes)
 
+    assignment_coordinates = [[0, 0, 0] for _ in range(len(assignments))]
+
+    # weights shape: (num_cnodes, num_anodes)
     weights = td['proc_times'][0]
     num_cnodes, num_anodes = weights.shape
 
@@ -187,10 +187,10 @@ def encode_image(td: TensorDict, num_groups: int, output_prefix: str, assignment
             anode_to_group[a_idx] = (g_idx, idx_in_group)
 
     markers = ['o', 's', '^', 'D', 'P', 'X', '*', 'v']
-    
+
     # For each Cnode → one image
     for i in range(num_cnodes):
-        cnode_name = f"{i}"
+        cnode_name = f"C{i}"
         cnode_weights = weights[i]
 
         pos = {}
@@ -204,22 +204,32 @@ def encode_image(td: TensorDict, num_groups: int, output_prefix: str, assignment
             # **distance proportional to weight**
             radius = scale * cnode_weights[j]
             theta = j * angle_step
+            x = radius * np.cos(theta)
+            y = radius * np.sin(theta)
             pos[an] = np.array([
-                radius * np.cos(theta),
-                radius * np.sin(theta)
+                x,
+                y 
             ])
-        
-        
-
+            print( (i,j) )
+            if (i, j) in assignments:
+                index = assignments.index( (i,j) )
+                min_val = -5 
+                max_val = 5
+                x_n = (x - min_val) / (max_val - min_val)
+                y_n = (y - min_val) / (max_val - min_val)
+                i_n = (i - 0) / (3 - 0)
+                assignment_coordinates[index] = [i_n, x_n, y_n]
+            # assignments_coordinates
+            # print(i, x, y)
 
         # Draw
         plt.figure(figsize=(8, 8))
 
         # Center Cnode
         plt.scatter(*pos[cnode_name], color="red", s=300)
-        plt.text(pos[cnode_name][0], pos[cnode_name][1],
-                 cnode_name, fontsize=14,
-                 ha="center", va="center")
+        #plt.text(pos[cnode_name][0], pos[cnode_name][1],
+        #         cnode_name, fontsize=14,
+        #         ha="center", va="center")
 
         # Draw Anodes and labels
         for j, an in enumerate(anodes):
@@ -229,56 +239,61 @@ def encode_image(td: TensorDict, num_groups: int, output_prefix: str, assignment
 
             # index within group just above
             y_offset = 0.025 * weights.max() * scale
-            plt.text(pos[an][0], pos[an][1] + y_offset,
-                     str(idx_in_group),
-                     fontsize=10, ha="center", va="bottom",
-                     color="green")
+            #plt.text(pos[an][0], pos[an][1] + y_offset,
+            #         str(idx_in_group),
+            #         fontsize=10, ha="center", va="bottom",
+            #         color="green")
 
             # show Anode name below
-            # plt.text(pos[an][0], pos[an][1] - y_offset, an, fontsize=8, ha="center", va="top")
+            #plt.text(pos[an][0], pos[an][1] - y_offset,
+            #         an, fontsize=8, ha="center", va="top")
 
             # weight just above the index label
-            # plt.text(pos[an][0], pos[an][1] + 2 * y_offset,
-            #          f"{cnode_weights[j]:.1f}",
-            #          fontsize=8, ha="center", va="bottom")
-            
+            #plt.text(pos[an][0], pos[an][1] + 2 * y_offset,
+            #         f"{cnode_weights[j]:.1f}",
+            #         fontsize=8, ha="center", va="bottom")
+
             # edge line
-            # xs = [pos[cnode_name][0], pos[an][0]]
-            # ys = [pos[cnode_name][1], pos[an][1]]
-            # plt.plot(xs, ys, color="gray", linewidth=1)
-
-
+            #xs = [pos[cnode_name][0], pos[an][0]]
+            #ys = [pos[cnode_name][1], pos[an][1]]
+            #plt.plot(xs, ys, color="gray", linewidth=1)
 
         plt.axis("off")
-        # plt.title(f"Cnode {cnode_name} and its Anodes (dist ∝ weight)")
+
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", bbox_inches="tight", dpi=300)  # save to in‑memory buffer
+        plt.savefig(buf, format="png", bbox_inches="tight", dpi=300)
+        plt.close()
+
+# 2) load buffer into PIL and convert to grayscale
         buf.seek(0)
+        img = Image.open(buf).convert("L")  # "L" = grayscale
 
-        img = Image.open(buf).convert("L")  # "L" mode = 8‑bit grayscale :contentReference[oaicite:1]{index=1}
-
+# 3) save grayscale image
         filename = f"{output_prefix}_{i}.png"
         img.save(filename)
 
-        plt.close()
-
-        print(f"Image saved: {filename}")
-
     if assignments:
-        return assignments_coordinates
-
-
+        return torch.tensor(assignment_coordinates)
 
 
 
 env, td, generator_params = make_instance(4,4,4,5,20)
-
-td, assignments = apply_fcfs(env, td, generator_params)
+td_fcfs, assignments = apply_fcfs(env, td.copy(), generator_params)
 print(assignments)
 
-# print(td["proc_times"])
+print(td["proc_times"])
 assignments_coordinates = encode_image(td, 4, 'procs', assignments)
-print(assignments_coordinates)
+
+
+
+
+if assignments_coordinates is not None:
+    print(assignments_coordinates)
+    print('')
+    print(assignments)
+
+print(assignments_coordinates[i])
+
 
 
 
