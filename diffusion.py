@@ -91,13 +91,15 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
         # coords: coordinates, shape (amt cords (3 for x,y,ma), w, b)
         # (imgs1, imgs2, imgs3, imgs4), (col1, col2, col3) = batch
         for batch_idx, (imgs, coords) in enumerate(loader):
-            imgs = imgs.to(device) # TODO: Burde vera i samma storrelse som gjer at man kan sende rett inn mellom kanalane
-            coords = coords.to(device) # TODO: Burde vera i samma storrelse som gjer at man kan sende rett inn mellom kanalane
-            
-            print(imgs.shape)
-            # Concatinating for input into channels
-            imgs_cat = torch.cat(imgs, dim=1)
+            imgs_cat = torch.cat(imgs, dim=1)  # shape: (B, 4, H, W)
+            coords_cat = torch.cat(coords, dim=1)  # shape: (B, 4, H, W)
+
+            imgs_cat = imgs_cat.to(device)
+            coords_cat = coords_cat.to(device)
+
             print(imgs_cat.shape)
+            # Concatinating for input into channels
+            print(coords_cat.shape)
             return
             # TODO send encodete bilder og koordinater inn i modell, fa tilbake koordinater
             # Predict noise
@@ -107,7 +109,6 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
 
 
 
-            coords_cat = torch.cat(coords, dim=1)
  
             # TODO diffuse koordinater .. Usikker på om skal stå batch_size, i annen kode er det adj.shape[0], som jeg tror bare er batch størrelse
             # Sample random timesteps
