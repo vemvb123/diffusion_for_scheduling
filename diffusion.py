@@ -53,19 +53,21 @@ target: ideal coordinates
 from utils import ImageCoordinateDataset, encode_image
 
 def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
-    # TODO finn ut av mengde parametere i en modell med ett lag, og hvordan bruke flere lag
 
-    # TODO: Import dataset
     dataset = ImageCoordinateDataset("tmp_dataset/img_coords_dataset")
     loader = DataLoader(dataset, batch_size=5, shuffle=True)
 
 
-    # TODO: Print size of dataset
     logging.info(f"Instances in dataset: { len(loader.dataset) }")
     logging.info(f"Instances in loader: { len(loader) }")
 
-    model_img = deepinv.models.DiffUNet(in_channels=1, out_channels=1, pretrained=None).to(device)
-    model_coords = UNet1DModel(in_channels=2, out_channels=1).to(device)
+    model_img = deepinv.models.DiffUNet(in_channels=4, out_channels=4, pretrained=None).to(device)
+    model_coords = UNet1DModel(in_channels=7, out_channels=3).to(device)
+    
+    # printing amount of parameters
+    trainable_params = sum(p.numel() for p in model_img.parameters() if p.requires_grad)
+    logging.info(f"Amount of trainable parameters: {trainable_params}")
+
 
     optimizer_img = torch.optim.Adam(model_img.parameters(), lr=lr)
     optimizer_coords = torch.optim.Adam(model_coords.parameters(), lr=lr)
@@ -94,29 +96,22 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
             imgs_cat = torch.cat(imgs, dim=1)  # shape: (B, 4, H, W)
             coords_cat = torch.cat(coords, dim=1)  # shape: (B, 4, H, W)
 
-            imgs_cat = imgs_cat.to(device)
-            coords_cat = coords_cat.to(device)
-
-            print(imgs_cat.shape)
             # Concatinating for input into channels
-            print(coords_cat.shape)
-            return
-            # TODO send encodete bilder og koordinater inn i modell, fa tilbake koordinater
-            # Predict noise
-            optimizer_img.zero_grad()
-            enc_imgs = model_img(imgs, t, type_t="timestep")
-            
+            imgs_cat = imgs_cat.to(device, dtype=torch.float32)
+            coords_cat = coords_cat.to(device, dtype=torch.float32)
+            coords_cat = coords_cat.squeeze(2)
 
-
-
- 
-            # TODO diffuse koordinater .. Usikker på om skal stå batch_size, i annen kode er det adj.shape[0], som jeg tror bare er batch størrelse
+            # TODO : Pass pa at alt av verdier er normaliser
             # Sample random timesteps
             t = torch.randint(0, timesteps, (batch_size,), device=device) 
+
+            # encode images
+            optimizer_img.zero_grad()
+            enc_imgs = model_img(imgs_cat, t, type_t="timestep")
+            logging.info("kjort modell")
+
             # Sample noise
-            # TODO for 1d diff burde vell det vera ei liste, altsa ikke sann 3 2d mat
-            # TODO verifiser at noise ikke bare inneholder 0
-            noise = torch.randn_like(torch.zeros(coords_cat)) # usikker på om skal væra den cat .. tror skal væra av samma shape som output, som jo blir cat
+            noise = torch.randn_like(coords_cat)
             # Apply forward diffusion process at timestep t
             noised_coords = (
                 sqrt_alphas_cumprod[t, None, None, None] * coords_cat
@@ -126,14 +121,21 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
 
             # TODO: flatut enkoda bilder
             # TODO skjekk om data ser riktig ut
-            encoded_flat = enc_imgs.flatten(start_dim=1)
+            encoded_flat = enc_imgs.flatten(start_dim=2)
 
             # TODO Concat encoda bilder, og koordinater
             # TODO skjekk at shape blir riktig
+            logging.info("catination")
+            logging.info(noise.shape)
+            logging.info(encoded_flat.shape)
+            return
             encimg_coords_cat = torch.cat([
                     noise,
-                    enc_imgs,
+                    encoded_flat,
                 ], dim=1)
+            
+            logging.info(encimg_coords_cat.shape)
+            return 
 
             # TODO send encodete bilder og koordinater inn i modell, fa tilbake koordinater
             # Predict noise
