@@ -60,9 +60,11 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
 
     logging.info(f"Instances in dataset: { len(loader.dataset) }")
     logging.info(f"Instances in loader: { len(loader) }")
-
-    model_img = deepinv.models.DiffUNet(in_channels=4, out_channels=4, pretrained=None).to(device)
-    model_coords = UNet1DModel(in_channels=7, out_channels=3).to(device)
+    
+    # TODO endre bilde rep, til ett eneste bilde, et bilde som kan encode hele problemet
+    # out channels, flere, samme som embedding dimensjon .. men burde kanskje endre bilderep, fordi nu sliter koordinatet
+    model_img = deepinv.models.DiffUNet(in_channels=1, out_channels=16, pretrained=None).to(device)
+    model_coords = UNet1DModel(in_channels=4, out_channels=3).to(device)
     
     # printing amount of parameters
     trainable_params = sum(p.numel() for p in model_img.parameters() if p.requires_grad)
@@ -93,7 +95,12 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
         # coords: coordinates, shape (amt cords (3 for x,y,ma), w, b)
         # (imgs1, imgs2, imgs3, imgs4), (col1, col2, col3) = batch
         for batch_idx, (imgs, coords) in enumerate(loader):
-            imgs_cat = torch.cat(imgs, dim=1)  # shape: (B, 4, H, W)
+            # TODO tester shapes, sa bruker bare fyrste bilde
+            logging.info('shait')
+            imgs_cat = imgs[0]
+            logging.info(imgs_cat.shape)
+            # imgs_cat = torch.cat(imgs, dim=1)  # shape: (B, 4, H, W)
+            # logging.info(imgs_cat)
             coords_cat = torch.cat(coords, dim=1)  # shape: (B, 4, H, W)
 
             # Concatinating for input into channels
@@ -104,11 +111,14 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
             # TODO : Pass pa at alt av verdier er normaliser
             # Sample random timesteps
             t = torch.randint(0, timesteps, (batch_size,), device=device) 
+            logging.info('t shape')
+            logging.info(t.shape)
 
             # encode images
             optimizer_img.zero_grad()
             enc_imgs = model_img(imgs_cat, t, type_t="timestep")
             logging.info("kjort modell")
+            logging.info(enc_imgs.shape)
 
             # Sample noise
             noise = torch.randn_like(coords_cat)
