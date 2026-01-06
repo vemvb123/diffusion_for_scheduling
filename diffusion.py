@@ -52,11 +52,179 @@ target: ideal coordinates
 '''
 from utils import ImageCoordinateDataset, encode_image
 
+
+
+'''
+Hvordan feature vectors...
+
+Prosseseringstid:
+    sender inn adj med prosseseringstidene (b, 1, w, h)
+    bruker output channels til å få flere dimensjoner (b, 256, w, h)
+    Flater, ved wh, så hele h inneholder alle nodene, og flater ut langs 256 som blir w
+    så shape blir (b, 1, 256, w x h)
+
+    ID tror jeg ikke er verdt noe, siden en ma eller op kan endre seg for hver instanse, så vil ikke en op eller ma bety det samme.
+    Men generelt for features, eks mengde precessors osv, kan man ha en adj matrise, så prossesere det likt som med prosseseringstid.
+
+'''
+
+def flatten_feature_vector(x):
+    x = x.reshape(x.size(0), x.size(1), -1)  # (b, f, w*h)
+    x = x.permute(0, 2, 1).unsqueeze(1)       # (b, 1, w*h, f)
+
+    return x
+
+
+def feature_diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
+    n_features = 256
+
+
+    # TODO loader datasett
+    dataset = ImageCoordinateDataset("tmp_dataset/img_coords_dataset")
+    loader = DataLoader(dataset, batch_size=5, shuffle=True)
+
+    
+    # TODO endre bilde rep, til ett eneste bilde, et bilde som kan encode hele problemet
+    # out channels, flere, samme som embedding dimensjon .. men burde kanskje endre bilderep, fordi nu sliter koordinatet
+    model_enc = deepinv.models.DiffUNet(in_channels=1, out_channels=n_features, pretrained=None).to(device)
+    model_coords = deepinv.models.DiffUNet(in_channels=n_features+1, out_channels=1, pretrained=None).to(device)
+    # model_coords = UNet1DModel(in_channels=n_features+1, out_channels=1).to(device)
+
+    # printing amount of parameters
+    trainable_params = sum(p.numel() for p in model_enc.parameters() if p.requires_grad)
+    logging.info(f"Amount of trainable parameters: {trainable_params}")
+
+
+    # optimizer_img = torch.optim.Adam(model_enc.parameters(), lr=lr)
+    # optimizer_coords = torch.optim.Adam(model_coords.parameters(), lr=lr)
+
+    optimizer = torch.optim.Adam(
+        list(model_enc.parameters()) + list(model_coords.parameters()),
+        lr=lr
+    )
+
+    mse = deepinv.loss.MSE()
+
+    beta_start = lr # antar at skal vere det samme som lr
+    # beta_start = 1e-3
+    beta_end = 0.02
+    timesteps = 1000
+
+    betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
+    alphas = 1.0 - betas
+    alphas_cumprod = torch.cumprod(alphas, dim=0)
+    sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
+    sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
+
+    all_losses = []
+    for epoch in range(num_epochs):
+        total_loss = 0.0
+        epoch_losses = []  # Store losses for this epoch
+        for batch_idx, (imgs, coords) in enumerate(loader):
+            
+            # TODO maskin
+            features = torch.rand(batch_size, 1, 20, 20)
+            allocations = torch.rand(batch_size, 1, 20, 20)
+
+
+            logging.info(f"f shape {features.shape}")
+            features = features.to(device, dtype=torch.float32)
+            allocations = allocations.to(device, dtype=torch.float32)
+
+            # Sample random timesteps
+            t = torch.randint(0, timesteps, (batch_size,), device=device) 
+            logging.info(f't shape {t.shape}')
+
+            # encode images
+            optimizer.zero_grad()
+            enc_f = model_enc(features, t, type_t="timestep")
+            logging.info(f"encoded f {enc_f.shape}")
+            
+            # Sample noise
+            noise = torch.randn_like(allocations)
+            # Apply forward diffusion process at timestep t
+            noised = (
+                sqrt_alphas_cumprod[t, None, None, None] * allocations
+                + sqrt_one_minus_alphas_cumprod[t, None, None, None] * noise
+            )
+
+
+            # flat ut features
+            # flat_f = flatten_feature_vector(enc_f)
+            # logging.info(f"flat f {flat_f.shape}")
+
+            # TODO Concat encoda bilder, og koordinater
+            # TODO skjekk at shape blir riktig
+            logging.info("catination")
+            logging.info(noise.shape)
+            logging.info(enc_f.shape)
+
+            model_input = torch.cat([
+                    noise,
+                    enc_f,
+                ], dim=1)
+            
+            logging.info(model_input.shape)
+
+            # TODO send encodete bilder og koordinater inn i modell, fa tilbake koordinater
+            # Predict noise
+            pred = model_coords(model_input, t, type_t="timestep")
+            logging.info(f"made prediction, {pred.shape}")
+
+            # TODO regn lossm og backpropagate, for 1d og 2d .. hvordan ta loss fra en modell, og gi til den andre..
+            loss = nn.MSELoss()(pred, noise)
+            loss.backward()
+            optimizer.step()
+            logging.info("one looped")
+            return
+
+
+            # Save the loss value
+            loss_value = loss.item()
+            total_loss += loss_value
+            epoch_losses.append(loss_value)
+
+        # Save all losses from this epoch
+        # Create directories if they don't exist
+        os.makedirs("./losses", exist_ok=True)
+        os.makedirs("./weights", exist_ok=True)
+        os.makedirs("./img/noised", exist_ok=True)
+        os.makedirs("./img/denoised", exist_ok=True)
+        os.makedirs("./img/original", exist_ok=True)
+
+        all_losses.extend(epoch_losses)
+
+        # Save the losses list after each epoch
+        np.save(f"./losses/losses_epoch_{epoch+1}.npy", np.array(all_losses))
+
+        avg_loss = total_loss / len(train_loader)
+        logging.info(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
+
+        torch.save(
+            model.state_dict(),
+            model_path,
+        )
+
+
+    logging.info("saved model")
+    torch.save(
+        model.state_dict(),
+        model_path,
+    )
+    return  model_path
+
+
+
+
+
 def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
+    logging.info("kjører diffusion")
+
 
     dataset = ImageCoordinateDataset("tmp_dataset/img_coords_dataset")
     loader = DataLoader(dataset, batch_size=5, shuffle=True)
 
+    
 
     logging.info(f"Instances in dataset: { len(loader.dataset) }")
     logging.info(f"Instances in loader: { len(loader) }")
@@ -123,8 +291,8 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
             # Sample noise
             noise = torch.randn_like(coords_cat)
             # Apply forward diffusion process at timestep t
-            noised_coords = (
-                sqrt_alphas_cumprod[t, None, None, None] * coords_cat
+            noised = (
+                sqrt_alphas_cumprod[t, None, None, None] * allocations
                 + sqrt_one_minus_alphas_cumprod[t, None, None, None] * noise
             )
 
@@ -136,23 +304,24 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
             # TODO Concat encoda bilder, og koordinater
             # TODO skjekk at shape blir riktig
             logging.info("catination")
-            logging.info(noise.shape)
+            logging.info(noised.shape)
             logging.info(encoded_flat.shape)
-            return
-            encimg_coords_cat = torch.cat([
-                    noise,
+
+
+            model_input = torch.cat([
+                    noised,
                     encoded_flat,
                 ], dim=1)
             
-            logging.info(encimg_coords_cat.shape)
+            logging.info(model_input.shape)
             return 
 
             # TODO send encodete bilder og koordinater inn i modell, fa tilbake koordinater
             # Predict noise
-            pred_coords_noise = model_coords(encimg_coords_cat, t, type_t="timestep")
+            pred = model_coords(pred, t, type_t="timestep")
             
             # TODO regn lossm og backpropagate, for 1d og 2d .. hvordan ta loss fra en modell, og gi til den andre..
-            loss = nn.MSELoss()(pred_coords_noise, noise)
+            loss = nn.MSELoss()(pred, noise)
             loss.backward()
             optimizer_coords.step()
             optimizer_img.step()
@@ -199,8 +368,7 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
 
 
 print("running")
-diffusion(1, "..", 5, 2)
-
+feature_diffusion(1, "..", 5, 2)
 
 
 
