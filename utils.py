@@ -109,6 +109,32 @@ def map_index_to_action(r_i, op_i, generator_params):
     return (op_i + 1) + (r_i // job_size) * ma_size
 
 
+import gc
+from rl4co.envs import JSSPEnv
+from rl4co.models.zoo.l2d.model import L2DPPOModel
+from rl4co.models.zoo.l2d.policy import L2DPolicy4PPO
+from torch.utils.data import DataLoader
+import json
+import os
+
+def make_target(td):
+    lr_d = 1e-4
+    CHECKPOINT_PATH = f'models/rl4co_model_{lr_d}.ckpt'
+
+    model = L2DModel.load_from_checkpoint(CHECKPOINT_PATH)
+    model = model.to("cpu")
+
+    with torch.inference_mode():
+        out = model(td.clone(),
+                    decode_type="multistart_sampling",
+                    num_starts=100,
+                    select_best=True,
+                    return_actions=True)
+
+    actions = out["actions"]   
+    return td, actions
+
+
 
 # HERSAN
 def apply_fcfs(env: FJSPEnv, td: TensorDict, generator_params: Dict
@@ -159,182 +185,7 @@ def save_instance():
 
 
 
-def encode_image(td: TensorDict, num_groups: int, output_prefix: str, img_size: int,assignments: list | None = None,):
 
-    assignment_coordinates = [[0, 0, 0] for _ in range(len(assignments))]
-
-    # weights shape: (num_cnodes, num_anodes)
-    weights = td['proc_times'][0]
-    num_cnodes, num_anodes = weights.shape
-
-    # Anode names
-    anodes = [f"A{j}" for j in range(num_anodes)]
-
-    # ----- Compute contiguous groups -----
-    base = num_anodes // num_groups
-    extra = num_anodes % num_groups
-    group_ranges = []
-    start = 0
-    for g in range(num_groups):
-        size = base + (1 if g < extra else 0)
-        group_ranges.append((start, start + size))
-        start += size
-
-    # Map anode index -> (group_index, index_in_group)
-    anode_to_group = {}
-    for g_idx, (s, e) in enumerate(group_ranges):
-        for idx_in_group, a_idx in enumerate(range(s, e)):
-            anode_to_group[a_idx] = (g_idx, idx_in_group)
-
-    markers = ['o', 's', '^', 'D', 'P', 'X', '*', 'v']
-
-    # For each Cnode → one image
-    for i in range(num_cnodes):
-        cnode_name = f"C{i}"
-        cnode_weights = weights[i]
-
-        pos = {}
-        # Center Cnode
-        pos[cnode_name] = np.array([0.0, 0.0])
-
-        # Place Anodes
-        angle_step = 2 * np.pi / num_anodes
-        scale = 0.25  # scale factor so plot doesn’t blow up
-        for j, an in enumerate(anodes):
-            # **distance proportional to weight**
-            radius = scale * cnode_weights[j]
-            theta = j * angle_step
-            x = radius * np.cos(theta)
-            y = radius * np.sin(theta)
-            pos[an] = np.array([
-                x,
-                y 
-            ])
-            # print( (i,j) )
-            if (i, j) in assignments:
-                index = assignments.index( (i,j) )
-                min_val = -5 
-                max_val = 5
-                x_n = (x - min_val) / (max_val - min_val)
-                y_n = (y - min_val) / (max_val - min_val)
-                i_n = (i - 0) / (3 - 0)
-                assignment_coordinates[index] = [i_n, x_n, y_n]
-            # assignments_coordinates
-            # print(i, x, y)
-
-        # Draw
-        plt.figure(figsize=(8, 8))
-
-        # Center Cnode
-        plt.scatter(*pos[cnode_name], color="red", s=300)
-        #plt.text(pos[cnode_name][0], pos[cnode_name][1],
-        #         cnode_name, fontsize=14,
-        #         ha="center", va="center")
-
-        # Draw Anodes and labels
-        for j, an in enumerate(anodes):
-            g_idx, idx_in_group = anode_to_group[j]
-            marker = markers[g_idx % len(markers)]
-            plt.scatter(*pos[an], marker=marker, color="blue", s=150)
-
-            # index within group just above
-            y_offset = 0.025 * weights.max() * scale
-            #plt.text(pos[an][0], pos[an][1] + y_offset,
-            #         str(idx_in_group),
-            #         fontsize=10, ha="center", va="bottom",
-            #         color="green")
-
-            # show Anode name below
-            #plt.text(pos[an][0], pos[an][1] - y_offset,
-            #         an, fontsize=8, ha="center", va="top")
-
-            # weight just above the index label
-            #plt.text(pos[an][0], pos[an][1] + 2 * y_offset,
-            #         f"{cnode_weights[j]:.1f}",
-            #         fontsize=8, ha="center", va="bottom")
-
-            # edge line
-            #xs = [pos[cnode_name][0], pos[an][0]]
-            #ys = [pos[cnode_name][1], pos[an][1]]
-            #plt.plot(xs, ys, color="gray", linewidth=1)
-
-        plt.axis("off")
-
-        buf = io.BytesIO()
-        plt.savefig(buf, format="png", bbox_inches="tight", dpi=300)
-        plt.close()
-
-# 2) load buffer into PIL and convert to grayscale
-        buf.seek(0)
-        img = Image.open(buf).convert("L")  # "L" = grayscale
-        img = img.resize((img_size, img_size), Image.BILINEAR)
-
-# 3) save grayscale image
-        filename = f"{output_prefix}_{i}.png"
-        img.save(filename)
-
-    if assignments:
-        return torch.tensor(assignment_coordinates)
-
-
-
-
-from torchvision.io import read_image
-
-class ImageCoordinateDataset(Dataset):
-    def __init__(self, root_dir, transform=None):
-        self.root_dir = root_dir
-        self.transform = transform
-
-        # Find all *coords*.pt files — one per instance
-        self.instances = sorted([
-            f for f in os.listdir(root_dir)
-            if f.startswith("coords_") and f.endswith(".pt")
-        ])
-
-    def __len__(self):
-        return len(self.instances)
-
-    
-
-    def __getitem__(self, idx):
-        # Get the coords file name, e.g., coords_444_3.pt
-        coords_filename = self.instances[idx]
-        coords_path = os.path.join(self.root_dir, coords_filename)
-
-        # Load coordinates tensor
-        coords = torch.load(coords_path)  # e.g., shape [16, 3]
-
-        # Split into columns: (col1, col2, col3)
-
-        col1 = coords[:, 0].unsqueeze(1)  # shape: (num_points, 1)
-        col2 = coords[:, 1].unsqueeze(1)
-        col3 = coords[:, 2].unsqueeze(1)
-        # col1 = coords[:, 0]
-        # col2 = coords[:, 1]
-        # col3 = coords[:, 2]
-
-        # Extract the instance index number from the file name
-        # e.g., "coords_444_3.pt" → "3"
-        instance_idx = coords_filename.split("_")[-1].replace(".pt", "")
-
-        # Load the 4 associated image files
-        img_tensors = []
-        for i in range(4):
-            image_name = f"img_444_{instance_idx}_{i}.png"
-            image_path = os.path.join(self.root_dir, image_name)
-
-            image = read_image(image_path)  # Returns (C, H, W) — C=1 if grayscale
-            if self.transform:
-                image = self.transform(image)
-
-            img_tensors.append(image)
-
-        # Pack images into a tuple
-        images = tuple(img_tensors)
-
-        # Return as ((img1, img2, img3, img4), (col1, col2, col3))
-        return images, (col1, col2, col3)
 
 
 def tensordict_to_dict(td):
@@ -359,20 +210,14 @@ def make_dataset(n):
 
     for i in range(n):
         # lag instanse
-        env, td, generator_params = make_instance(4,4,4,5,20)
+        env, td, generator_params = make_instance(4,4,4,5,50)
         # fa target fra instance 
-        td_target, assignments = apply_fcfs(env, td.copy(), generator_params)
-        # lage bilder og koordinater for instanse, der du kaller bilda noe spesifikt
-        assignments_coordinates = encode_image(td, 4, f'{dataset_folder}/img_444_{i}', 128, assignments)
-
+        td_target, actions = make_target(td.copy())
         # lagre json med: td, og optimale td koords
         td.set('opt_assignment', td_target['ma_assignment'])
-        td.set('opt_actions', torch.tensor(assignments).unsqueeze(0))
-        plain_dict = tensordict_to_dict(td.copy())
-        with open(f"{dataset_folder}/td_444_{i}.json", "w") as f:
-            json.dump(plain_dict, f, indent=4)
+        td.set('opt_actions', torch.tensor(actions))
         # lagre coords i en json, med visse navn
-        torch.save(assignments_coordinates.unsqueeze(0), f'{dataset_folder}/coords_444_{i}.pt')
+        torch.save(td.copy(), f'{dataset_folder}/coords_444_{i}.pt')
         
         logging.info(f'Made instance {i}')
 
@@ -380,62 +225,5 @@ def make_dataset(n):
 
 
 
-
-'''
-
-env, td, generator_params = make_instance(4,4,4,5,20)
-td_fcfs, assignments = apply_fcfs(env, td.copy(), generator_params)
-print(assignments)
-
-
-
-
-print(td["proc_times"])
-assignments_coordinates = encode_image(td, 4, 'procs', 64, assignments)
-print(assignments_coordinates)
-
-'''
-# make_dataset(5)
-
-dataset = ImageCoordinateDataset("tmp_dataset/img_coords_dataset")
-loader = DataLoader(dataset, batch_size=3, shuffle=True)
-
-for batch in loader:
-    (imgs1, imgs2, imgs3, imgs4), (col1, col2, col3) = batch
-
-    print("col1 shape:", col1.shape)
-    print("img1 shape:", imgs1.shape)
-    print(col1)
-    break
-
-
-# (img1, img2, img3, img4), (col1, col2, col3) = dataset[3]
-
-# print(img1.shape)   # e.g., (1, H, W)
-# print(col1.shape)   # e.g., (16,)
-
-
-
-
-"""
-
-
-I have four points, call these Cnodes.
-These four points should be in the center, with a bit of distance between them.
-Then I have this matrix:
-
-    proc_times
-
-each column annotes a Cnode's relation to the Anodes (nodes of another type).
-There is a row for each Anode. 
-The number for some Cnode-Anode, represents the weight between the Anode and the Cnode.
-
-The Cnodes are plotted in the center.
-We encode the weight as distance between Anodes and Cnodes.
-Now, make code for plotting the Anodes and Cnodes. 
-Show product as an image
-
-
-"""
 
 
