@@ -119,8 +119,7 @@ import os
 
 def make_target(td):
     lr_d = 1e-4
-    CHECKPOINT_PATH = f'models/rl4co_model_{lr_d}.ckpt'
-
+    CHECKPOINT_PATH = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_{lr_d}.ckpt"
     model = L2DModel.load_from_checkpoint(CHECKPOINT_PATH)
     model = model.to("cpu")
 
@@ -205,7 +204,7 @@ def tensordict_to_dict(td):
 
 def make_dataset(n):
 
-    dataset_folder = 'tmp_dataset/img_coords_dataset'
+    dataset_folder = 'data/with_targets'
     os.makedirs(dataset_folder, exist_ok=True)
 
     for i in range(n):
@@ -222,7 +221,7 @@ def make_dataset(n):
         logging.info(f'Made instance {i}')
 
 
-
+make_dataset(100000)
 
 
 

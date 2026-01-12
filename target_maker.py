@@ -86,3 +86,4 @@ def train_model():
         print(f"saved model for {model_name}")
 
 
+train_model()
