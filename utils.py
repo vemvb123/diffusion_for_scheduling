@@ -117,7 +117,86 @@ from torch.utils.data import DataLoader
 import json
 import os
 
-def make_target(td):
+
+# 1: no order
+# 2: ordered
+# 3: ordered by ma
+def schedule_actions(
+        actions, td_unscheduled, env, ordered: int = 1
+):
+    """
+    ordered == 1: global normalized order (i / n_actions)
+    ordered == 2: per-row normalized order
+    ordered == 3: (reserved / undefined – keep same as 1 for now)
+    """
+
+    if ordered not in (1, 2, 3):
+        raise ValueError(f"ordered {ordered} is not supported, must be either 1, 2 or 3")
+
+    n_actions = len(actions)
+
+    td_to_actions = td_unscheduled.copy()
+    prev_adj = td_to_actions["ma_assignment"].clone()
+
+    # this stores the sequence / order matrix
+    assignment_adj = torch.zeros_like(prev_adj, dtype=torch.float)
+
+    # only used for ordered == 2
+    # count how many assignments so far per row
+    per_row_counts = torch.zeros(prev_adj.size(0), dtype=torch.int)
+
+    for i, action in enumerate(actions[0]):
+
+        td_to_actions["action"] = torch.tensor([action])
+        td_to_actions = env.step(td_to_actions)["next"]
+
+        new_adj = td_to_actions["ma_assignment"]
+
+        diff = (new_adj == 1) & (prev_adj == 0)
+
+        if diff.any():
+
+            if ordered == 1 or ordered == 3:
+                # global normalized order
+                normalized_order = i / float(n_actions)
+                assignment_adj[diff] = normalized_order
+
+            elif ordered == 2:
+                # for each row, assign per-row sequential rank
+                rows, cols = diff.nonzero(as_tuple=True)
+
+                for r, c in zip(rows.tolist(), cols.tolist()):
+                    # increment this row's counter
+                    per_row_counts[r] += 1
+
+                    # total possible edges for that row
+                    # (could also compute it if known in advance)
+                    # But here we only know relative rank, not full normalizer
+                    # So store raw sequence index for now
+                    assignment_adj[r, c] = per_row_counts[r]
+
+        prev_adj = new_adj.clone()
+
+    if ordered == 2:
+        # now normalize per row
+        # for each row r, divide all nonzero entries
+        # by the maximum count
+        for r in range(assignment_adj.size(0)):
+            row_vals = assignment_adj[r]
+            nonzero = row_vals.nonzero()
+            if nonzero.numel() > 0:
+                max_val = row_vals.max()
+                if max_val > 0:
+                    assignment_adj[r] = assignment_adj[r] / float(max_val)
+
+    td_to_actions["ma_assignment"] = assignment_adj
+    return td_to_actions
+
+
+
+
+
+def make_target(env, td: TensorDict, ordered: bool):
     lr_d = 1e-4
     CHECKPOINT_PATH = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_{lr_d}.ckpt"
     model = L2DModel.load_from_checkpoint(CHECKPOINT_PATH)
@@ -130,8 +209,9 @@ def make_target(td):
                     select_best=True,
                     return_actions=True)
     # ein kommentar
-    actions = out["actions"]   
-    return td, actions
+    actions = out["actions"]
+    td_scheduled = schedule_actions(actions, td.copy(), env, 3)
+    return td_scheduled, actions
 
 
 
@@ -211,7 +291,7 @@ def make_dataset(n):
         # lag instanse
         env, td, generator_params = make_instance(4,4,4,5,50)
         # fa target fra instance 
-        td_target, actions = make_target(td.copy())
+        td_target, actions = make_target(env, td.copy(), False)
         # lagre json med: td, og optimale td koords
         td.set('opt_assignment', td_target['ma_assignment'])
         td.set('opt_actions', torch.tensor(actions))
@@ -249,14 +329,19 @@ def expand_matrix(x: torch.Tensor, shape_to_make: tuple[int, int], max_and_min: 
 
 
 
-def get_feature_adj_from_instance(td: TensorDict) -> tuple[
+def get_feature_adj_from_instance(td: TensorDict, env, ordered: int = 3) -> tuple[
         torch.Tensor, # target assignments
         torch.Tensor, # proc times matrix
         torch.Tensor, # jobid matrix
         torch.Tensor # pos in job matrix
         ]:
     # bytt senere ut med assignments fra target
-    assignments = td['ma_assignment']
+    assignments = None
+    if ordered:
+        td_scheduled = schedule_actions(td['opt_actions'], env, td.copy(), ordered)
+        assignments = td_scheduled['ma_assignment']
+    else:
+        assignments = td['opt_assignment']
     assignments = expand_matrix(assignments, (20, 20), (0, 1))
 
     proc_times = td['proc_times']
@@ -314,9 +399,12 @@ from torch.utils.data import Dataset
 
 
 class Dataset_RL4CO(Dataset):
-    def __init__(self, folder, transform=None):
+    def __init__(self, folder, ordered: bool, generator_params, transform=None):
         self.folder = folder
         self.transform = transform
+        self.ordered = ordered
+        self.generator_params = generator_params
+        self.env = FJSPEnv(generator_params=self.generator_params)
 
         self.files = [
             os.path.join(folder, f)
@@ -333,11 +421,30 @@ class Dataset_RL4CO(Dataset):
 
         # load the TensorDict
         td = torch.load(file_path)
-
-        assignments, proc_times, job_id, pos_job = get_feature_adj_from_instance(td)
-
+        target_assignments, proc_times, job_id, pos_job = get_feature_adj_from_instance(td, self.env, self.ordered)
 
         if self.transform:
             tensordict = self.transform(td)
 
-        return assignments, proc_times, job_id, pos_job
+        return target_assignments, proc_times, job_id, pos_job
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
