@@ -279,7 +279,7 @@ def get_feature_adj_from_instance(td: TensorDict) -> tuple[
 
     return assignments, proc_times, job_id, pos_job
 
-
+'''
 jobs = 4
 ma = 4
 ops_per_job = 4
@@ -296,6 +296,8 @@ generator_params = {
     "min_eligible_ma_per_op": ma,
     "max_eligible_ma_per_op": ma,
 }
+
+
 env = FJSPEnv(
     generator_params=generator_params,
     _torchrl_mode=True,
@@ -304,5 +306,38 @@ env = FJSPEnv(
 td = env.reset(batch_size=[1])
 
 get_feature_adj_from_instance(td)
+'''
+
+import os
+import torch
+from torch.utils.data import Dataset
 
 
+class Dataset_RL4CO(Dataset):
+    def __init__(self, folder, transform=None):
+        self.folder = folder
+        self.transform = transform
+
+        self.files = [
+            os.path.join(folder, f)
+            for f in os.listdir(folder)
+            if f.endswith(".pt")
+        ]
+        self.files.sort()  # optional but often helpful
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        file_path = self.files[idx]
+
+        # load the TensorDict
+        td = torch.load(file_path)
+
+        assignments, proc_times, job_id, pos_job = get_feature_adj_from_instance(td)
+
+
+        if self.transform:
+            tensordict = self.transform(td)
+
+        return assignments, proc_times, job_id, pos_job
