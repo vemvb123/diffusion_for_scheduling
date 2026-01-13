@@ -50,7 +50,7 @@ dataset has: image of machine relations (1 for each machinbe)
 model outputs: set of coordinates, to one of the coordinates for an operation, where each coordinate in sequence gives the assignment order
 target: ideal coordinates
 '''
-from utils import ImageCoordinateDataset, encode_image
+from utils import Dataset_RL4CO
 
 
 
@@ -75,19 +75,18 @@ def flatten_feature_vector(x):
     return x
 
 
-def feature_diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
-    n_features = 256
+def feature_diffusion(n_base_features: int, n_embed_features: int, dataset_path: str, op_n, model_path_enc: str, model_path_adj: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
 
 
     # TODO loader datasett
-    dataset = ImageCoordinateDataset("tmp_dataset/img_coords_dataset")
-    loader = DataLoader(dataset, batch_size=5, shuffle=True)
+    dataset = Dataset_RL4CO(dataset_path)
+    loader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     
     # TODO endre bilde rep, til ett eneste bilde, et bilde som kan encode hele problemet
     # out channels, flere, samme som embedding dimensjon .. men burde kanskje endre bilderep, fordi nu sliter koordinatet
-    model_enc = deepinv.models.DiffUNet(in_channels=1, out_channels=n_features, pretrained=None).to(device)
-    model_coords = deepinv.models.DiffUNet(in_channels=n_features+1, out_channels=1, pretrained=None).to(device)
+    model_enc = deepinv.models.DiffUNet(in_channels=n_base_features, out_channels=n_embed_features, pretrained=None).to(device)
+    model_adj = deepinv.models.DiffUNet(in_channels=n_embed_features+1, out_channels=1, pretrained=None).to(device)
     # model_coords = UNet1DModel(in_channels=n_features+1, out_channels=1).to(device)
 
     # printing amount of parameters
@@ -99,7 +98,7 @@ def feature_diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: i
     # optimizer_coords = torch.optim.Adam(model_coords.parameters(), lr=lr)
 
     optimizer = torch.optim.Adam(
-        list(model_enc.parameters()) + list(model_coords.parameters()),
+        list(model_enc.parameters()) + list(model_adj.parameters()),
         lr=lr
     )
 
@@ -120,30 +119,27 @@ def feature_diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: i
     for epoch in range(num_epochs):
         total_loss = 0.0
         epoch_losses = []  # Store losses for this epoch
-        for batch_idx, (imgs, coords) in enumerate(loader):
+        for batch_idx, (target_assignments, proc_times, job_id, pos_job) in enumerate(loader):
             
             # hva flere features? -- jobb.. gitt av hvor det er i matrise, men man veit jo fortstt ikke hvor mange jobber, så ok 
             # kan da også gi mengde etterkommere og førkommere.... normaliser.. når instanser har forskjellig mengde jobber, burde man ta ut i fra instanse med flest og minst
             # hvis noen jobber kune er for noen maskiner, kan man ha feature for det...
             # så ha disse: proc tid, innenfor rekkefølge i en jobb, hvilken jobb (normalisert fra instanse med flest til minst) ... når maskiner varierer, inkluderer jeg det også
 
-            # ops for cnn... burde kanskje alltid ta fra samme, eks samme jobb, eller over alle jobber... kan se i kode for tsp hvordan gjort det... kanskje kan bruke annet nett, bruker for nå unet 
+            # ops for cnn... burde kanskje alltid ta fra samme, eks samme jobb, eller over alle jobber... kan se i kode for tsp hvordan gjort det... kanskje kan bruke annet nett, bruker for nå unet
 
-            proc_times = torch.rand(batch_size, 1, 20, 20)
-            pos_in_job = torch.rand(batch_size, 1, 20, 20) 
-            in_job = torch.rand(batch_size, 1, 20, 20) 
             features = torch.cat([
                 proc_times,
-                pos_in_job,
-                in_job,
+                job_id,
+                pos_job,
             ], dim=1)
 
-            allocations = torch.rand(batch_size, 1, 20, 20)
+            assignments = torch.rand(batch_size, 1, 20, 20)
 
 
             logging.info(f"f shape {features.shape}")
             features = features.to(device, dtype=torch.float32)
-            allocations = allocations.to(device, dtype=torch.float32)
+            assignments = assignments.to(device, dtype=torch.float32)
 
             # Sample random timesteps
             t = torch.randint(0, timesteps, (batch_size,), device=device) 
@@ -155,10 +151,10 @@ def feature_diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: i
             logging.info(f"encoded f {enc_f.shape}")
             
             # Sample noise
-            noise = torch.randn_like(allocations)
+            noise = torch.randn_like(assignments)
             # Apply forward diffusion process at timestep t
             noised = (
-                sqrt_alphas_cumprod[t, None, None, None] * allocations
+                sqrt_alphas_cumprod[t, None, None, None] * assignments
                 + sqrt_one_minus_alphas_cumprod[t, None, None, None] * noise
             )
 
@@ -182,7 +178,7 @@ def feature_diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: i
 
             # TODO send encodete bilder og koordinater inn i modell, fa tilbake koordinater
             # Predict noise
-            pred = model_coords(model_input, t, type_t="timestep")
+            pred = model_adj(model_input, t, type_t="timestep")
             logging.info(f"made prediction, {pred.shape}")
 
             # TODO regn lossm og backpropagate, for 1d og 2d .. hvordan ta loss fra en modell, og gi til den andre..
@@ -190,7 +186,6 @@ def feature_diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: i
             loss.backward()
             optimizer.step()
             logging.info("one looped")
-            return
 
 
             # Save the loss value
@@ -211,21 +206,30 @@ def feature_diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: i
         # Save the losses list after each epoch
         np.save(f"./losses/losses_epoch_{epoch+1}.npy", np.array(all_losses))
 
-        avg_loss = total_loss / len(train_loader)
+        avg_loss = total_loss / len(loader)
         logging.info(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
 
         torch.save(
-            model.state_dict(),
-            model_path,
+            model_enc.state_dict(),
+            model_enc,
+        )
+        torch.save(
+            model_adj.state_dict(),
+            model_adj,
         )
 
 
     logging.info("saved model")
     torch.save(
-        model.state_dict(),
-        model_path,
+        model_enc.state_dict(),
+        model_enc,
     )
-    return  model_path
+    torch.save(
+        model_adj.state_dict(),
+        model_adj,
+    )
+
+    return model_enc, model_adj
 
 
 
@@ -235,8 +239,8 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
     logging.info("kjører diffusion")
 
 
-    dataset = ImageCoordinateDataset("tmp_dataset/img_coords_dataset")
-    loader = DataLoader(dataset, batch_size=5, shuffle=True)
+    dataset = Dataset_RL4CO("tmp_dataset/img_coords_dataset")
+    loader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     
 
