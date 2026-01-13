@@ -122,8 +122,22 @@ def feature_diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: i
         epoch_losses = []  # Store losses for this epoch
         for batch_idx, (imgs, coords) in enumerate(loader):
             
-            # TODO maskin
-            features = torch.rand(batch_size, 1, 20, 20)
+            # hva flere features? -- jobb.. gitt av hvor det er i matrise, men man veit jo fortstt ikke hvor mange jobber, så ok 
+            # kan da også gi mengde etterkommere og førkommere.... normaliser.. når instanser har forskjellig mengde jobber, burde man ta ut i fra instanse med flest og minst
+            # hvis noen jobber kune er for noen maskiner, kan man ha feature for det...
+            # så ha disse: proc tid, innenfor rekkefølge i en jobb, hvilken jobb (normalisert fra instanse med flest til minst) ... når maskiner varierer, inkluderer jeg det også
+
+            # ops for cnn... burde kanskje alltid ta fra samme, eks samme jobb, eller over alle jobber... kan se i kode for tsp hvordan gjort det... kanskje kan bruke annet nett, bruker for nå unet 
+
+            proc_times = torch.rand(batch_size, 1, 20, 20)
+            pos_in_job = torch.rand(batch_size, 1, 20, 20) 
+            in_job = torch.rand(batch_size, 1, 20, 20) 
+            features = torch.cat([
+                proc_times,
+                pos_in_job,
+                in_job,
+            ], dim=1)
+
             allocations = torch.rand(batch_size, 1, 20, 20)
 
 
@@ -160,7 +174,7 @@ def feature_diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: i
             logging.info(enc_f.shape)
 
             model_input = torch.cat([
-                    noise,
+                    noised,
                     enc_f,
                 ], dim=1)
             

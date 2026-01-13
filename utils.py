@@ -220,13 +220,12 @@ def make_dataset(n):
         
         logging.info(f'Made instance {i}')
 
-
 # returnerer matriser i riktig shape, som inneholder featursene
 # ting utenfor adj blir maskert med 1
 # nar loss kalkuleres, fjernes ting utenfor rammen for instanse
 # lager adj matriser for features som ikke gis av instanse ogsa, ex jobb tilhorer osv..
 #..
-# nar lager datasett, loader td fra fil 
+# nar lager datasett, loader td fra fil
 # sa sender td inn til denne,
 # ma ogsa returneree target
 # normaliserer
@@ -269,6 +268,7 @@ def get_feature_adj_from_instance(td: TensorDict) -> tuple[
     job_id = td['ops_job_map']
     job_id = job_id.repeat(16, 1).unsqueeze(0)  # now shape is (1, 16, 16)
     job_id = expand_matrix(job_id, (20,20), (0,n_jobs))
+
 
     # pos in job matrix
     pos_job = torch.tensor([0, 1, 2, 3], dtype=torch.float)
