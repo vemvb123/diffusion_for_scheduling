@@ -69,7 +69,8 @@ Prosseseringstid:
 '''
 
 
-def feature_diffusion(ordered: bool, generator_params, n_base_features: int, n_embed_features: int, dataset_path: str, op_n, model_path_enc: str, model_path_adj: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
+def feature_diffusion(ordered: bool, generator_params, n_base_features: int, n_embed_features: int, dataset_path: str,
+                      model_path_enc: str, model_path_adj: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
 
 
 
@@ -209,7 +210,7 @@ def feature_diffusion(ordered: bool, generator_params, n_base_features: int, n_e
     return model_enc, model_adj
 
 
-def adj_diffusion(ordered: bool, generator_params, n_base_features: int, n_embed_features: int, dataset_path: str, op_n, model_path_enc: str, model_path_adj: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
+def adj_diffusion(ordered: bool, generator_params, n_base_features: int, n_embed_features: int, dataset_path: str, model_path_enc: str, model_path_adj: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
 
 
     dataset = Dataset_RL4CO(dataset_path, ordered, generator_params)

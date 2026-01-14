@@ -429,17 +429,50 @@ class Dataset_RL4CO(Dataset):
         return target_assignments, proc_times, job_id, pos_job
 
 
+from diffusion import feature_diffusion, adj_diffusion
 
 
+model_to_train = 1
+# 1 features
+# 2 features ordered
+# 3 features ordered ma
+# 4 adj
+# 5 adj ordered
+# 6 adj ordered ma
+def train_models(model_to_train: int):
+    jobs = 4
+    ma = 4
+    ops_per_job = 4
+    min_proc = 5
+    max_proc = 50
+    generator_params = {
+        "num_jobs": jobs,
+        "num_machines": ma,
+        "min_ops_per_job": ops_per_job,
+        "max_ops_per_job": ops_per_job,
+        "min_processing_time": min_proc,
+        "max_processing_time": max_proc,
+        "min_eligible_ma_per_op": ma,
+        "max_eligible_ma_per_op": ma,
+    }
 
+    dataset_path = 'path'
+    model_path_enc = 'path'
+    model_path_adj = 'path'
 
+    if model_to_train == 1:
+        feature_diffusion(3, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
+    elif model_to_train == 2:
+        feature_diffusion(1, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
+    elif model_to_train == 3:
+        feature_diffusion(2, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
 
-
-
-
-
-
-
+    elif model_to_train == 4:
+        adj_diffusion(3, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
+    elif model_to_train == 5:
+        adj_diffusion(1, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
+    elif model_to_train == 6:
+        adj_diffusion(2, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
 
 
 
