@@ -135,6 +135,37 @@ def make_target(td):
 
 
 
+
+
+def schedule_actions(env, actions, td):
+    for action in actions[0]:
+        td['action'] = torch.tensor([action])
+        td = env.step(td)['next']
+    return td
+
+def make_target(env, td, in_ssh):
+    lr_d = 1e-4
+
+    CHECKPOINT_PATH = None
+    if in_ssh: CHECKPOINT_PATH = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_{lr_d}.ckpt"
+    else: CHECKPOINT_PATH = f'/home/vemund/Dokumenter/koding/d_m/rl4co_ex/rl4co_model_0.0001.ckpt'
+    model = L2DModel.load_from_checkpoint(CHECKPOINT_PATH)
+    model = model.to("cpu")
+
+    with torch.inference_mode():
+        out = model(td.clone(),
+                    decode_type="multistart_sampling",
+                    num_starts=100,
+                    select_best=True,
+                    return_actions=True)
+    
+    actions = out["actions"]
+    td_scheduled = schedule_actions(env, actions, td.copy())
+    return td_scheduled, actions
+
+
+
+
 # HERSAN
 def apply_fcfs(env: FJSPEnv, td: TensorDict, generator_params: Dict
                ) -> Tuple[TensorDict, List]:
@@ -211,7 +242,7 @@ def make_dataset(n):
         # lag instanse
         env, td, generator_params = make_instance(4,4,4,5,50)
         # fa target fra instance 
-        td_target, actions = make_target(td.copy())
+        td_target, actions = make_target(env, td.copy(), True)
         # lagre json med: td, og optimale td koords
         td.set('opt_assignment', td_target['ma_assignment'])
         td.set('opt_actions', torch.tensor(actions))
