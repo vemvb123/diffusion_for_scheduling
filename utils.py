@@ -492,7 +492,14 @@ class Dataset_RL4CO(Dataset):
 
 
 from diffusion import feature_diffusion, adj_diffusion
+import sys
 
+model_to_train = None
+if len(sys.argv) > 1:
+    model_to_train = int(sys.argv[1])
+    print("model_to_train:", model_to_train)
+else:
+    print("Please provide a training number!")
 
 model_to_train = 1
 # 1 features

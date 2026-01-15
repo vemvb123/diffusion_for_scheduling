@@ -69,7 +69,7 @@ Prosseseringstid:
 '''
 
 
-def feature_diffusion(ordered: bool, generator_params, n_base_features: int, n_embed_features: int, dataset_path: str,
+def feature_diffusion(ordered: int, generator_params, n_base_features: int, n_embed_features: int, dataset_path: str,
                       model_path_enc: str, model_path_adj: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
 
 
@@ -221,7 +221,7 @@ def feature_diffusion(ordered: bool, generator_params, n_base_features: int, n_e
     plt.grid(True)
 
     # save plot to file
-    plt.savefig(f"{model_path_adj}_loss_over_epochs.png")
+    plt.savefig(f"f_{ordered}_loss_over_epochs.png")
     #TODO fjern
     exit()
 
@@ -371,7 +371,7 @@ def adj_diffusion(ordered: bool, generator_params, n_base_features: int, n_embed
     plt.grid(True)
 
     # save plot to file
-    plt.savefig(f"{model_path_adj}_loss_over_epochs.png")
+    plt.savefig(f"adj_{ordered}_loss_over_epochs.png")
     #TODO fjern
     exit()
 
