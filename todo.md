@@ -1,2 +1,11 @@
-Ferdigstille utils, sa man far riktige dimensjoner i en batchs, altsa: b, 1, h, w 
-men siden det skal condateneres, sa er det kanskje: b, 3, h, w (for coords), og b, 4, h, w (for bilder)
+
+Gjor at kan fullt kjore, skjekk at kan kjore - ingen feil
+Gjor at loss plottes
+gjor at stopper hvis loss ikke går ned etter 3 epoker
+Gjor så kan gjøre testkjør for å se shapes når klar til å kjøre
+
+
+
+gjor:
+kjor diffusion med feature, se print for shapes.
+Deretter fjern alle der det står TODO i diffusion. så kjor utils fila igjen for a trene modellene.

@@ -118,9 +118,9 @@ import json
 import os
 
 
-# 1: no order
-# 2: ordered
-# 3: ordered by ma
+# 1: ordered
+# 2: ordered ma
+# 3: no order
 def schedule_actions(
         actions, td_unscheduled, env, ordered: int = 1
 ):
@@ -507,6 +507,10 @@ def train_models(model_to_train: int):
     ops_per_job = 4
     min_proc = 5
     max_proc = 50
+
+    base_embed = 3
+    embed_size = 80
+
     generator_params = {
         "num_jobs": jobs,
         "num_machines": ma,
@@ -517,24 +521,36 @@ def train_models(model_to_train: int):
         "min_eligible_ma_per_op": ma,
         "max_eligible_ma_per_op": ma,
     }
+    # TODO full path
+    full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
+    dataset_path = f'{full_path}/data/with_targets'
 
-    dataset_path = 'path'
-    model_path_enc = 'path'
-    model_path_adj = 'path'
 
     if model_to_train == 1:
-        feature_diffusion(3, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
+        model_path_enc = f'{full_path}/models/feature_v_adj/model_feature_enc_noorder.pth'
+        model_path_adj = f'{full_path}/models/feature_v_adj/model_feature_adj_noorder.pth'
+        feature_diffusion(3, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
     elif model_to_train == 2:
-        feature_diffusion(1, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
+        model_path_enc = f'{full_path}/models/feature_v_adj/model_feature_enc_order.pth'
+        model_path_adj = f'{full_path}/models/feature_v_adj/model_feature_adj_order.pth'
+        feature_diffusion(1, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
     elif model_to_train == 3:
-        feature_diffusion(2, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
+        model_path_enc = f'{full_path}/models/feature_v_adj/model_feature_enc_maorder.pth'
+        model_path_adj = f'{full_path}/models/feature_v_adj/model_feature_adj_maorder.pth'
+        feature_diffusion(2, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
 
     elif model_to_train == 4:
-        adj_diffusion(3, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
+        model_path_enc = f'{full_path}/models/feature_v_adj/model_adj_enc_noorder.pth'
+        model_path_adj = f'{full_path}/models/feature_v_adj/model_adj_adj_noorder.pth'
+        adj_diffusion(3, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
     elif model_to_train == 5:
-        adj_diffusion(1, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
+        model_path_enc = f'{full_path}/models/feature_v_adj/model_adj_enc_order.pth'
+        model_path_adj = f'{full_path}/models/feature_v_adj/model_adj_adj_order.pth'
+        adj_diffusion(1, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
     elif model_to_train == 6:
-        adj_diffusion(2, generator_params, 3, 80, dataset_path, model_path_enc, model_path_adj)
+        model_path_enc = f'{full_path}/models/feature_v_adj/model_adj_enc_maorder.pth'
+        model_path_adj = f'{full_path}/models/feature_v_adj/model_adj_adj_maorder.pth'
+        adj_diffusion(2, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
 
 
 

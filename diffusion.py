@@ -122,18 +122,18 @@ def feature_diffusion(ordered: bool, generator_params, n_base_features: int, n_e
             ], dim=1)
 
 
-            logging.info(f"f shape {features.shape}")
+            # logging.info(f"f shape {features.shape}")
             features = features.to(device, dtype=torch.float32)
             target_assignments = target_assignments.to(device, dtype=torch.float32)
 
             # Sample random timesteps
             t = torch.randint(0, timesteps, (batch_size,), device=device) 
-            logging.info(f't shape {t.shape}')
+            # logging.info(f't shape {t.shape}')
 
             # encode images
             optimizer.zero_grad()
             enc_f = model_enc(features, t, type_t="timestep")
-            logging.info(f"encoded f {enc_f.shape}")
+            # logging.info(f"encoded f {enc_f.shape}")
             
             # Sample noise
             noise = torch.randn_like(target_assignments)
@@ -143,7 +143,7 @@ def feature_diffusion(ordered: bool, generator_params, n_base_features: int, n_e
                 + sqrt_one_minus_alphas_cumprod[t, None, None, None] * noise
             )
 
-
+            # TODO fjern
             logging.info("catination")
             logging.info(noise.shape)
             logging.info(enc_f.shape)
@@ -157,19 +157,21 @@ def feature_diffusion(ordered: bool, generator_params, n_base_features: int, n_e
 
             # Predict noise
             pred = model_adj(model_input, t, type_t="timestep")
+            # TODO fjern
             logging.info(f"made prediction, {pred.shape}")
 
-            # TODO regn lossm og backpropagate, for 1d og 2d .. hvordan ta loss fra en modell, og gi til den andre..
             loss = nn.MSELoss()(pred, noise)
             loss.backward()
             optimizer.step()
-            logging.info("one looped")
-
 
             # Save the loss value
             loss_value = loss.item()
             total_loss += loss_value
             epoch_losses.append(loss_value)
+
+            # TODO fjern
+            exit()
+
 
         # Save all losses from this epoch
         # Create directories if they don't exist
@@ -187,27 +189,57 @@ def feature_diffusion(ordered: bool, generator_params, n_base_features: int, n_e
         avg_loss = total_loss / len(loader)
         logging.info(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
 
+
+
+
         torch.save(
             model_enc.state_dict(),
-            model_enc,
+            model_path_enc,
         )
         torch.save(
             model_adj.state_dict(),
-            model_adj,
+            model_path_adj,
         )
 
+
+        if len(all_losses) >= 3:
+            last3 = all_losses[-3:]
+            if last3[0] > last3[1] > last3[2]:
+                print("Loss has gone down for the last 3 epochs — stopping training.")
+                break
+
+
+
+
+
+    # TODO kjor også til hit for at se at plot lages riktig
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, num_epochs+1), all_losses, marker='o')
+    plt.title(f"Training Loss per Epoch, model {model_path_adj}")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.grid(True)
+
+    # save plot to file
+    plt.savefig(f"{model_path_adj}_loss_over_epochs.png")
+    #TODO fjern
+    exit()
 
     logging.info("saved model")
     torch.save(
         model_enc.state_dict(),
-        model_enc,
+        model_path_enc,
     )
     torch.save(
         model_adj.state_dict(),
-        model_adj,
+        model_path_adj,
     )
 
-    return model_enc, model_adj
+    return model_path_enc, model_path_adj
+
+
+
+
 
 
 def adj_diffusion(ordered: bool, generator_params, n_base_features: int, n_embed_features: int, dataset_path: str, model_path_enc: str, model_path_adj: str, batch_size: int = 32, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda"):
@@ -316,13 +348,36 @@ def adj_diffusion(ordered: bool, generator_params, n_base_features: int, n_embed
 
         torch.save(
             model_adj.state_dict(),
-            model_adj,
+            model_path_adj,
         )
 
+
+        if len(all_losses) >= 3:
+            last3 = all_losses[-3:]
+            if last3[0] > last3[1] > last3[2]:
+                print("Loss has gone down for the last 3 epochs — stopping training.")
+                break
+
+
+
     logging.info("saved model")
+
+    # TODO kjor også til hit for at se at plot lages riktig
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, num_epochs+1), all_losses, marker='o')
+    plt.title(f"Training Loss per Epoch, model {model_path_adj}")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.grid(True)
+
+    # save plot to file
+    plt.savefig(f"{model_path_adj}_loss_over_epochs.png")
+    #TODO fjern
+    exit()
+
     torch.save(
         model_adj.state_dict(),
-        model_adj,
+        model_path_adj,
     )
 
     return model_adj
@@ -416,7 +471,7 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
             noise = torch.randn_like(coords_cat)
             # Apply forward diffusion process at timestep t
             noised = (
-                sqrt_alphas_cumprod[t, None, None, None] * allocations
+                sqrt_alphas_cumprod[t, None, None, None] * coords_cat
                 + sqrt_one_minus_alphas_cumprod[t, None, None, None] * noise
             )
 
@@ -468,18 +523,18 @@ def diffusion(op_n, model_path: str, batch_size: int = 32, num_epochs: int = 100
         # Save the losses list after each epoch
         np.save(f"./losses/losses_epoch_{epoch+1}.npy", np.array(all_losses))
 
-        avg_loss = total_loss / len(train_loader)
+        avg_loss = total_loss / len(loader)
         logging.info(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
 
         torch.save(
-            model.state_dict(),
+            model_coords.state_dict(),
             model_path,
         )
 
 
     logging.info("saved model")
     torch.save(
-        model.state_dict(),
+        model_coords.state_dict(),
         model_path,
     )
     return  model_path
