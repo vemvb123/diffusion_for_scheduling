@@ -26,11 +26,12 @@ from torch.utils.data import Dataset
 # logging.info("skjekk")
 from rl4co.envs import FJSPEnv
 from rl4co.models.zoo.l2d import L2DModel
-from rl4co.models.zoo.l2d.policy import L2DPolicy
-from rl4co.models.zoo.l2d.decoder import L2DDecoder
-from rl4co.models.nn.graph.hgnn import HetGNNEncoder
-from rl4co.utils.trainer import RL4COTrainer
-from IPython.display import display, clear_output
+
+# from rl4co.models.zoo.l2d.policy import L2DPolicy
+# from rl4co.models.zoo.l2d.decoder import L2DDecoder
+# from rl4co.models.nn.graph.hgnn import HetGNNEncoder
+# from rl4co.utils.trainer import RL4COTrainer
+# from IPython.display import display, clear_output
 
 # logging.info(2)
 import matplotlib
@@ -44,7 +45,7 @@ from torchvision import transforms
 
 # logging.info(3)
 from torch.utils.data import Dataset
-from PIL import Image
+# from PIL import Image
 import glob
 import os
 import torch
@@ -77,7 +78,7 @@ params:
   4: maximum proc time
 """
 def make_instance(
-        ma: int, ops_per_job: int, jobs: int, min_proc: int, max_proc: int
+        ma: int, ops_per_job: int, jobs: int, min_proc: int, max_proc: int, batch_size: int
 ) -> Tuple[FJSPEnv, TensorDict, Dict]:
 
     generator_params = {
@@ -96,7 +97,7 @@ def make_instance(
         _torchrl_mode=True,
         stepwise_reward=True
     )
-    td = env.reset(batch_size=[1])
+    td = env.reset(batch_size=[batch_size])
     return env, td, generator_params
 
 
@@ -118,16 +119,16 @@ import json
 import os
 
 
-# 1: ordered
-# 2: ordered ma
-# 3: no order
+# 1: no order
+# 2: ordered
+# 3: ordered ma
 def schedule_actions(
-        actions, td_unscheduled, env, ordered: int = 1
+        actions, td_unscheduled, env, ordered: int
 ):
     """
-    ordered == 1: global normalized order (i / n_actions)
-    ordered == 2: per-row normalized order
-    ordered == 3: (reserved / undefined – keep same as 1 for now)
+    ordered == 2: global normalized order (i / n_actions)
+    ordered == 3: per-row normalized order
+    ordered == 1: (reserved / undefined – keep same as 1 for now)
     """
 
     if ordered not in (1, 2, 3):
@@ -136,6 +137,7 @@ def schedule_actions(
     n_actions = len(actions)
 
     td_to_actions = td_unscheduled.copy()
+    td_to_actions = td_to_actions.unsqueeze(0)
     prev_adj = td_to_actions["ma_assignment"].clone()
 
     # this stores the sequence / order matrix
@@ -144,9 +146,7 @@ def schedule_actions(
     # only used for ordered == 2
     # count how many assignments so far per row
     per_row_counts = torch.zeros(prev_adj.size(0), dtype=torch.int)
-
-    for i, action in enumerate(actions[0]):
-
+    for i, action in enumerate(actions):
         td_to_actions["action"] = torch.tensor([action])
         td_to_actions = env.step(td_to_actions)["next"]
 
@@ -156,14 +156,18 @@ def schedule_actions(
 
         if diff.any():
 
-            if ordered == 1 or ordered == 3:
+            if ordered == 1 or ordered == 2:
                 # global normalized order
                 normalized_order = i / float(n_actions)
                 assignment_adj[diff] = normalized_order
 
-            elif ordered == 2:
+            elif ordered == 3:
                 # for each row, assign per-row sequential rank
-                rows, cols = diff.nonzero(as_tuple=True)
+                batch_idx, rows, cols = diff.nonzero(as_tuple=True)
+                if batch_idx.numel() > 0 and batch_idx.max() > 0:
+                        # optionally handle multi-batch later
+                        raise NotImplementedError("Batch size > 1 not yet supported for ordered==3")
+
 
                 for r, c in zip(rows.tolist(), cols.tolist()):
                     # increment this row's counter
@@ -177,7 +181,7 @@ def schedule_actions(
 
         prev_adj = new_adj.clone()
 
-    if ordered == 2:
+    if ordered == 3:
         # now normalize per row
         # for each row r, divide all nonzero entries
         # by the maximum count
@@ -190,13 +194,14 @@ def schedule_actions(
                     assignment_adj[r] = assignment_adj[r] / float(max_val)
 
     td_to_actions["ma_assignment"] = assignment_adj
+    # td_to_actions = td_to_actions.squeeze(0)
     return td_to_actions
 
 
 
 
 
-def make_target(env, td: TensorDict, ordered: bool):
+def make_target_orderedinput(env, td: TensorDict, ordered: int):
     lr_d = 1e-4
     CHECKPOINT_PATH = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_{lr_d}.ckpt"
     model = L2DModel.load_from_checkpoint(CHECKPOINT_PATH)
@@ -216,12 +221,24 @@ def make_target(env, td: TensorDict, ordered: bool):
 
 
 
-
+"""
 def schedule_actions(env, actions, td):
     for action in actions[0]:
         td['action'] = torch.tensor([action])
         td = env.step(td)['next']
     return td
+"""
+
+
+def schedule_actions_batch(env, actions, td):
+    # actions: [batch_size, seq_len]
+    for t in range(actions.size(1)):
+        # take the batch of actions at time t
+        td["action"] = actions[:, t]   # shape [batch_size]
+        td = env.step(td)["next"]
+    return td
+
+
 
 def make_target(env, td, in_ssh):
     lr_d = 1e-4
@@ -233,45 +250,13 @@ def make_target(env, td, in_ssh):
     model = model.to("cpu")
 
     with torch.inference_mode():
-        out = model(td.clone(),
+        out = model(td,
                     decode_type="multistart_sampling",
-                    num_starts=100,
+                    num_starts=5,
                     select_best=True,
                     return_actions=True)
-    
     actions = out["actions"]
-    td_scheduled = schedule_actions(env, actions, td.copy())
-    return td_scheduled, actions
-
-
-
-
-
-
-def schedule_actions(env, actions, td):
-    for action in actions[0]:
-        td['action'] = torch.tensor([action])
-        td = env.step(td)['next']
-    return td
-
-def make_target(env, td, in_ssh):
-    lr_d = 1e-4
-
-    CHECKPOINT_PATH = None
-    if in_ssh: CHECKPOINT_PATH = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_{lr_d}.ckpt"
-    else: CHECKPOINT_PATH = f'/home/vemund/Dokumenter/koding/d_m/rl4co_ex/rl4co_model_0.0001.ckpt'
-    model = L2DModel.load_from_checkpoint(CHECKPOINT_PATH)
-    model = model.to("cpu")
-
-    with torch.inference_mode():
-        out = model(td.clone(),
-                    decode_type="multistart_sampling",
-                    num_starts=100,
-                    select_best=True,
-                    return_actions=True)
-    
-    actions = out["actions"]
-    td_scheduled = schedule_actions(env, actions, td.copy())
+    td_scheduled = schedule_actions_batch(env, actions, td.copy())
     return td_scheduled, actions
 
 
@@ -345,23 +330,25 @@ def tensordict_to_dict(td):
 
 
 def make_dataset(n):
-
-    dataset_folder = 'data/with_targets'
+    print("Making dataset...")
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/batched_444'
     os.makedirs(dataset_folder, exist_ok=True)
-
-    for i in range(n):
+    batch_size = 184
+    for i in range(0, n, batch_size):
         # lag instanse
-        env, td, generator_params = make_instance(4,4,4,5,50)
+        env, td, generator_params = make_instance(4,4,4,5,50, batch_size)
         # fa target fra instance 
         td_target, actions = make_target(env, td.copy(), True)
         # lagre json med: td, og optimale td koords
         td.set('opt_assignment', td_target['ma_assignment'])
         td.set('opt_actions', torch.tensor(actions))
         # lagre coords i en json, med visse navn
-        torch.save(td.copy(), f'{dataset_folder}/coords_444_{i}.pt')
-        
-        logging.info(f'Made instance {i}')
+        torch.save(td.copy(), f'{dataset_folder}/{i}_{i+batch_size}.pt')
+        logging.info(f'Made instance {i} to {i+batch_size}')
 
+    logging.info(f'Made all {i+batch_size} instances. Done making dataset')
+# make_dataset(100000)
+# exit()
 # returnerer matriser i riktig shape, som inneholder featursene
 # ting utenfor adj blir maskert med 1
 # nar loss kalkuleres, fjernes ting utenfor rammen for instanse
@@ -380,18 +367,25 @@ def expand_matrix(x: torch.Tensor, shape_to_make: tuple[int, int], max_and_min: 
     x_norm = (x - min_val) / (max_val - min_val)
     x_norm = x_norm.clamp(0, 1)  # ensure range [0,1]
 
-    _, h, w = x_norm.shape
+    h = None
+    w = None
+    if len(x_norm.shape) == 2:
+        h, w = x_norm.shape
+    else:
+        _, h, w = x_norm.shape
+
     pad_bottom = shape_to_make[0] - h
     pad_right = shape_to_make[1] - w
     x_padded = F.pad(x_norm, (0, pad_right, 0, pad_bottom), value=0.0)
 
-    x_final = x_padded.unsqueeze(1)
-    return x_final
+    # x_final = x_padded.unsqueeze(1)
+    return x_padded
 
 
-
-
-def get_feature_adj_from_instance(td: TensorDict, env, ordered: int = 3) -> tuple[
+# TODO
+# trene med forskjelige loss verdier...
+# trener da for 2 epoker, så ser hvilken av lossene som er minst, og trener en modell for flere epoker med den lr
+def get_feature_adj_from_instance(td: TensorDict, env, ordered: int) -> tuple[
         torch.Tensor, # target assignments
         torch.Tensor, # proc times matrix
         torch.Tensor, # jobid matrix
@@ -399,17 +393,22 @@ def get_feature_adj_from_instance(td: TensorDict, env, ordered: int = 3) -> tupl
         ]:
     # bytt senere ut med assignments fra target
     assignments = None
-    if ordered:
-        td_scheduled = schedule_actions(td['opt_actions'], env, td.copy(), ordered)
+    if ordered == 2 or ordered == 3:
+        td_scheduled = schedule_actions(td['opt_actions'], td.copy(), env, ordered)
         assignments = td_scheduled['ma_assignment']
+        # assignments = assignments.unsqueeze(0)
     else:
         assignments = td['opt_assignment']
+        assignments = assignments.unsqueeze(0)
+
     assignments = expand_matrix(assignments, (20, 20), (0, 1))
 
     proc_times = td['proc_times']
+    proc_times = proc_times.unsqueeze(0)
     proc_times = expand_matrix(proc_times, (20,20), (5,50))
 
-    n_jobs = int(td["ops_job_map"][0].max())
+    # TODO endre hvis annerledes jobber
+    n_jobs = 4
 
     # matrix for jobid
     job_id = td['ops_job_map']
@@ -424,8 +423,31 @@ def get_feature_adj_from_instance(td: TensorDict, env, ordered: int = 3) -> tupl
     pos_job = pos_job.unsqueeze(0)
     pos_job = expand_matrix(pos_job, (20,20), (0,n_jobs))
 
-    return assignments, proc_times, job_id, pos_job
+    """
+    logging.info("shapes from get_feature_adj_from_instance:")
+    logging.info(assignments.shape)
+    logging.info(proc_times.shape)
+    logging.info(job_id.shape)
+    logging.info(pos_job.shape)
+    """
+    if torch.isnan(assignments).any():
+        print("assignemtn NaN values found in features tensor")
+        exit()
+    if torch.isnan(proc_times).any():
+        print("proc NaN values found in features tensor")
+        exit()
+    if torch.isnan(job_id).any():
+        print("job id NaN values found in features tensor")
+        exit()
+    if torch.isnan(pos_job).any():
+        print("pos job NaN values found in features tensor")
+        exit()
 
+
+
+
+
+    return assignments, proc_times, job_id, pos_job
 '''
 jobs = 4
 ma = 4
@@ -460,6 +482,7 @@ import torch
 from torch.utils.data import Dataset
 
 
+"""
 class Dataset_RL4CO(Dataset):
     def __init__(self, folder, ordered: bool, generator_params, transform=None):
         self.folder = folder
@@ -489,6 +512,80 @@ class Dataset_RL4CO(Dataset):
             tensordict = self.transform(td)
 
         return target_assignments, proc_times, job_id, pos_job
+"""
+
+import bisect
+
+class Dataset_RL4CO(Dataset):
+    def __init__(self, folder, ordered: bool, generator_params, transform=None):
+        self.folder = folder
+        self.transform = transform
+        self.ordered = ordered
+        self.generator_params = generator_params
+        self.env = FJSPEnv(generator_params=self.generator_params)
+
+        self.files = sorted(
+            os.path.join(folder, f)
+            for f in os.listdir(folder)
+            if f.endswith(".pt")
+        )
+
+        # Precompute number of instances per file
+        self.file_sizes = []
+        for f in self.files:
+            td = torch.load(f, map_location="cpu", weights_only=False)
+            self.file_sizes.append(self._get_batch_size(td))
+
+        # Prefix sum for fast index lookup
+        self.cum_sizes = [0]
+        for size in self.file_sizes:
+            self.cum_sizes.append(self.cum_sizes[-1] + size)
+
+    def _get_batch_size(self, td):
+        """
+        Infer batch size from TensorDict or dict of tensors.
+        """
+        # Example for TensorDict
+        return td.batch_size[0]
+        # or, if plain dict:
+        # return next(iter(td.values())).shape[0]
+
+    def __len__(self):
+        return self.cum_sizes[-1]
+
+    def __getitem__(self, idx):
+        # Find which file this idx belongs to
+        file_idx = bisect.bisect_right(self.cum_sizes, idx) - 1
+        instance_idx = idx - self.cum_sizes[file_idx]
+
+        file_path = self.files[file_idx]
+        td = torch.load(
+            file_path,
+            map_location="cpu",
+            weights_only=False,
+        )
+
+        # Select a single instance from the batch
+        td_instance = td[instance_idx]
+
+        if self.transform:
+            td_instance = self.transform(td_instance)
+
+        target_assignments, proc_times, job_id, pos_job = \
+            get_feature_adj_from_instance(
+                td_instance, self.env, self.ordered
+            )
+        return target_assignments, proc_times, job_id, pos_job
+
+
+
+
+
+
+
+
+
+
 
 
 from diffusion import feature_diffusion, adj_diffusion
@@ -497,18 +594,22 @@ import sys
 model_to_train = None
 if len(sys.argv) > 1:
     model_to_train = int(sys.argv[1])
-    print("model_to_train:", model_to_train)
+    logging.info("model_to_train:", model_to_train)
 else:
-    print("Please provide a training number!")
+    logging.info("Please provide a training number!")
 
-model_to_train = 1
 # 1 features
 # 2 features ordered
 # 3 features ordered ma
 # 4 adj
 # 5 adj ordered
 # 6 adj ordered ma
+
+from datetime import datetime
+
 def train_models(model_to_train: int):
+    logging.info(f"Training models nr {model_to_train}")
+
     jobs = 4
     ma = 4
     ops_per_job = 4
@@ -530,37 +631,40 @@ def train_models(model_to_train: int):
     }
     # TODO full path
     full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
-    dataset_path = f'{full_path}/data/with_targets'
+    dataset_path = f'{full_path}/data/with_targets/batched_444'
+    loss_image_path = f'{full_path}/models/feature_v_adj'
+
+    lrs = [1e-3, 1e-4, 1e-5, 1e-6]
+    testing_epochs = 2
+    run_epochs = 100
+
+    training_func = None
+    if model_to_train >= 3: training_func = feature_diffusion
+    else: training_func = adj_diffusion
+
+    dataset = Dataset_RL4CO(dataset_path, model_to_train, generator_params)
+    model_path_enc = f'{full_path}/models/feature_v_adj/enc_type_{model_to_train}.pth'
+    model_path_adj = f'{full_path}/models/feature_v_adj/enc_type_{model_to_train}.pth'
+    
+    best_testing_loss = 1
+    best_lr = None
+
+    logging.info(f"Began training model {model_to_train} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+
+    for lr in lrs:
+        logging.info(f"Training with lr {lr}")
+        path_enc, path_adj, last_epoch_loss = training_func(loss_image_path, dataset, model_to_train, base_embed, embed_size, 
+                                                                model_path_enc, model_path_adj, lr=lr, num_epochs=testing_epochs)
+        if last_epoch_loss < best_testing_loss: best_lr = lr
+
+    logging.info(f"Best lr found: {best_lr}, for model {model_to_train} training full model now")
+    path_enc, path_adj, last_epoch_loss = training_func(loss_image_path, dataset, model_to_train, base_embed, embed_size, 
+                                                            model_path_enc, model_path_adj, lr=best_lr, num_epochs=run_epochs)
+
+    logging.info(f"Ended training model {model_to_train} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 
 
-    if model_to_train == 1:
-        model_path_enc = f'{full_path}/models/feature_v_adj/model_feature_enc_noorder.pth'
-        model_path_adj = f'{full_path}/models/feature_v_adj/model_feature_adj_noorder.pth'
-        feature_diffusion(3, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
-    elif model_to_train == 2:
-        model_path_enc = f'{full_path}/models/feature_v_adj/model_feature_enc_order.pth'
-        model_path_adj = f'{full_path}/models/feature_v_adj/model_feature_adj_order.pth'
-        feature_diffusion(1, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
-    elif model_to_train == 3:
-        model_path_enc = f'{full_path}/models/feature_v_adj/model_feature_enc_maorder.pth'
-        model_path_adj = f'{full_path}/models/feature_v_adj/model_feature_adj_maorder.pth'
-        feature_diffusion(2, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
-
-    elif model_to_train == 4:
-        model_path_enc = f'{full_path}/models/feature_v_adj/model_adj_enc_noorder.pth'
-        model_path_adj = f'{full_path}/models/feature_v_adj/model_adj_adj_noorder.pth'
-        adj_diffusion(3, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
-    elif model_to_train == 5:
-        model_path_enc = f'{full_path}/models/feature_v_adj/model_adj_enc_order.pth'
-        model_path_adj = f'{full_path}/models/feature_v_adj/model_adj_adj_order.pth'
-        adj_diffusion(1, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
-    elif model_to_train == 6:
-        model_path_enc = f'{full_path}/models/feature_v_adj/model_adj_enc_maorder.pth'
-        model_path_adj = f'{full_path}/models/feature_v_adj/model_adj_adj_maorder.pth'
-        adj_diffusion(2, generator_params, base_embed, embed_size, dataset_path, model_path_enc, model_path_adj)
-
-
-
+train_models(model_to_train)
 
 
 

@@ -10,3 +10,6 @@ gjor:
 kjor diffusion med feature, se print for shapes.
 Deretter fjern alle der det står TODO i diffusion. så kjor utils fila igjen for a trene modellene.
 sa kjor de to sh scriptsa med sbatch navn.sh
+
+
+maske..?
