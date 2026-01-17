@@ -19,14 +19,21 @@ import time
 
 
 
-def adj_inference(proc_instance, model_path, n_samples, batch_size, n_features, model_path_enc, model_path_adj, dim_x=8, dim_y=8, pad_x=16, pad_y=16):
-    device = "cuda"
 
-    model_enc = deepinv.models.DiffUNet(
-        in_channels=1, out_channels=n_features, pretrained=Path(model_path_enc)
-    ).to(device)
-    model_adj = deepinv.models.DiffUNet(
-        in_channels=2, out_channels=n_features+1, pretrained=Path(model_path_adj)
+
+def guiding_function(x): #  is batch of instances
+    target = 0
+    error = torch.abs(x - target).mean()
+    return error
+
+
+# conditions er konkatinert av all conditioning data
+def guide_adj_inference(conditions, n_channels, model_path, n_to_make, batch_size):
+    device = "cuda"
+    guidence_scale = 0.25
+
+    model = deepinv.models.DiffUNet(
+        in_channels=n_channels, out_channels=1, pretrained=Path(model_path)
     ).to(device)
 
 
@@ -42,53 +49,68 @@ def adj_inference(proc_instance, model_path, n_samples, batch_size, n_features, 
     sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
     sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
 
-    model_enc.eval()
-    model_adj.eval()
+    model.eval()
     
-    mask_value = 1
-    x = None
     with torch.no_grad():
                 # start timer
         start_time = time.perf_counter()
 
-
-        allocations = torch.rand(batch_size, 1, 20, 20)
-        allocations = allocations.to(device, dtype=torch.float32)
+        x_allocations = torch.rand(batch_size, 1, 20, 20)
+        x_allocations = x_allocations.to(device, dtype=torch.float32)
 
         for t in reversed(range(timesteps)):
-            t_tensor = torch.ones(n_samples, device=device).long() * t
+            t_tensor = torch.ones(n_to_make, device=device).long() * t
     
-            enc_f = model_enc(proc_instance, t_tensor, type_t="timestep")
-                
             model_input = torch.cat([
-                    allocations,
-                    enc_f,
+                    x_allocations,
+                    conditions,
                 ], dim=1)
-
-            pred_allocations = model_enc(model_input, t_tensor, type_t="timestep")
+            
+            x_allocations = x_allocations.detach().requires_grad_()
+            pred_x_allocations = model(model_input, t_tensor, type_t="timestep")
  
             alpha = alphas[t]
             alpha_cumprod = alphas_cumprod[t]
             beta = betas[t]
 
+
+            estimated_x0 = (
+                (x_allocations - torch.sqrt(1 - alpha_cumprod) * pred_x_allocations) /
+                torch.sqrt(alpha_cumprod)
+            )
+
+            guidance_loss = guiding_function(estimated_x0) * guidence_scale 
+            # compute gradient wrt x_allocations
+            grad_x = torch.autograd.grad(guidance_loss, x_allocations)[0]
+            # update the noised sample towards lower guidance loss
+            x_guided = x_allocations.detach() - guidence_scale * grad_x
+
+
+
+
             # skal jeg bruke predicted noise? eller nei, det er vell bare for shape... man x er jo her med cond, så må kanskje endre, så lik predicted noise
             if t > 0:
-                noise = torch.randn_like(allocations)
+                noise = torch.randn_like(x_allocations)
             else:
-                noise = torch.zeros_like(allocations) # ma ha maske??
+                noise = torch.zeros_like(x_allocations) # ma ha maske??
                 # noise = 0
         
-            allocations = (1 / torch.sqrt(alpha)) * (
-                allocations - (beta / torch.sqrt(1 - alpha_cumprod)) * pred_allocations
+            x_prev = (1 / torch.sqrt(alpha)) * (
+                x_allocations - (beta / torch.sqrt(1 - alpha_cumprod)) * pred_x_allocations
             ) + torch.sqrt(beta) * noise
+
+            x_allocations = x_prev.detach()
+
+
+
 
     # end timer
     end_time = time.perf_counter()
     elapsed = end_time - start_time
 
-    allocations = torch.clamp(allocations, 0, 1)
+    x_allocations = torch.clamp(x_allocations, 0, 1)
 
-    return allocations, elapsed
+    return x_allocations, elapsed
 
 
 
