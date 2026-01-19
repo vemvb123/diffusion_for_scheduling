@@ -181,8 +181,10 @@ def feature_diffusion(loss_image_path, train_dataset, test_dataset, ordered: int
 
 
 
-    #subset_dataset = Subset(dataset, range(32*5))
-    #loader = DataLoader(subset_dataset, batch_size=32, shuffle=False)
+    #train_subset_dataset = Subset(train_dataset, range(32*5))
+    #test_subset_dataset = Subset(test_dataset, range(32*5))
+    #train_loader = DataLoader(subset_dataset, batch_size=32, shuffle=False)
+    #test_loader = DataLoader(subset_dataset, batch_size=32, shuffle=False)
 
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)
