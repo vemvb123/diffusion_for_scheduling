@@ -122,6 +122,7 @@ import os
 # 1: no order
 # 2: ordered
 # 3: ordered ma
+
 def schedule_actions(
         actions, td_unscheduled, env, ordered: int
 ):
@@ -347,8 +348,9 @@ def make_dataset(n):
         logging.info(f'Made instance {i} to {i+batch_size}')
 
     logging.info(f'Made all {i+batch_size} instances. Done making dataset')
-make_dataset(20000)
-exit()
+
+# make_dataset(20000)
+# exit()
 
 # returnerer matriser i riktig shape, som inneholder featursene
 # ting utenfor adj blir maskert med 1
@@ -576,13 +578,203 @@ class Dataset_RL4CO(Dataset):
             get_feature_adj_from_instance(
                 td_instance, self.env, self.ordered
             )
+
         return target_assignments, proc_times, job_id, pos_job
 
 
 
+from inference import feature_inference, adj_inference
+
+def round_to_values(x, ordered: bool, n_values: int):
+    if ordered == False:
+        # flatten tensor, get indices of top 16 values
+        topk_vals, topk_idx = torch.topk(x.flatten(), n_values)
+
+        # create a copy or a zero tensor
+        y = x.clone()
+
+        # set the top 16 values to 1
+        y.flatten()[topk_idx] = 1.0
+        return y
 
 
 
+#def map_assignemnts_to_actions(assignments, ordered:bool):
+#    actions = []
+#    if ordered:
+        # assignments matrise
+        # er i 4 seksjoner av matrisen, 4columns etter 4columns, helt til 16 kolonner, delt i 4 seksjoner
+        # henter største verdi, ser hvilken seksjon den er innenfor
+        # ser hvilken rad det ligger på. første rad er 1, andre rad har verdi 2, osv.
+        # de er delt inn i de fire seksjonene. 1 rad innenfor 1st seksjon er 1, 3rd rad innenfor 2nd seksjon er 4*2+3=11, osv...
+        # kartlegger alle disse verdiene inn i en liste. Først den størst verdien (eks 0.87) i matrisen sin verdi (eks kanskje mappes 14), 
+        # så neste største verdi (eks 0.79), mappes til 18
+        # så får man etterhvert en liste på 16 tall [14,18 ....]
+
+
+
+def map_assignemnts_to_actions(assignments, ordered: bool):
+    if ordered:
+
+        # remove batch/channel dims if present
+        if assignments.dim() == 4:
+            assignments = assignments.squeeze(0).squeeze(0)  # (4,16)
+
+        H, W = assignments.shape  # H=4, W=16
+        section_width = 4
+        num_sections = W // section_width
+
+        actions = []
+
+        if ordered:
+            # order by largest value first
+            _, indices = torch.topk(assignments.flatten(), H * W)
+
+            for idx in indices:
+                row = idx // W
+                col = idx % W
+                section = col // section_width
+                action = section * H + row + 1
+                actions.append(action.item())
+
+    else:
+        # section-wise column sweep:
+        # col 0 in section 0, col 0 in section 1, ...
+        # then col 1 in section 0, etc.
+        for local_col in range(section_width):
+            for section in range(num_sections):
+                col = section * section_width + local_col
+
+                # pick row with max value in this column
+                row = torch.argmax(assignments[:, col]).item()
+
+                action = section * H + row + 1
+                actions.append(action)
+
+    return actions
+
+
+
+def make_step(env, td, action):
+    td['action'] = torch.tensor([action])
+    td = env.step(td)['next']
+    return td
+
+def inferenced_schedule(assignments, ordered: bool, env, td, path_save_image: str):
+    actions = map_assignemnts_to_actions(assignments, ordered)
+
+    if path_save_image:
+        env.render(td, 0)
+        i = 0
+        fig = None
+        while not td["done"].all():
+            td = make_step(env, td, actions[i])
+            fig = env.render(td, 0)
+            i += 1
+        fig.savefig(f"frame_{i:03d}.png")
+        plt.close(fig)
+    else:
+        i = 0
+        while not td["done"].all():
+            td = make_step(env, td, actions[i])
+            i+=1
+
+    return td
+
+
+
+ 
+# /cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/test_batched_444/0_184.pt
+def get_td_from_path(path, instance_idx: int) -> TensorDict:
+    for fname in os.listdir(path):
+        if not fname.endswith(".pt"):
+            continue
+
+        start, end = map(int, fname.replace(".pt", "").split("_"))
+
+        if start <= instance_idx < end:
+            file_path = os.path.join(path, fname)
+            batch = torch.load(file_path)
+
+            local_idx = instance_idx - start
+            return batch[local_idx]
+
+    raise ValueError(f"Instance {instance_idx} not found in {path}")
+
+
+# bruk hvis ordered, for å se klart sekvens
+# første operasjon er laveste tallet i return matrisen, det er annerledes enn hvordan det ellers er, der største verdi rett fra modell er første operasjon
+def get_clear_sequence(assignments):
+    """
+    Given a tensor `assignments` with values between 0 and 1,
+    return a tensor of the same shape where:
+      - the largest value gets 16,
+      - the 2nd largest gets 15,
+      - ...
+      - the 16th largest gets 1,
+      - all others get 0.
+    """
+
+    flat = assignments.flatten()
+    # get indices of the top 16 values
+    top_vals, top_idx = torch.topk(flat, 16)
+
+    # output tensor initialized with zeros
+    out = torch.zeros_like(flat, dtype=torch.long)
+
+    # assign values 16 → 1
+    for rank, idx in enumerate(top_idx):
+        out[idx] = 16 - rank
+
+    return out.view(assignments.shape)
+
+
+
+
+
+def get_inference_result():
+
+    path = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/test_batched_444"
+    which_instance_in_batch = 10
+
+    td = get_td_from_path(path, which_instance_in_batch)
+    env, td_ignore, generator_params = make_instance(4,4,4,5,50, batch_size=1)
+    ordered = 1
+
+    target_assignments, proc_times, job_id, pos_job = \
+        get_feature_adj_from_instance(
+            td, env, ordered
+        )
+
+
+    embed_size = 80
+    n_samples = 1
+    # TODO må endre disse stiene, dette er bare fyllekode
+    model_path_enc_ordered = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/feature_v_adj/enc_type_2.pth'
+    model_path_adj = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/feature_v_adj/adj_type_2.pth'
+
+    # TODO tar først modell som har order
+    # f_ordered_assignments, elapsed = feature_inference(proc_times, job_id, pos_job, model_path, n_samples, embed_size)    
+    # f_assignments, elapsed = feature_inference(proc_times, job_id, pos_job, model_path, n_samples, embed_size)    
+    adj_ordered_assignments, elapsed = adj_inference(proc_times, job_id, pos_job, model_path_adj, n_samples, embed_size)    
+    # adj_assignments, elapsed = adj_inference(proc_times, job_id, pos_job, model_path, n_samples, embed_size)    
+    adj_ordered_assignments = adj_ordered_assignments[:, :, :4, :16]
+    adj_assignments = adj_assignments[:, :, :4, :16]
+
+    # adj_assignment = round_to_values(adj_assignments, False, 16)
+    # trenger ikke runde ordered, bare bruker til 16 største når skedulerer
+    # TODO ma assignment er ikke assignet, må muligens fjerne opt actions og optma assignments fra td
+    td_scheduled = inferenced_schedule(adj_assignments, False, env, td.copy())
+
+    makespan = td_scheduled['makespan']
+
+    # sammenligner target og fra modell
+    # her er det ikke viktig at resultatene er like, siden taget gir ikek en perfekt løsning
+    get_clear_sequence(td['opt_ma_assignments'])
+    get_clear_sequence(adj_assignments)
+
+
+    
 
 
 
@@ -595,7 +787,7 @@ import sys
 model_to_train = None
 if len(sys.argv) > 1:
     model_to_train = int(sys.argv[1])
-    logging.info("model_to_train:", model_to_train)
+    logging.info(f"Training models nr {model_to_train}")
 else:
     logging.info("Please provide a training number!")
 
@@ -631,9 +823,6 @@ def train_models(model_to_train: int):
         "max_eligible_ma_per_op": ma,
     }
     # TODO full path
-    full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
-    dataset_path = f'{full_path}/data/with_targets/batched_444'
-    loss_image_path = f'{full_path}/models/feature_v_adj'
 
     lrs = [1e-3, 1e-4, 1e-5, 1e-6]
     testing_epochs = 2
@@ -648,26 +837,43 @@ def train_models(model_to_train: int):
         training_func = adj_diffusion
         graph_name = f"adjecency model {model_to_train}"
 
+    full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
+
+    loss_image_path = f'{full_path}/models/feature_v_adj'
     graph_save_folder = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/graphs" 
 
-    dataset = Dataset_RL4CO(dataset_path, model_to_train, generator_params)
+    train_dataset_path = f'{full_path}/data/with_targets/batched_444'
+    test_dataset_path = f'{full_path}/data/with_targets/test_batched_444'
+    train_dataset = Dataset_RL4CO(train_dataset_path, model_to_train, generator_params)
+    test_dataset = Dataset_RL4CO(test_dataset_path, model_to_train, generator_params)
+
     model_path_enc = f'{full_path}/models/feature_v_adj/enc_type_{model_to_train}.pth'
-    model_path_adj = f'{full_path}/models/feature_v_adj/enc_type_{model_to_train}.pth'
+    model_path_adj = f'{full_path}/models/feature_v_adj/adj_type_{model_to_train}.pth'
     
-    best_testing_loss = 1
+    best_loss = 1
     best_lr = None
 
     logging.info(f"Began training model {model_to_train} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 
     for lr in lrs:
         logging.info(f"Training with lr {lr}")
-        path_enc, path_adj, last_epoch_loss = training_func(loss_image_path, dataset, model_to_train, base_embed, embed_size, 
-                                                                model_path_enc, model_path_adj, graph_name, graph_save_folder, lr=lr, num_epochs=testing_epochs)
-        if last_epoch_loss < best_testing_loss: best_lr = lr
+        path_enc, path_adj, last_epoch_loss = training_func(
+            loss_image_path, train_dataset, test_dataset, model_to_train,
+            base_embed, embed_size, model_path_enc, model_path_adj,
+            graph_name, graph_save_folder, testing_epochs, lr
+        ) 
+        if best_loss > last_epoch_loss: 
+            best_lr = lr
+            best_loss = last_epoch_loss
 
     logging.info(f"Best lr found: {best_lr}, for model {model_to_train} training full model now")
-    path_enc, path_adj, last_epoch_loss = training_func(loss_image_path, dataset, model_to_train, base_embed, embed_size, 
-                                                            model_path_enc, model_path_adj, graph_name, graph_save_folder, lr=best_lr, num_epochs=run_epochs)
+    path_enc, path_adj, last_epoch_loss = training_func(
+        loss_image_path, train_dataset, test_dataset, model_to_train,
+        base_embed, embed_size, model_path_enc, model_path_adj,
+        graph_name, graph_save_folder, run_epochs, best_lr
+    )
+
+
 
     logging.info(f"Ended training model {model_to_train} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 

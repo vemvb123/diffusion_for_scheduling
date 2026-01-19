@@ -11,11 +11,193 @@ import matplotlib.pyplot as plt
 import torch
 from PIL import Image
 import torchvision.io as io
-import utils
 from torchvision import datasets, transforms
 
 from tqdm import tqdm
 import time
+
+# når får tilbake x, så minsker jeg det jeg får til kun x innenfor dimensjonene
+def feature_inference(proc_times, job_id, pos_job, model_path, n_samples, embed_size):
+
+    device = "cuda"
+
+    adj_model = deepinv.models.DiffUNet(
+        in_channels=embed_size+1, out_channels=1, pretrained=Path(model_path)
+    ).to(device)
+    enc_model = deepinv.models.DiffUNet(
+        in_channels=3, out_channels=embed_size, pretrained=Path(model_path)
+    ).to(device)
+
+
+
+    # beta start var opprinnelig 1e-4
+    beta_start = 1e-4
+    beta_end = 0.02
+    timesteps = 1000
+
+    betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
+    alphas = 1.0 - betas
+    alphas_cumprod = torch.cumprod(alphas, dim=0)
+    sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
+    sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
+
+    model.eval()
+    
+    x = None
+    with torch.no_grad():
+        
+        # creating a matrix, everything out side of the submatrix dim_x,dim_y has the value 1, while the matrix dim_x,dim_y has a random value.
+        # similair to how x was masked during training
+        x = torch.randn(n_samples, 1, 20, 20).to(device)
+        # Set rows outside dim_x to 1
+        #x[:, :, dim_x:, :] = 1
+        # Set columns outside dim_y to 1 (for rows inside dim_x)
+        #x[:, :, :dim_x, dim_y:] = 1
+
+        # må fore inn maske...
+        features = torch.cat([
+            proc_times,
+            job_id,
+            pos_job,
+        ], dim=1)
+
+        features = features.to(device, dtype=torch.float32)
+        x = x.to(device, dtype=torch.float32)
+
+        # start timer
+        start_time = time.perf_counter()
+
+        for t in reversed(range(timesteps)):
+            t_tensor = torch.ones(n_samples, device=device).long() * t
+
+            f_enc = enc_model(features, t_tensor, type_t="timestep") 
+
+            inputs = torch.cat([
+                x,
+                f_enc,
+            ], dim=1)  # channels = 4
+
+            predicted_noise = adj_model(inputs, t_tensor, type_t="timestep")
+                
+            alpha = alphas[t]
+            alpha_cumprod = alphas_cumprod[t]
+            beta = betas[t]
+
+            # skal jeg bruke predicted noise? eller nei, det er vell bare for shape... man x er jo her med cond, så må kanskje endre, så lik predicted noise
+            if t > 0:
+                noise = torch.randn_like(x)
+            else:
+                noise = torch.zeros_like(x) # ma ha maske??
+                # noise = 0
+        
+            x = (1 / torch.sqrt(alpha)) * (
+                x - (beta / torch.sqrt(1 - alpha_cumprod)) * predicted_noise
+            ) + torch.sqrt(beta) * noise
+
+    # end timer
+    end_time = time.perf_counter()
+    elapsed = end_time - start_time
+
+    x = torch.clamp(x, 0, 1)
+
+    return x, elapsed
+
+
+
+
+# når får tilbake x, så minsker jeg det jeg får til kun x innenfor dimensjonene
+def adj_inference(proc_times, job_id, pos_job, model_path, n_samples):
+
+    device = "cuda"
+
+    model = deepinv.models.DiffUNet(
+        in_channels=3, out_channels=1, pretrained=Path(model_path)
+    ).to(device)
+
+    # beta start var opprinnelig 1e-4
+    beta_start = 1e-4
+    beta_end = 0.02
+    timesteps = 1000
+
+    betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
+    alphas = 1.0 - betas
+    alphas_cumprod = torch.cumprod(alphas, dim=0)
+    sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
+    sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
+
+    model.eval()
+
+    given_assignments = []
+    
+    x = None
+    with torch.no_grad():
+        
+        # creating a matrix, everything out side of the submatrix dim_x,dim_y has the value 1, while the matrix dim_x,dim_y has a random value.
+        # similair to how x was masked during training
+        x = torch.randn(n_samples, 1, 20, 20).to(device)
+        # Set rows outside dim_x to 1
+        #x[:, :, dim_x:, :] = 1
+        # Set columns outside dim_y to 1 (for rows inside dim_x)
+        #x[:, :, :dim_x, dim_y:] = 1
+
+        # må fore inn maske...
+        features = torch.cat([
+            proc_times,
+            job_id,
+            pos_job,
+        ], dim=1)
+
+        features = features.to(device, dtype=torch.float32)
+        x = x.to(device, dtype=torch.float32)
+
+        # start timer
+        start_time = time.perf_counter()
+
+        for t in reversed(range(timesteps)):
+            t_tensor = torch.ones(n_samples, device=device).long() * t
+
+            inputs = torch.cat([
+                x,
+                features,
+            ], dim=1)  # channels = 4
+
+            predicted_noise = model(inputs, t_tensor, type_t="timestep")
+                
+            alpha = alphas[t]
+            alpha_cumprod = alphas_cumprod[t]
+            beta = betas[t]
+
+            # skal jeg bruke predicted noise? eller nei, det er vell bare for shape... man x er jo her med cond, så må kanskje endre, så lik predicted noise
+            if t > 0:
+                noise = torch.randn_like(x)
+            else:
+                noise = torch.zeros_like(x) # ma ha maske??
+                # noise = 0
+        
+            x = (1 / torch.sqrt(alpha)) * (
+                x - (beta / torch.sqrt(1 - alpha_cumprod)) * predicted_noise
+            ) + torch.sqrt(beta) * noise
+            
+            if t % 250==0:
+                given_assignments.append(x)
+
+    # end timer
+    end_time = time.perf_counter()
+    elapsed = end_time - start_time
+
+    x = torch.clamp(x, 0, 1)
+
+    return x, elapsed, given_assignments
+
+
+
+
+
+
+
+
+
+
 
 
 
