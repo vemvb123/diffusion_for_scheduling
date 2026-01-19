@@ -331,7 +331,7 @@ def tensordict_to_dict(td):
 
 def make_dataset(n):
     print("Making dataset...")
-    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/batched_444'
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/test_batched_444'
     os.makedirs(dataset_folder, exist_ok=True)
     batch_size = 184
     for i in range(0, n, batch_size):
@@ -347,8 +347,9 @@ def make_dataset(n):
         logging.info(f'Made instance {i} to {i+batch_size}')
 
     logging.info(f'Made all {i+batch_size} instances. Done making dataset')
-# make_dataset(100000)
-# exit()
+make_dataset(20000)
+exit()
+
 # returnerer matriser i riktig shape, som inneholder featursene
 # ting utenfor adj blir maskert med 1
 # nar loss kalkuleres, fjernes ting utenfor rammen for instanse
@@ -600,10 +601,10 @@ else:
 
 # 1 features
 # 2 features ordered
-# 3 features ordered ma
+## 3 features ordered ma
 # 4 adj
 # 5 adj ordered
-# 6 adj ordered ma
+## 6 adj ordered ma
 
 from datetime import datetime
 
@@ -639,8 +640,15 @@ def train_models(model_to_train: int):
     run_epochs = 100
 
     training_func = None
-    if model_to_train >= 3: training_func = feature_diffusion
-    else: training_func = adj_diffusion
+    graph_name = None
+    if model_to_train >= 3: 
+        training_func = feature_diffusion
+        graph_name = f"feature vector model {model_to_train}"
+    else: 
+        training_func = adj_diffusion
+        graph_name = f"adjecency model {model_to_train}"
+
+    graph_save_folder = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/graphs" 
 
     dataset = Dataset_RL4CO(dataset_path, model_to_train, generator_params)
     model_path_enc = f'{full_path}/models/feature_v_adj/enc_type_{model_to_train}.pth'
@@ -654,12 +662,12 @@ def train_models(model_to_train: int):
     for lr in lrs:
         logging.info(f"Training with lr {lr}")
         path_enc, path_adj, last_epoch_loss = training_func(loss_image_path, dataset, model_to_train, base_embed, embed_size, 
-                                                                model_path_enc, model_path_adj, lr=lr, num_epochs=testing_epochs)
+                                                                model_path_enc, model_path_adj, graph_name, graph_save_folder, lr=lr, num_epochs=testing_epochs)
         if last_epoch_loss < best_testing_loss: best_lr = lr
 
     logging.info(f"Best lr found: {best_lr}, for model {model_to_train} training full model now")
     path_enc, path_adj, last_epoch_loss = training_func(loss_image_path, dataset, model_to_train, base_embed, embed_size, 
-                                                            model_path_enc, model_path_adj, lr=best_lr, num_epochs=run_epochs)
+                                                            model_path_enc, model_path_adj, graph_name, graph_save_folder, lr=best_lr, num_epochs=run_epochs)
 
     logging.info(f"Ended training model {model_to_train} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 

@@ -1,15 +1,26 @@
+Kiler:
+tspdiffuserTSPDiffuser: Diffusion Models as Learned Samplers for
+Traveling Salesperson Path Planning Problems
+https://arxiv.org/pdf/2406.02858
 
-Gjor at kan fullt kjore, skjekk at kan kjore - ingen feil
-Gjor at loss plottes
-gjor at stopper hvis loss ikke går ned etter 3 epoker
-Gjor så kan gjøre testkjør for å se shapes når klar til å kjøre
-gjor at kan kjore alle fra sbatch
+difformer
+https://arxiv.org/pdf/2301.09474
+
+diffusion moas plug and priors
+https://arxiv.org/pdf/2206.09012
+
+Planning with Diffusion for Flexible Behavior Synthesis
+https://arxiv.org/pdf/2205.09991
+
+Exploring the Boundary of Diffusion-based Methods
+for Solving Constrained Optimization
+https://arxiv.org/pdf/2502.10330
+
+DIFUSCO: Graph-based Diffusion Solvers
+for Combinatorial Optimization
+https://arxiv.org/pdf/2302.08224
 
 
-gjor:
-kjor diffusion med feature, se print for shapes.
-Deretter fjern alle der det står TODO i diffusion. så kjor utils fila igjen for a trene modellene.
-sa kjor de to sh scriptsa med sbatch navn.sh
 
 
-maske..?
+

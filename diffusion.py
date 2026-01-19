@@ -69,15 +69,125 @@ from torch.utils.data import DataLoader, Subset
 # ta vekk subset, gjor num epochs til 100
 
 
-def feature_diffusion(loss_image_path, dataset, ordered: int, n_base_features: int, n_embed_features: int,
-                      model_path_enc: str, model_path_adj: str, num_epochs: int = 5, lr: float = 1e-3, device: str = "cuda", batch_size: int = 32):
+
+def save_losses(epoch, graph_name, losses):
+    os.makedirs("./losses", exist_ok=True)
+    os.makedirs("./weights", exist_ok=True)
+    os.makedirs("./img/noised", exist_ok=True)
+    os.makedirs("./img/denoised", exist_ok=True)
+    os.makedirs("./img/original", exist_ok=True)
+
+    # all_losses.extend(epoch_losses)
+
+    # Save the losses list after each epoch
+    np.save(f"./losses/losses_epoch_{epoch+1}_{graph_name}.npy", np.array(losses))
+
+
+
+
+def plot_losses(save_path, graph_name, losses):
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, len(losses)+1), losses, marker='o')
+    plt.title(graph_name)
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.grid(True)
+    plt.savefig(f"{save_path}/{graph_name}.png")
+
+
+def run_epoch_feature(on_epoch_nr: int, loader, num_epochs, device, timesteps,
+                       model_enc, model_adj, optimizer,
+                       batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod):
+
+    total_loss = 0.0
+    epoch_losses = []  # Store losses for this epoch
+    loop = tqdm(loader, desc=f"Epoch {on_epoch_nr+1}/{num_epochs}", unit="batch")
+    for batch_idx, (target_assignments, proc_times, job_id, pos_job) in enumerate(loop): 
+        """ 
+        logging.info("dataset shapes")
+        logging.info(proc_times.shape)
+        logging.info(job_id.shape)
+        logging.info(pos_job.shape)
+        """
+
+        features = torch.cat([
+            proc_times,
+            job_id,
+            pos_job,
+        ], dim=1)
+
+        # logging.info(f"f shape {features.shape}")
+        features = features.to(device, dtype=torch.float32)
+        target_assignments = target_assignments.to(device, dtype=torch.float32)
+
+        # Sample random timesteps
+        t = torch.randint(0, timesteps, (batch_size,), device=device) 
+        # logging.info(f't shape {t.shape}')
+
+        # encode images
+        optimizer.zero_grad()
+        enc_f = model_enc(features, t, type_t="timestep")
+        # logging.info(f"encoded f {enc_f.shape}")
+        
+        # Sample noise
+        noise = torch.randn_like(target_assignments)
+        # Apply forward diffusion process at timestep t
+        noised = (
+            sqrt_alphas_cumprod[t, None, None, None] * target_assignments
+            + sqrt_one_minus_alphas_cumprod[t, None, None, None] * noise
+        )
+
+        #logging.info("catination")
+        #logging.info(noise.shape)
+        #logging.info(enc_f.shape)
+
+        model_input = torch.cat([
+                noised,
+                enc_f,
+            ], dim=1)
+        
+        #logging.info(model_input.shape)
+
+        # Predict noise
+        pred = model_adj(model_input, t, type_t="timestep")
+        #logging.info(f"made prediction, {pred.shape}")
+        
+        # only considering the valid loss region
+        valid_h = 4
+        valid_w = 16
+        pred_valid  = pred[..., :valid_h, :valid_w]
+        noise_valid = noise[..., :valid_h, :valid_w]
+        loss = nn.MSELoss()(pred_valid,noise_valid)
+
+        if mode == 'train':
+            loss.backward()
+            optimizer.step()
+
+        # Save the loss value
+        loss_value = loss.item()
+        total_loss += loss_value
+        epoch_losses.append(loss_value)
+
+        loop.set_postfix(loss=loss_value)
+
+    return loss, model
+
+
+
+
+
+
+def feature_diffusion(loss_image_path, train_dataset, test_dataset, ordered: int, n_base_features: int, n_embed_features: int,
+                      model_path_enc: str, model_path_adj: str, graph_name: str, graph_save_folder: str, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda", batch_size: int = 32):
 
 
     #subset_dataset = Subset(dataset, range(32*5))
     #loader = DataLoader(subset_dataset, batch_size=32, shuffle=False)
 
-    loader = DataLoader(dataset, batch_size=32, shuffle=True)
-    logging.info(f"N instances in dataset: { len(loader.dataset) }")
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)
+    logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
+    logging.info(f"N instances in test dataset: { len(train_loader.dataset) }")
     
     # out channels, flere, samme som embedding dimensjon .. men burde kanskje endre bilderep, fordi nu sliter koordinatet
     model_enc = deepinv.models.DiffUNet(in_channels=n_base_features, out_channels=n_embed_features, pretrained=None).to(device)
@@ -110,106 +220,51 @@ def feature_diffusion(loss_image_path, dataset, ordered: int, n_base_features: i
     sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
 
     all_losses = []
+    all_test_losses = []
     for epoch in range(num_epochs):
-        total_loss = 0.0
-        epoch_losses = []  # Store losses for this epoch
-        loop = tqdm(loader, desc=f"Epoch {epoch+1}/{num_epochs}", unit="batch")
-        for batch_idx, (target_assignments, proc_times, job_id, pos_job) in enumerate(loop): 
-            """ 
-            logging.info("dataset shapes")
-            logging.info(proc_times.shape)
-            logging.info(job_id.shape)
-            logging.info(pos_job.shape)
-            """
-
-            features = torch.cat([
-                proc_times,
-                job_id,
-                pos_job,
-            ], dim=1)
 
 
-            # logging.info(f"f shape {features.shape}")
-            features = features.to(device, dtype=torch.float32)
-            target_assignments = target_assignments.to(device, dtype=torch.float32)
+        train_loss = run_epoch_feature(
+            epoch, train_loader, num_epochs, device, timesteps,
+            model_enc, model_adj, optimizer,
+            batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod)
+               
 
-            # Sample random timesteps
-            t = torch.randint(0, timesteps, (batch_size,), device=device) 
-            # logging.info(f't shape {t.shape}')
-
-            # encode images
-            optimizer.zero_grad()
-            enc_f = model_enc(features, t, type_t="timestep")
-            # logging.info(f"encoded f {enc_f.shape}")
-            
-            # Sample noise
-            noise = torch.randn_like(target_assignments)
-            # Apply forward diffusion process at timestep t
-            noised = (
-                sqrt_alphas_cumprod[t, None, None, None] * target_assignments
-                + sqrt_one_minus_alphas_cumprod[t, None, None, None] * noise
-            )
-
-            #logging.info("catination")
-            #logging.info(noise.shape)
-            #logging.info(enc_f.shape)
-
-            model_input = torch.cat([
-                    noised,
-                    enc_f,
-                ], dim=1)
-            
-            #logging.info(model_input.shape)
-
-            # Predict noise
-            pred = model_adj(model_input, t, type_t="timestep")
-            #logging.info(f"made prediction, {pred.shape}")
-            
-            # only considering the valid loss region
-            valid_h = 4
-            valid_w = 16
-            pred_valid  = pred[..., :valid_h, :valid_w]
-            noise_valid = noise[..., :valid_h, :valid_w]
-            loss = nn.MSELoss()(pred_valid,noise_valid)
             # loss = nn.MSELoss()(pred, noise)
-            loss.backward()
-            optimizer.step()
+        train_loss.backward()
+        optimizer.step()
 
-            # Save the loss value
-            loss_value = loss.item()
-            total_loss += loss_value
-            epoch_losses.append(loss_value)
+        test_loss = run_epoch_feature(
+            epoch, test_loader, 1, device, timesteps,
+            model_enc, model_adj, optimizer,
+            batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod)
+             
 
-            loop.set_postfix(loss=loss_value)
 
 
         # Save all losses from this epoch
         # Create directories if they don't exist
-        os.makedirs("./losses", exist_ok=True)
-        os.makedirs("./weights", exist_ok=True)
-        os.makedirs("./img/noised", exist_ok=True)
-        os.makedirs("./img/denoised", exist_ok=True)
-        os.makedirs("./img/original", exist_ok=True)
 
-        # all_losses.extend(epoch_losses)
+        save_losses(epoch, f"{graph_name}_train", all_losses)
+        save_losses(epoch, f"{graph_name}_test", all_test_losses)
 
-        # Save the losses list after each epoch
-        np.save(f"./losses/losses_epoch_{epoch+1}.npy", np.array(all_losses))
 
-        avg_loss = total_loss / len(loader)
-        logging.info(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
+        avg_loss = total_loss / len(train_loader)
+
+        test_loss = test_feature_diffusion(
+            test_loader, model_enc, optimizer, model_adj,
+            n_base_features, n_embed_features,
+            beta_start, beta_end, timesteps,
+            device=device, batch_size=batch_size
+        )
+
+        logging.info(f"Epoch [{epoch + 1}/{num_epochs}], Train loss: {avg_loss:.4f}, test loss: {test_loss:.4f}")
 
         all_losses.append(avg_loss)
+        all_test_losses.append(test_loss)
 
-
-        torch.save(
-            model_enc.state_dict(),
-            model_path_enc,
-        )
-        torch.save(
-            model_adj.state_dict(),
-            model_path_adj,
-        )
+        torch.save(model_enc.state_dict(),model_path_enc,)
+        torch.save(model_adj.state_dict(),model_path_adj,)
 
         # If we have at least 2 epochs, check the difference
         if len(all_losses) >= 3:
@@ -220,6 +275,7 @@ def feature_diffusion(loss_image_path, dataset, ordered: int, n_base_features: i
                 )
                 break
 
+        """
         if len(all_losses) >= 2:
             diff = abs(all_losses[-2] - all_losses[-1])
             if diff < 0.0001:
@@ -228,29 +284,15 @@ def feature_diffusion(loss_image_path, dataset, ordered: int, n_base_features: i
                     "- stopping training early."
                 )
                 break
+        """
 
-
-
-    plt.figure(figsize=(8, 5))
-    plt.plot(range(1, len(all_losses)+1), all_losses, marker='o')
-    plt.title(f"Training Loss per Epoch, model {model_path_adj}")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.grid(True)
-
-    # save plot to file
-    plt.savefig(f"{loss_image_path}/f_{ordered}_loss_over_epochs.png")
     logging.info("saved loss image")
+    plot_losses(graph_save_folder, graph_name, all_losses)
+    plot_losses(graph_save_folder, graph_name, all_test_losses)
 
     logging.info("saved model")
-    torch.save(
-        model_enc.state_dict(),
-        model_path_enc,
-    )
-    torch.save(
-        model_adj.state_dict(),
-        model_path_adj,
-    )
+    torch.save(model_enc.state_dict(),model_path_enc,)
+    torch.save(model_adj.state_dict(),model_path_adj,)
 
     return model_path_enc, model_path_adj, epoch_losses[-1]
 
@@ -401,9 +443,8 @@ def adj_diffusion(loss_image_path, dataset, ordered: int, n_base_features: int, 
 
 
     logging.info("saved model")
-
     plt.figure(figsize=(8, 5))
-    plt.plot(range(1, len(all_losses)+1, all_losses, marker='o'))
+    plt.plot(range(1, len(all_losses)+1), all_losses, marker='o')
     plt.title(f"Training Loss per Epoch, model {model_path_adj}")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
