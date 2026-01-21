@@ -202,6 +202,8 @@ def adj_inference(proc_times, job_id, pos_job, model_path, n_samples):
 
 
 
+# her kan jeg eks ta at ikke skal bruke en maskin som test.
+# så kan jeg prøve på noe annet, eks øke brukbarhet, eller få ned inferencetid
 
 def guiding_function(x): #  is batch of instances
     target = 0
