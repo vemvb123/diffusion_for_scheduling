@@ -206,8 +206,16 @@ def adj_inference(proc_times, job_id, pos_job, model_path, n_samples):
 # så kan jeg prøve på noe annet, eks øke brukbarhet, eller få ned inferencetid
 
 def guiding_function(x): #  is batch of instances
-    target = 0
-    error = torch.abs(x - target).mean()
+    # x has shape [1, 1, 20, 20]
+    # extract the 4×16 region
+    x_inside = x[:, :, :4, :16]   # shape [1, 1, 4, 16]
+
+    # select the bottom row of that 4×16 → index 3
+    bottom_row = x_inside[:, :, 3, :]  # shape [1, 1, 16]
+
+    # compute mean absolute value of bottom row
+    error = torch.abs(bottom_row).mean()
+
     return error
 
 
@@ -220,6 +228,12 @@ def guide_adj_inference(conditions, n_channels, model_path, n_to_make, batch_siz
         in_channels=n_channels, out_channels=1, pretrained=Path(model_path)
     ).to(device)
 
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Amount of trainable parameters: {trainable_params}")
+
+
+
+    conditions = conditions.to(device, dtype=torch.float32)
 
 
     # beta start var opprinnelig 1e-4
@@ -234,59 +248,63 @@ def guide_adj_inference(conditions, n_channels, model_path, n_to_make, batch_siz
     sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
 
     model.eval()
-    
-    with torch.no_grad():
-                # start timer
-        start_time = time.perf_counter()
 
-        x_allocations = torch.rand(batch_size, 1, 20, 20)
-        x_allocations = x_allocations.to(device, dtype=torch.float32)
+    # start timer
+    start_time = time.perf_counter()
 
-        for t in reversed(range(timesteps)):
-            t_tensor = torch.ones(n_to_make, device=device).long() * t
-    
-            model_input = torch.cat([
-                    x_allocations,
-                    conditions,
-                ], dim=1)
-            
-            x_allocations = x_allocations.detach().requires_grad_()
-            pred_x_allocations = model(model_input, t_tensor, type_t="timestep")
- 
-            alpha = alphas[t]
-            alpha_cumprod = alphas_cumprod[t]
-            beta = betas[t]
+    x_allocations = torch.rand(batch_size, 1, 20, 20)
+    x_allocations = x_allocations.to(device, dtype=torch.float32)
 
-
-            estimated_x0 = (
-                (x_allocations - torch.sqrt(1 - alpha_cumprod) * pred_x_allocations) /
-                torch.sqrt(alpha_cumprod)
-            )
-
-            guidance_loss = guiding_function(estimated_x0) * guidence_scale 
-            # compute gradient wrt x_allocations
-            grad_x = torch.autograd.grad(guidance_loss, x_allocations)[0]
-            # update the noised sample towards lower guidance loss
-            x_guided = x_allocations.detach() - guidence_scale * grad_x
+    allocations_over_time = []
+    errors = []
+    for t in reversed(range(timesteps)):
+        t_tensor = torch.ones(n_to_make, device=device).long() * t
 
 
 
-
-            # skal jeg bruke predicted noise? eller nei, det er vell bare for shape... man x er jo her med cond, så må kanskje endre, så lik predicted noise
-            if t > 0:
-                noise = torch.randn_like(x_allocations)
-            else:
-                noise = torch.zeros_like(x_allocations) # ma ha maske??
-                # noise = 0
+        model_input = torch.cat([
+                x_allocations,
+                conditions,
+            ], dim=1)
         
-            x_prev = (1 / torch.sqrt(alpha)) * (
-                x_allocations - (beta / torch.sqrt(1 - alpha_cumprod)) * pred_x_allocations
-            ) + torch.sqrt(beta) * noise
+        x_allocations = x_allocations.detach().requires_grad_(True)    
+        pred_x_allocations = model(model_input, t_tensor, type_t="timestep")
 
-            x_allocations = x_prev.detach()
+        alpha = alphas[t]
+        alpha_cumprod = alphas_cumprod[t]
+        beta = betas[t]
+
+
+        estimated_x0 = (
+            (x_allocations - torch.sqrt(1 - alpha_cumprod) * pred_x_allocations) /
+            torch.sqrt(alpha_cumprod)
+        )
+
+        guidance_loss = guiding_function(estimated_x0) * guidence_scale 
+        # compute gradient wrt x_allocations
+        grad_x = torch.autograd.grad(guidance_loss, x_allocations)[0]
+        # update the noised sample towards lower guidance loss
+        x_guided = x_allocations.detach() - guidence_scale * grad_x
 
 
 
+
+        # skal jeg bruke predicted noise? eller nei, det er vell bare for shape... man x er jo her med cond, så må kanskje endre, så lik predicted noise
+        if t > 0:
+            noise = torch.randn_like(x_allocations)
+        else:
+            noise = torch.zeros_like(x_allocations) # ma ha maske??
+            # noise = 0
+    
+        x_prev = (1 / torch.sqrt(alpha)) * (
+            x_guided - (beta / torch.sqrt(1 - alpha_cumprod)) * pred_x_allocations # sto tidligere x_allocations
+        ) + torch.sqrt(beta) * noise
+
+        x_allocations = x_prev.detach()
+
+        if t % 100 == 0:
+            allocations_over_time.append(x_allocations.clone())
+            errors.append(guidance_loss)
 
     # end timer
     end_time = time.perf_counter()
@@ -294,7 +312,7 @@ def guide_adj_inference(conditions, n_channels, model_path, n_to_make, batch_siz
 
     x_allocations = torch.clamp(x_allocations, 0, 1)
 
-    return x_allocations, elapsed
+    return x_allocations, elapsed, allocations_over_time, errors
 
 
 

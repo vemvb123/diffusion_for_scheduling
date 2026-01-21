@@ -598,8 +598,6 @@ def round_to_values(x: torch.Tensor, n_values: int) -> torch.Tensor:
     # restore original leading dims
     result = result.view(orig_shape)
 
-    print(result)
-
     return result
     """
     # flatten and get top k indices
@@ -708,7 +706,6 @@ import random
 
 def inferenced_schedule(assignments, order: bool, env, td, path_save_image: str):
     actions = map_assignemnts_to_actions(assignments, order)
-    print(actions)
     # print(assignments)
     # print(td["opt_assignment"])
     # print(actions)
@@ -724,7 +721,6 @@ def inferenced_schedule(assignments, order: bool, env, td, path_save_image: str)
     #print(td.shape)
 
     td = td.unsqueeze(0)
-    print("scheduling actions")
     env.render(td, 0)
 
 
@@ -760,11 +756,8 @@ def inferenced_schedule(assignments, order: bool, env, td, path_save_image: str)
                     td['action'] = torch.tensor([actions[op]])
                     td = env.step(td)['next']
                     env.render(td, 0)
-                    print(f"did action {actions[op]}")
-                    print(f"actions: {actions}")
                 else:
                     td["time"] = busy_val.unsqueeze(0)
-                    print("could not schedule, jumped in time")
 
     if path_save_image:
         plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
@@ -951,12 +944,20 @@ def compare_inference_guiding(model_type: str, order: bool, adj_model_path, enc_
     print("Running inference")
 
 
+    conditions = torch.cat([            
+        proc_times,
+        job_id,
+        pos_job,
+    ], dim=1)
+
     inference_assignments = None
     if model_type == "adj":
+        print("running inference")
         # NORMAL INFERENCE
         inference_assignments, elapsed, assignments_over_time = adj_inference(proc_times, job_id, pos_job, adj_model_path, n_samples)
+        print("running guided inference")
         # INFERENCE GUIDE
-        guided_inference_assignments, guided_elapsed, guided_assignments_over_time = guide_adj_inference(proc_times, job_id, pos_job, adj_model_path, n_samples)
+        guided_inference_assignments, guided_elapsed, guided_assignments_over_time, errors = guide_adj_inference(conditions,3+1, adj_model_path, n_samples, 1)
 
     elif model_type == "f":
         pass
@@ -964,19 +965,26 @@ def compare_inference_guiding(model_type: str, order: bool, adj_model_path, enc_
         raise ValueError("Model type must be either adj or f")
 
 
-    guided_inference_assignments = inference_assignments[:, :, :4, :16]
+    guided_inference_assignments = guided_inference_assignments[:, :, :4, :16]
     inference_assignments = inference_assignments[:, :, :4, :16]
 
 
     
     # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
-    if order:
-        inference_assignments = show_order_clear(inference_assignments, 16)
-    else:
-        inference_assignments = round_to_values(inference_assignments, 16)
+    #if order:
+    inference_assignments = round_to_values(inference_assignments, 16)
+    guided_inference_assignments = round_to_values(guided_inference_assignments, 16)
+    #else:
+    #    inference_assignments = show_order_clear(inference_assignments, 16)
+    #    guided_inference_assignments = show_order_clear(guided_inference_assignments, 16)
 
+    print("RESULT")
     print(inference_assignments)
     print(guided_inference_assignments)
+
+    for value in [x.item() for x in errors]:
+        print(value)
+
 
 
     """
@@ -1027,7 +1035,7 @@ dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_pros
 instance_idx = 10
 
 print("inference result")
-get_inference_result(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
+compare_inference_guiding(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
 exit()
    
 
