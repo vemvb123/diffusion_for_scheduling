@@ -111,7 +111,7 @@ def adj_inference(proc_times, job_id, pos_job, model_path, n_samples):
     device = "cuda"
 
     model = deepinv.models.DiffUNet(
-        in_channels=3, out_channels=1, pretrained=Path(model_path)
+        in_channels=4, out_channels=1, pretrained=Path(model_path)
     ).to(device)
 
     # beta start var opprinnelig 1e-4
@@ -141,7 +141,7 @@ def adj_inference(proc_times, job_id, pos_job, model_path, n_samples):
         #x[:, :, :dim_x, dim_y:] = 1
 
         # må fore inn maske...
-        features = torch.cat([
+        features = torch.cat([            
             proc_times,
             job_id,
             pos_job,
@@ -178,8 +178,8 @@ def adj_inference(proc_times, job_id, pos_job, model_path, n_samples):
                 x - (beta / torch.sqrt(1 - alpha_cumprod)) * predicted_noise
             ) + torch.sqrt(beta) * noise
             
-            if t % 250==0:
-                given_assignments.append(x)
+            if t % 100==0:
+                given_assignments.append(x.clone())
 
     # end timer
     end_time = time.perf_counter()

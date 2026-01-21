@@ -120,6 +120,12 @@ def run_epoch_feature(loop, device, timesteps,
         features = features.to(device, dtype=torch.float32)
         target_assignments = target_assignments.to(device, dtype=torch.float32)
 
+        B = target_assignments.shape[0]
+        if B != batch_size:
+            logging.warning(f"Skipping batch {batch_idx} with size {B}")
+            continue
+ 
+
         # Sample random timesteps
         t = torch.randint(0, timesteps, (batch_size,), device=device) 
         # logging.info(f't shape {t.shape}')
@@ -248,14 +254,13 @@ def feature_diffusion(loss_image_path, train_dataset, test_dataset, ordered: int
         torch.save(model_adj.state_dict(),model_path_adj,)
 
 
-        # If we have at least 2 epochs, check the difference
-        if len(all_losses) >= 3:
-            if all_losses[-1] > all_losses[-2] and all_losses[-2] > all_losses[-3]:
+        if len(all_losses_test) >= 4:
+            if all_losses_test[-1] > all_losses_test[-4]:
                 logging.info(
-                    f"Loss has increased for two consecutive epochs "
-                    "- stopping training early."
+                    "Test loss has not gone down for 4 epochs - stopping early"
                 )
                 break
+    
 
 
     logging.info("saved loss image")
@@ -436,10 +441,10 @@ def adj_diffusion(
 
         torch.save(model_adj.state_dict(), model_path_adj)
 
-        if len(all_losses) >= 3:
-            if all_losses[-1] > all_losses[-2] and all_losses[-2] > all_losses[-3]:
+        if len(all_losses_test) >= 4:
+            if all_losses_test[-1] > all_losses_test[-4]:
                 logging.info(
-                    "Loss has increased for two consecutive epochs - stopping early."
+                    "Test loss has not gone down for 4 epochs - stopping early"
                 )
                 break
     

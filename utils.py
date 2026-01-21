@@ -1,13 +1,14 @@
 import logging
 
+logging.info(1)
 logging.basicConfig(
     level=logging.INFO,
     format="%(filename)s:%(lineno)d - %(message)s"
 )
 
 
-import io
-import random
+logging.info(2)
+
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 from typing import Tuple, Optional
@@ -21,6 +22,8 @@ Method to vizulise a schedule
 A class representing a dataset, which combined op and ma embeddings, and can also return a combined data back into a ma and op embedding
 """
 # logging.info(1)
+
+logging.info(3)
 import torch
 from torch.utils.data import Dataset
 # logging.info("skjekk")
@@ -34,6 +37,8 @@ from rl4co.models.zoo.l2d import L2DModel
 # from IPython.display import display, clear_output
 
 # logging.info(2)
+
+logging.info(4)
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -54,6 +59,7 @@ import numpy as np
 import networkx as nx  # Make sure you install networkx if you don’t have it
 
 
+logging.info(5)
 import json
 
 # logging.info(4)
@@ -110,6 +116,7 @@ def map_index_to_action(r_i, op_i, generator_params):
     return (op_i + 1) + (r_i // job_size) * ma_size
 
 
+logging.info(6)
 import gc
 from rl4co.envs import JSSPEnv
 from rl4co.models.zoo.l2d.model import L2DPPOModel
@@ -121,19 +128,17 @@ import os
 
 # 1: no order
 # 2: ordered
-# 3: ordered ma
 
+
+# order .. første skedulerte op har minst verdi, sist skedulerte op har størst verdi
 def schedule_actions(
-        actions, td_unscheduled, env, ordered: int
+        actions, td_unscheduled, env, order: bool
 ):
     """
     ordered == 2: global normalized order (i / n_actions)
     ordered == 3: per-row normalized order
     ordered == 1: (reserved / undefined – keep same as 1 for now)
     """
-
-    if ordered not in (1, 2, 3):
-        raise ValueError(f"ordered {ordered} is not supported, must be either 1, 2 or 3")
 
     n_actions = len(actions)
 
@@ -157,42 +162,11 @@ def schedule_actions(
 
         if diff.any():
 
-            if ordered == 1 or ordered == 2:
-                # global normalized order
-                normalized_order = i / float(n_actions)
-                assignment_adj[diff] = normalized_order
-
-            elif ordered == 3:
-                # for each row, assign per-row sequential rank
-                batch_idx, rows, cols = diff.nonzero(as_tuple=True)
-                if batch_idx.numel() > 0 and batch_idx.max() > 0:
-                        # optionally handle multi-batch later
-                        raise NotImplementedError("Batch size > 1 not yet supported for ordered==3")
-
-
-                for r, c in zip(rows.tolist(), cols.tolist()):
-                    # increment this row's counter
-                    per_row_counts[r] += 1
-
-                    # total possible edges for that row
-                    # (could also compute it if known in advance)
-                    # But here we only know relative rank, not full normalizer
-                    # So store raw sequence index for now
-                    assignment_adj[r, c] = per_row_counts[r]
-
+            # global normalized order
+            normalized_order = i / float(n_actions)
+            assignment_adj[diff] = normalized_order
         prev_adj = new_adj.clone()
 
-    if ordered == 3:
-        # now normalize per row
-        # for each row r, divide all nonzero entries
-        # by the maximum count
-        for r in range(assignment_adj.size(0)):
-            row_vals = assignment_adj[r]
-            nonzero = row_vals.nonzero()
-            if nonzero.numel() > 0:
-                max_val = row_vals.max()
-                if max_val > 0:
-                    assignment_adj[r] = assignment_adj[r] / float(max_val)
 
     td_to_actions["ma_assignment"] = assignment_adj
     # td_to_actions = td_to_actions.squeeze(0)
@@ -362,6 +336,7 @@ def make_dataset(n):
 # ma ogsa returneree target
 # normaliserer
 
+logging.info(7)
 import torch.nn.functional as F
 
 def expand_matrix(x: torch.Tensor, shape_to_make: tuple[int, int], max_and_min: tuple[int, int]) -> torch.Tensor:
@@ -388,7 +363,7 @@ def expand_matrix(x: torch.Tensor, shape_to_make: tuple[int, int], max_and_min: 
 # TODO
 # trene med forskjelige loss verdier...
 # trener da for 2 epoker, så ser hvilken av lossene som er minst, og trener en modell for flere epoker med den lr
-def get_feature_adj_from_instance(td: TensorDict, env, ordered: int) -> tuple[
+def get_feature_adj_from_instance(td: TensorDict, env, order: bool) -> tuple[
         torch.Tensor, # target assignments
         torch.Tensor, # proc times matrix
         torch.Tensor, # jobid matrix
@@ -396,8 +371,8 @@ def get_feature_adj_from_instance(td: TensorDict, env, ordered: int) -> tuple[
         ]:
     # bytt senere ut med assignments fra target
     assignments = None
-    if ordered == 2 or ordered == 3:
-        td_scheduled = schedule_actions(td['opt_actions'], td.copy(), env, ordered)
+    if order:
+        td_scheduled = schedule_actions(td['opt_actions'], td.copy(), env, order)
         assignments = td_scheduled['ma_assignment']
         # assignments = assignments.unsqueeze(0)
     else:
@@ -433,22 +408,6 @@ def get_feature_adj_from_instance(td: TensorDict, env, ordered: int) -> tuple[
     logging.info(job_id.shape)
     logging.info(pos_job.shape)
     """
-    if torch.isnan(assignments).any():
-        print("assignemtn NaN values found in features tensor")
-        exit()
-    if torch.isnan(proc_times).any():
-        print("proc NaN values found in features tensor")
-        exit()
-    if torch.isnan(job_id).any():
-        print("job id NaN values found in features tensor")
-        exit()
-    if torch.isnan(pos_job).any():
-        print("pos job NaN values found in features tensor")
-        exit()
-
-
-
-
 
     return assignments, proc_times, job_id, pos_job
 '''
@@ -480,6 +439,7 @@ td = env.reset(batch_size=[1])
 get_feature_adj_from_instance(td)
 '''
 
+logging.info(8)
 import os
 import torch
 from torch.utils.data import Dataset
@@ -517,13 +477,14 @@ class Dataset_RL4CO(Dataset):
         return target_assignments, proc_times, job_id, pos_job
 """
 
+logging.info(9)
 import bisect
 
 class Dataset_RL4CO(Dataset):
-    def __init__(self, folder, ordered: bool, generator_params, transform=None):
+    def __init__(self, folder, ordered: bool, generator_params, order,transform=None):
         self.folder = folder
         self.transform = transform
-        self.ordered = ordered
+        self.order = order
         self.generator_params = generator_params
         self.env = FJSPEnv(generator_params=self.generator_params)
 
@@ -576,26 +537,81 @@ class Dataset_RL4CO(Dataset):
 
         target_assignments, proc_times, job_id, pos_job = \
             get_feature_adj_from_instance(
-                td_instance, self.env, self.ordered
+                td_instance, self.env, self.order
             )
+
+        for data in [target_assignments, proc_times, job_id, pos_job]:
+            if torch.isnan(data).any():
+                raise ValueError("Assignment NaN values found in tensor")
 
         return target_assignments, proc_times, job_id, pos_job
 
 
+logging.info(10)
 
 from inference import feature_inference, adj_inference
 
-def round_to_values(x, ordered: bool, n_values: int):
-    if ordered == False:
-        # flatten tensor, get indices of top 16 values
-        topk_vals, topk_idx = torch.topk(x.flatten(), n_values)
+# første skedulerte har minst verdi, sist skedulerte har størst verdi
+def show_order_clear(x, n_values):
+    # flatten all values
+    flat = x.flatten()
 
-        # create a copy or a zero tensor
-        y = x.clone()
+    # find the top 16 values and their indices
+    topk_vals, topk_idx = torch.topk(flat, n_values)
 
-        # set the top 16 values to 1
-        y.flatten()[topk_idx] = 1.0
-        return y
+    # sort those top 16 in descending order so largest -> rank 1
+    sorted_vals, sorted_order = torch.sort(topk_vals, descending=False)
+    top16_idx_sorted = topk_idx[sorted_order]
+
+    # create an output tensor of zeros
+    out = torch.zeros_like(flat)
+
+    # assign ranks 1..16 to those positions
+    for rank, idx in enumerate(top16_idx_sorted, start=1):
+        out[idx] = rank
+
+    # reshape back to original
+    return out.view_as(x)
+
+
+
+
+
+def round_to_values(x: torch.Tensor, n_values: int) -> torch.Tensor:
+    orig_shape = x.shape
+
+    # assume shape [1,1,4,16] or similar, so flatten leading dims
+    flat = x.view(-1, x.shape[-2], x.shape[-1])  # [B, 4, 16]
+
+    # find max in each column along row dim (dim=1)
+    max_vals, _ = flat.max(dim=1, keepdim=True)  # [B, 1, 16]
+
+    # compare with max and binarize
+    mask = torch.isclose(flat, max_vals)  # True where value == max
+
+    # convert to float (1.0/0.0)
+    result = mask.float()
+
+    # restore original leading dims
+    result = result.view(orig_shape)
+
+    print(result)
+
+    return result
+    """
+    # flatten and get top k indices
+    topk_vals, topk_idx = torch.topk(x.flatten(), n_values)
+
+    # start with all zeros
+    y = torch.zeros_like(x).flatten()
+
+    # set top entries to 1
+    y[topk_idx] = 1.0
+
+    # reshape back to original shape
+    return y.view(x.shape)
+
+    """
 
 
 
@@ -614,92 +630,173 @@ def round_to_values(x, ordered: bool, n_values: int):
 
 
 def map_assignemnts_to_actions(assignments, ordered: bool):
+
+    # remove batch/channel dims if present
+    if assignments.dim() == 4:
+        assignments = assignments.squeeze(0).squeeze(0)  # (4,16)
+
+    H, W = assignments.shape  # H=4, W=16
+    section_width = 4
+    num_sections = W // section_width
+
+    actions = []
+
     if ordered:
+        # order by largest value first
+        _, indices = torch.topk(assignments.flatten(), H * W)
 
-        # remove batch/channel dims if present
-        if assignments.dim() == 4:
-            assignments = assignments.squeeze(0).squeeze(0)  # (4,16)
-
-        H, W = assignments.shape  # H=4, W=16
-        section_width = 4
-        num_sections = W // section_width
-
-        actions = []
-
-        if ordered:
-            # order by largest value first
-            _, indices = torch.topk(assignments.flatten(), H * W)
-
-            for idx in indices:
-                row = idx // W
-                col = idx % W
-                section = col // section_width
-                action = section * H + row + 1
-                actions.append(action.item())
+        for idx in indices:
+            row = idx // W
+            col = idx % W
+            section = col // section_width
+            action = section * H + row + 1
+            actions.append(action.item())
 
     else:
-        # section-wise column sweep:
-        # col 0 in section 0, col 0 in section 1, ...
-        # then col 1 in section 0, etc.
-        for local_col in range(section_width):
-            for section in range(num_sections):
-                col = section * section_width + local_col
+        cols_per_section = 4
+        actions = []
 
-                # pick row with max value in this column
-                row = torch.argmax(assignments[:, col]).item()
+        for col in range(assignments.shape[1]):
+            section_idx = col // cols_per_section
+            for row in range(assignments.shape[0]):
+                if assignments[row, col] == 1: 
+                    value = section_idx * cols_per_section + (row + 1)
+                    actions.append(value)
 
-                action = section * H + row + 1
-                actions.append(action)
-
-    return actions
+        return actions
 
 
 
 def make_step(env, td, action):
     td['action'] = torch.tensor([action])
     td = env.step(td)['next']
+
+
     return td
+
+
+import time
+import random
 
 def inferenced_schedule(assignments, ordered: bool, env, td, path_save_image: str):
     actions = map_assignemnts_to_actions(assignments, ordered)
+    td.del_("opt_assignment")
+    td.del_("opt_actions")
 
+    #print(td.shape)
+    #td = TensorDict.from_dict(td, auto_batch_size=True)
+    #print(td.shape)
+    #td = TensorDict(td, batch_size=[1])
+    #print(td.shape)
+
+    td = td.unsqueeze(0)
     if path_save_image:
+        print("scheduling actions")
+
         env.render(td, 0)
         i = 0
         fig = None
-        while not td["done"].all():
-            td = make_step(env, td, actions[i])
-            fig = env.render(td, 0)
-            i += 1
-        fig.savefig(f"frame_{i:03d}.png")
-        plt.close(fig)
-    else:
-        i = 0
-        while not td["done"].all():
-            td = make_step(env, td, actions[i])
-            i+=1
 
+
+        looped = 0
+        hit = False
+
+
+
+        #---
+        while not td["done"].all():
+            # loop true indexer
+            # for en true index, se at maskinen den oppgaven skal skeduleres til ikke er opptatt
+            # det ses ved at: mapped = [((v - 1) % 4) + 1 for v in actions]  ... fra ctions
+            # hvis opptatt, gå til neste gå til neste true.
+            # så den oppgaven endelig kn skeduleres, skeduleres den, så starter du å loope true fra starten av
+            # time.sleep(10)
+            print(td["time"])
+            print(td["busy_until"])
+            print(td["is_ready"])
+            print(assignments)
+
+            hit = False
+
+            ready_ops = torch.nonzero(td["is_ready"], as_tuple=True)[1]
+
+            ma_indices_for_actions = [((v - 1) % 4) for v in actions]  # 0‑based
+            # print("machine indices:", ma_indices_for_actions)
+
+            for op in ready_ops:
+                op = op.item()
+                machine_idx = ma_indices_for_actions[op]
+                busy_val = td["busy_until"][0, machine_idx]
+                current_time = td["time"][0]
+
+                if busy_val <= current_time:
+                    td['action'] = torch.tensor([actions[op]])
+                    td = env.step(td)['next']
+
+
+                    env.render(td, 0)
+                    looped = 0
+                    hit = True
+                    # print(f"did action {actions[op]}")
+                    # ---
+                if hit == False:
+                    looped += 1
+                if looped >= 16:
+                    mask_flat = td["is_ready"].flatten()
+                    true_cols = torch.nonzero(mask_flat, as_tuple=True)[0]  # e.g. [8, 12]
+                    sections = (true_cols // 4) + 1  # 1‑based section index
+                    sections = sections.tolist()                        
+
+                    random_section = random.choice(sections)
+                    td['action'] = torch.tensor([actions[op]])
+                    td = env.step(td)['next']
+                    env.render(td, 0)
+                    looped = 0
+                    hit = True
+                    # print(f"did action {actions[op]}")
+                    # ---
+
+        plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
     return td
 
 
 
  
 # /cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/test_batched_444/0_184.pt
-def get_td_from_path(path, instance_idx: int) -> TensorDict:
-    for fname in os.listdir(path):
-        if not fname.endswith(".pt"):
-            continue
 
+def get_td_from_path(path: str, instance_idx: int) -> Tensor:
+    # Get sorted list of data files
+    files = sorted([f for f in os.listdir(path) if f.endswith(".pt")])
+    # Build file ranges
+    cum_sizes = []
+    ranges = []
+    total = 0
+
+    for fname in files:
         start, end = map(int, fname.replace(".pt", "").split("_"))
+        size = end - start
+        cum_sizes.append(total)
+        ranges.append((start, end))
+        total += size
 
-        if start <= instance_idx < end:
-            file_path = os.path.join(path, fname)
-            batch = torch.load(file_path)
+    # Find which file contains the instance
+    file_idx = bisect.bisect_right(cum_sizes, instance_idx) - 1
+    if file_idx < 0:
+        raise ValueError(f"Instance {instance_idx} not found in {path}")
 
-            local_idx = instance_idx - start
-            return batch[local_idx]
+    file_path = os.path.join(path, files[file_idx])
 
-    raise ValueError(f"Instance {instance_idx} not found in {path}")
+    # Load with weights_only=False so that TensorDict objects (or other custom objects)
+    # can be unpickled properly. Only do this if the file is from a trusted source.
+    batch = torch.load(
+        file_path,
+        map_location="cpu",
+        weights_only=False,  # use full pickle, not restricted weights_only loader
+    )
+
+    # Compute local index within this batch
+    local_idx = instance_idx - cum_sizes[file_idx]
+    return batch[local_idx]
 
 
 # bruk hvis ordered, for å se klart sekvens
@@ -731,50 +828,110 @@ def get_clear_sequence(assignments):
 
 
 
+"""
+adj_1_loss_over_epochs.png  adj_type_4.pth  enc_type_4.pth            f_2_loss_over_epochs.png  model_adj_adj_noorder.pth      model_feature_adj_order.pth
+adj_2_loss_over_epochs.png  enc_type_1.pth  enc_type_5.pth            f_4_loss_over_epochs.png  model_adj_adj_order.pth        model_feature_enc_noorder.pth
+adj_type_1.pth              enc_type_2.pth  f_1_loss_over_epochs.png  f_5_loss_over_epochs.png  model_feature_adj_noorder.pth  model_feature_enc_order.pth
+"""
 
-def get_inference_result():
 
-    path = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/test_batched_444"
-    which_instance_in_batch = 10
+# 4 features
+# 5 features ordered
+# 1 adj
+# 2 adj ordered
 
-    td = get_td_from_path(path, which_instance_in_batch)
+def get_inference_result(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx):
+
+    # GETTING DATA OF TEST INSTANCE TO CHECK
+    td = get_td_from_path(dataset_folder, instance_idx)
+
     env, td_ignore, generator_params = make_instance(4,4,4,5,50, batch_size=1)
-    ordered = 1
 
-    target_assignments, proc_times, job_id, pos_job = \
-        get_feature_adj_from_instance(
-            td, env, ordered
-        )
+    target_assignments, proc_times, job_id, pos_job = get_feature_adj_from_instance(td, env, order)
 
+    target_assignments = target_assignments.unsqueeze(0)
+    proc_times = proc_times.unsqueeze(0)
+    job_id = job_id.unsqueeze(0)
+    pos_job = pos_job.unsqueeze(0)
 
+    # GETTING THE INFERENCED RESULT
     embed_size = 80
     n_samples = 1
-    # TODO må endre disse stiene, dette er bare fyllekode
-    model_path_enc_ordered = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/feature_v_adj/enc_type_2.pth'
-    model_path_adj = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/feature_v_adj/adj_type_2.pth'
 
-    # TODO tar først modell som har order
-    # f_ordered_assignments, elapsed = feature_inference(proc_times, job_id, pos_job, model_path, n_samples, embed_size)    
-    # f_assignments, elapsed = feature_inference(proc_times, job_id, pos_job, model_path, n_samples, embed_size)    
-    adj_ordered_assignments, elapsed = adj_inference(proc_times, job_id, pos_job, model_path_adj, n_samples, embed_size)    
-    # adj_assignments, elapsed = adj_inference(proc_times, job_id, pos_job, model_path, n_samples, embed_size)    
-    adj_ordered_assignments = adj_ordered_assignments[:, :, :4, :16]
-    adj_assignments = adj_assignments[:, :, :4, :16]
+    print("Running inference")
 
-    # adj_assignment = round_to_values(adj_assignments, False, 16)
-    # trenger ikke runde ordered, bare bruker til 16 største når skedulerer
-    # TODO ma assignment er ikke assignet, må muligens fjerne opt actions og optma assignments fra td
-    td_scheduled = inferenced_schedule(adj_assignments, False, env, td.copy())
+    inference_assignments = None
+    if model_type == "adj":
+        inference_assignments, elapsed, assignments_over_time = adj_inference(proc_times, job_id, pos_job, adj_model_path, n_samples)
+    elif model_type == "f":
+        pass
+    else:
+        raise ValueError("Model type must be either adj or f")
 
-    makespan = td_scheduled['makespan']
+    print("Inference done. Took {elapsed} time")
 
-    # sammenligner target og fra modell
-    # her er det ikke viktig at resultatene er like, siden taget gir ikek en perfekt løsning
-    get_clear_sequence(td['opt_ma_assignments'])
-    get_clear_sequence(adj_assignments)
+
+    inference_assignments = inference_assignments[:, :, :4, :16]
 
 
     
+    # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
+    if order:
+        inference_assignments = show_order_clear(inference_assignments, 16)
+    else:
+        inference_assignments = round_to_values(inference_assignments, 16)
+
+    print("inferenced results here:")
+    target_assignments = target_assignments[:,:,:4,:16]
+    print(inference_assignments)
+    print(target_assignments)
+    print(show_order_clear(target_assignments, 16))
+    print("exit")
+    exit()
+
+    # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESULT
+    for i, assignment_at_time in enumerate(assignments_over_time):
+        assignment_at_time = assignment_at_time[:, :, :4, :16]
+        if order:
+            assignment_at_time = round_to_values(assignment_at_time, 16)
+        else:
+            assignment_at_time = show_order_clear(assignment_at_time, 16)
+
+        if torch.equal(assignment_at_time, inference_assignments):
+            print(f"assignments are exactly the same at point {i}")
+            print(assignment_at_time)
+            print(inference_assignments)
+            break
+    
+    # SCHEDULING THE INFERENCED SCHEDULE
+    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/graphs"
+    graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
+    graph_save_path = f"{graph_folder}/{graph_name}"
+
+    td_scheduled = inferenced_schedule(inference_assignments, False, env, td.copy(), graph_save_path)
+
+    # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
+    makespan = td_scheduled['makespan']
+    print(makespan)
+
+
+
+model_type = "adj"
+order = True
+adj_model_path = None
+enc_model_path = None
+if order:
+    adj_model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/feature_v_adj/adj_type_2.pth'
+else:
+    adj_model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/feature_v_adj/adj_type_1.pth'
+
+dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/test_batched_444'
+instance_idx = 10
+
+print("inference result")
+get_inference_result(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
+exit()
+   
 
 
 
@@ -791,17 +948,32 @@ if len(sys.argv) > 1:
 else:
     logging.info("Please provide a training number!")
 
-# 1 features
-# 2 features ordered
-## 3 features ordered ma
-# 4 adj
-# 5 adj ordered
-## 6 adj ordered ma
+
+model_type = None
+order = None
+if model_to_train < 3:
+    model_type = "adj"
+elif model_to_train > 2:
+    model_type = "f"
+if model_to_train == 2 or model_to_train == 4:
+    order = True
+elif model_to_train == 1 or model_to_train == 3:
+    order = False
+
+logging.info("Using model: type: {type}, order: {order}")
+if model_type == None or order == None:
+    raise ValueError("That model type dosent exist. pecify one between 1 and 2")
+
+# 1 adj
+# 2 adj ordered
+# 3 f
+# 4 f ordered
+
+
 
 from datetime import datetime
 
-def train_models(model_to_train: int):
-    logging.info(f"Training models nr {model_to_train}")
+def train_models(model_type: str, order: bool):
 
     jobs = 4
     ma = 4
@@ -830,12 +1002,11 @@ def train_models(model_to_train: int):
 
     training_func = None
     graph_name = None
-    if model_to_train >= 3: 
+    if  model_type == "f": 
         training_func = feature_diffusion
-        graph_name = f"feature vector model {model_to_train}"
-    else: 
+    elif model_type == "adj": 
         training_func = adj_diffusion
-        graph_name = f"adjecency model {model_to_train}"
+    graph_name = f"model {model_type}, with order: {order}"
 
     full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
 
@@ -844,16 +1015,16 @@ def train_models(model_to_train: int):
 
     train_dataset_path = f'{full_path}/data/with_targets/batched_444'
     test_dataset_path = f'{full_path}/data/with_targets/test_batched_444'
-    train_dataset = Dataset_RL4CO(train_dataset_path, model_to_train, generator_params)
-    test_dataset = Dataset_RL4CO(test_dataset_path, model_to_train, generator_params)
+    train_dataset = Dataset_RL4CO(train_dataset_path, generator_params, order)
+    test_dataset = Dataset_RL4CO(test_dataset_path, generator_params, order)
 
-    model_path_enc = f'{full_path}/models/feature_v_adj/enc_type_{model_to_train}.pth'
-    model_path_adj = f'{full_path}/models/feature_v_adj/adj_type_{model_to_train}.pth'
+    model_path_enc = f'{full_path}/models/feature_v_adj/enc_type_{model_type}_order_{order}.pth'
+    model_path_adj = f'{full_path}/models/feature_v_adj/adj_type_{model_type}_order_{order}.pth'
     
     best_loss = 1
     best_lr = None
 
-    logging.info(f"Began training model {model_to_train} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+    logging.info(f"Began training model {model_type} order_{order} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 
     for lr in lrs:
         logging.info(f"Training with lr {lr}")
@@ -866,7 +1037,7 @@ def train_models(model_to_train: int):
             best_lr = lr
             best_loss = last_epoch_loss
 
-    logging.info(f"Best lr found: {best_lr}, for model {model_to_train} training full model now")
+    logging.info(f"Best lr found: {best_lr}, for model {model_type} order_{order} training full model now")
     path_enc, path_adj, last_epoch_loss = training_func(
         loss_image_path, train_dataset, test_dataset, model_to_train,
         base_embed, embed_size, model_path_enc, model_path_adj,
@@ -875,10 +1046,10 @@ def train_models(model_to_train: int):
 
 
 
-    logging.info(f"Ended training model {model_to_train} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+    logging.info(f"Ended training model {model_type} order_{order} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 
 
-train_models(model_to_train)
+# train_models(model_type, order)
 
 
 
