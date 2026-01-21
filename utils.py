@@ -481,7 +481,7 @@ logging.info(9)
 import bisect
 
 class Dataset_RL4CO(Dataset):
-    def __init__(self, folder, ordered: bool, generator_params, order,transform=None):
+    def __init__(self, folder, generator_params, order,transform=None):
         self.folder = folder
         self.transform = transform
         self.order = order
@@ -915,7 +915,7 @@ def get_inference_result(model_type: str, order: bool, adj_model_path, enc_model
     print(makespan)
 
 
-
+"""
 model_type = "adj"
 order = True
 adj_model_path = None
@@ -932,6 +932,7 @@ print("inference result")
 get_inference_result(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
 exit()
    
+"""
 
 
 
@@ -1015,6 +1016,7 @@ def train_models(model_type: str, order: bool):
 
     train_dataset_path = f'{full_path}/data/with_targets/batched_444'
     test_dataset_path = f'{full_path}/data/with_targets/test_batched_444'
+
     train_dataset = Dataset_RL4CO(train_dataset_path, generator_params, order)
     test_dataset = Dataset_RL4CO(test_dataset_path, generator_params, order)
 
@@ -1049,7 +1051,7 @@ def train_models(model_type: str, order: bool):
     logging.info(f"Ended training model {model_type} order_{order} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 
 
-# train_models(model_type, order)
+train_models(model_type, order)
 
 
 
