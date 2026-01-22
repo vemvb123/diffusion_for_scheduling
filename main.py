@@ -23,7 +23,7 @@ from rl4co.utils.trainer import RL4COTrainer
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-import utils
+import scheduling_utils
 # logging.info(1)
 import diffusion
 import inference
@@ -31,7 +31,7 @@ import importlib
 # logging.info(2)
 importlib.reload(diffusion)
 importlib.reload(inference)
-importlib.reload(utils)
+importlib.reload(scheduling_utils)
 import os
 from pathlib import Path
 import torch
@@ -47,7 +47,7 @@ def main():
     instance_size = (4,4,4)
     pad_size=(20,20)
     root_dir = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/ad_test/"
-    dataset = utils.AdjDataset(root_dir, instance_size, pad_size)
+    dataset = scheduling_utils.AdjDataset(root_dir, instance_size, pad_size)
     train_loader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=2)
     # referer til en enkeltinstanse, der du da får adj, procs, h, w
     adj, proc_instance, w, h = dataset[7]

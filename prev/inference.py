@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import torch
 from PIL import Image
 import torchvision.io as io
-import utils
+import scheduling_utils
 from torchvision import datasets, transforms
 
 from tqdm import tqdm
@@ -583,7 +583,7 @@ def existing_problem_to_instance(file_to_solve, n_samples, dim_x, dim_y, device,
     mask = None
     if use_mask:
         file_to_solve.replace("_nodes.png","_all_edges.png")
-        mask = utils.make_mask(file_to_solve, 64, 64, "cuda")
+        mask = scheduling_utils.make_mask(file_to_solve, 64, 64, "cuda")
 
     return img_batch, mask
 

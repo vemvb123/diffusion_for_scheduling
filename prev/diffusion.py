@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 import deepinv
 import torch.nn as nn
 from typing import Tuple
-import utils
+import scheduling_utils
 # import new_dataset
 
 import sys
@@ -67,7 +67,7 @@ def adj_diffusion(instance_size, pad_size, model_path: str, batch_size: int = 32
     # VURD
     root_dir = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/instances/adj/'
 
-    dataset = utils.AdjDataset(root_dir, instance_size, pad_size)
+    dataset = scheduling_utils.AdjDataset(root_dir, instance_size, pad_size)
     train_loader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=2)
 
     # x, x2 = dataset[10]
@@ -395,7 +395,7 @@ def get_makespan(dataset, data, batch_size):
     td = dataset.td
     env = dataset.env
     embed_dim = op_emb.shape[2]
-    makespans = utils.visulize_schedule(td, env, embed_dim, ma_emb, op_emb, batch_size)
+    makespans = scheduling_utils.visulize_schedule(td, env, embed_dim, ma_emb, op_emb, batch_size)
     makespans_mean = makespans.mean()
     return makespans_mean
 
