@@ -1,3 +1,9 @@
+"""
+diffusion.py contains code for training diffusion models
+"""
+
+
+
 import logging
 
 logging.basicConfig(

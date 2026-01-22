@@ -1,3 +1,11 @@
+"""
+target_maker.py contains code for training a rl4co reinforcment model on the FJSP problem,
+to make targets.
+
+The targets can later be used in a dataset
+"""
+
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -86,4 +94,4 @@ def train_model():
         print(f"saved model for {model_name}")
 
 
-train_model()
+# train_model()

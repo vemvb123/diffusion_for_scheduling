@@ -1,3 +1,8 @@
+"""
+inference.py contains code for running inference with trained models
+"""
+
+
 import logging
 
 logging.basicConfig(

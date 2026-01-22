@@ -1,5 +1,5 @@
 """
-results.py is for gathering results.
+results.py contains code for gathering results.
 Such as gathering mean makespan of scheduled instances, graphs, training results, etc
 """
 

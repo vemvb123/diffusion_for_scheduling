@@ -1,3 +1,8 @@
+"""
+gpu_avalible.py contains code for checking if the gpu is avalible
+"""
+
+
 import torch
 
 # Check if CUDA GPU is available

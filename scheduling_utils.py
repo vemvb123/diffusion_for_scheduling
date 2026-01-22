@@ -1,3 +1,9 @@
+"""
+scheduling_utils.py contains all code that does scheduling
+"""
+
+
+
 import time
 import random
 import os
