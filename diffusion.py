@@ -5,42 +5,28 @@ logging.basicConfig(
     format="%(filename)s:%(lineno)d - %(message)s"
 )
 
-import random
 import os
 import numpy as np
 import torch
 import torch.nn as nn
-from torchvision import datasets, transforms
-import torch.utils.data
-from torchtyping import TensorType
-from torchvision.transforms import Lambda
-import torchvision.transforms.functional as F
-import PIL
-from torchvision.transforms import ToPILImage
-
 
 from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
-from deepinv.models.diffunet import DiffUNet
 import os
 
 import torch.nn as nn
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
 import matplotlib.pyplot as plt
 
 import deepinv
 import torch.nn as nn
-from typing import Tuple
 # import new_dataset
 
-import sys
 
 from diffusers import UNet1DModel
-
+from deepinv.models.diffunet import DiffUNet
 
 
 
@@ -456,22 +442,6 @@ def adj_diffusion(
     torch.save(model_adj.state_dict(), model_path_adj)
 
     return None, model_path_adj, all_losses[-1]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
