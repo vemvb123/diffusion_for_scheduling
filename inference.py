@@ -41,7 +41,8 @@ def feature_inference(proc_times, job_id, pos_job, model_path, n_samples, embed_
     timesteps = 1000
     betas, alphas, alphas_cumprod, = get_inference_schedule(beta_start, beta_end, timesteps, device = "cuda")
 
-    model.eval()
+    adj_model.eval()
+    enc_model.eval()
     
     x = None
     with torch.no_grad():

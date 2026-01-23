@@ -31,7 +31,7 @@ import torch.nn.functional as F
 
 import sys
 
-
+from scheduling_utils import make_adj_with_order
 
 
 # 1 adj

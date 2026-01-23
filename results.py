@@ -3,8 +3,8 @@ results.py contains code for gathering results.
 Such as gathering mean makespan of scheduled instances, graphs, training results, etc
 """
 
-from scheduling_utils import get_td_from_path, make_instance, get_feature_adj_from_instance
-from inference import adj_inference
+from scheduling_utils import get_td_from_path, make_instance, get_feature_adj_from_instance, make_adj_with_order
+from inference import adj_inference, guide_adj_inference
 
 from torchtyping import TensorType
 from typing import Callable, Dict, List, Tuple
@@ -14,6 +14,11 @@ import torch
 import os
 import logging
 import bisect
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 
 
 
