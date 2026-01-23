@@ -25,7 +25,7 @@ import bisect
 from tensordict import TensorDict, from_dict
 from typing import Callable, Dict, List, Tuple
 
-from diffusion import diffusion, diffusion
+from diffusion import diffusion
 
 import torch.nn.functional as F
 
@@ -297,8 +297,8 @@ def train_models(model_type: str, order: bool):
     for lr in lrs:
         logging.info(f"Training with lr {lr}")
         path_enc, path_adj, last_epoch_loss = training_func(
-            loss_image_path, train_dataset, test_dataset, model_to_train,
-            base_embed, embed_size, model_path_enc, model_path_adj,
+            model_type, loss_image_path, train_dataset, test_dataset,
+            base_embed, embed_size, model_path_adj, model_path_enc,
             graph_name, graph_save_folder, testing_epochs, lr
         ) 
         if best_loss > last_epoch_loss: 
@@ -307,15 +307,12 @@ def train_models(model_type: str, order: bool):
 
     print(f"Best lr found: {best_lr}, for model {model_type} order_{order} training full model now")
     path_enc, path_adj, last_epoch_loss = training_func(
-        loss_image_path, train_dataset, test_dataset, model_to_train,
-        base_embed, embed_size, model_path_enc, model_path_adj,
+        model_type, loss_image_path, train_dataset, test_dataset,
+        base_embed, embed_size, model_path_adj, model_path_enc,
         graph_name, graph_save_folder, run_epochs, best_lr
     )
 
-
-
     print(f"Ended training model {model_type} order_{order} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
-
 
 
 

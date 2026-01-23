@@ -307,11 +307,10 @@ def diffusion(
     loss_image_path,
     train_dataset,
     test_dataset,
-    ordered: int,
     n_base_features: int,
     n_embed_features: int,
-    model_path_enc: str,      # keep this for signature match
     model_path_adj: str,
+    model_path_enc: str,      # keep this for signature match
     graph_name: str,
     graph_save_folder: str,
     num_epochs: int = 100,
