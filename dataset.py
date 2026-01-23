@@ -25,7 +25,7 @@ import bisect
 from tensordict import TensorDict, from_dict
 from typing import Callable, Dict, List, Tuple
 
-from diffusion import adj_diffusion, feature_diffusion
+from diffusion import diffusion, diffusion
 
 import torch.nn.functional as F
 
@@ -270,9 +270,9 @@ def train_models(model_type: str, order: bool):
     training_func = None
     graph_name = None
     if  model_type == "f": 
-        training_func = feature_diffusion
+        training_func = diffusion
     elif model_type == "adj": 
-        training_func = adj_diffusion
+        training_func = diffusion
     graph_name = f"model {model_type}, with order: {order}"
 
     full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'

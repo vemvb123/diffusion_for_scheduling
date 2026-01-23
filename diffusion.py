@@ -61,6 +61,18 @@ from torch.utils.data import DataLoader, Subset
 # ta vekk subset, gjor num epochs til 100
 
 
+def get_noised_x(t, x, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod):
+    # Sample noise
+    noise = torch.randn_like(x)
+
+    noised = (
+        sqrt_alphas_cumprod[t, None, None, None] * x
+        + sqrt_one_minus_alphas_cumprod[t, None, None, None] * noise
+    )
+
+    return noise, noised
+
+
 
 def save_losses(epoch, graph_name, losses):
     os.makedirs("./losses", exist_ok=True)
@@ -87,11 +99,10 @@ def plot_losses(save_path, graph_name, losses):
     plt.savefig(f"{save_path}/{graph_name}.png")
 
 
-
-
 def run_epoch_feature(loop, device, timesteps,
-            model_enc, model_adj, optimizer,
+            model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod, mode):
+
     total_loss = 0.0
     for batch_idx, (target_assignments, proc_times, job_id, pos_job) in enumerate(loop): 
         """ 
@@ -128,13 +139,7 @@ def run_epoch_feature(loop, device, timesteps,
         # logging.info(f"encoded f {enc_f.shape}")
         
         # Sample noise
-        noise = torch.randn_like(target_assignments)
-        # Apply forward diffusion process at timestep t
-        noised = (
-            sqrt_alphas_cumprod[t, None, None, None] * target_assignments
-            + sqrt_one_minus_alphas_cumprod[t, None, None, None] * noise
-        )
-
+        noise, noised = get_noised_x(t, target_assignments, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod)
         #logging.info("catination")
         #logging.info(noise.shape)
         #logging.info(enc_f.shape)
@@ -174,107 +179,11 @@ def run_epoch_feature(loop, device, timesteps,
 
 
 
-def feature_diffusion(loss_image_path, train_dataset, test_dataset, ordered: int, n_base_features: int, n_embed_features: int,
-                      model_path_enc: str, model_path_adj: str, graph_name: str, graph_save_folder: str, num_epochs: int = 100, lr: float = 1e-3, device: str = "cuda", batch_size: int = 32):
+def run_epoch_adj(loop, device, timesteps,
+            model_adj, model_enc, optimizer,
+            batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod, mode):
 
 
-
-    #train_subset_dataset = Subset(train_dataset, range(32*5))
-    #test_subset_dataset = Subset(test_dataset, range(32*5))
-    #train_loader = DataLoader(train_subset_dataset, batch_size=32, shuffle=False)
-    #test_loader = DataLoader(test_subset_dataset, batch_size=32, shuffle=False)
-
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)
-    logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
-    logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")
-    
-    # out channels, flere, samme som embedding dimensjon .. men burde kanskje endre bilderep, fordi nu sliter koordinatet
-    model_enc = deepinv.models.DiffUNet(in_channels=n_base_features, out_channels=n_embed_features, pretrained=None).to(device)
-    model_adj = deepinv.models.DiffUNet(in_channels=n_embed_features+1, out_channels=1, pretrained=None).to(device)
-    # model_coords = UNet1DModel(in_channels=n_features+1, out_channels=1).to(device)
-
-    # printing amount of parameters
-    trainable_params = sum(p.numel() for p in model_enc.parameters() if p.requires_grad)
-    logging.info(f"Amount of trainable parameters: {trainable_params}")
-
-
-    # optimizer_img = torch.optim.Adam(model_enc.parameters(), lr=lr)
-    # optimizer_coords = torch.optim.Adam(model_coords.parameters(), lr=lr)
-
-    optimizer = torch.optim.Adam(
-        list(model_enc.parameters()) + list(model_adj.parameters()),
-        lr=lr
-    )
-
-    mse = deepinv.loss.MSE()
-
-    beta_start = 1e-4
-    beta_end = 0.02
-    timesteps = 1000
-
-    betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
-    alphas = 1.0 - betas
-    alphas_cumprod = torch.cumprod(alphas, dim=0)
-    sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
-    sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
-
-    all_losses = []
-    all_losses_test = []
-    for epoch in range(num_epochs):
-        train_loop = tqdm(train_loader, desc=f"Train Epoch {epoch+1}/{num_epochs}", unit="batch")
-        test_loop = tqdm(test_loader, desc=f"Test Epoch {epoch+1}/{num_epochs}", unit="batch")
-
-        train_loop, model_adj, model_enc, avg_loss = run_epoch_feature(train_loop, device, timesteps,
-                                                        model_enc, model_adj, optimizer,
-                                                        batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod, mode="train")
-        
-        test_loop, model_adj, model_enc, avg_loss_test = run_epoch_feature(test_loop, device, timesteps,
-                                                        model_enc, model_adj, optimizer,
-                                                        batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod, mode="test")
-        
-
-
-       # Save the losses list after each epoch
-        np.save(f"./losses/losses_epoch_{epoch+1}_{graph_name}.npy", np.array(all_losses))
-        logging.info(f"Epoch [{epoch + 1}/{num_epochs}], Train Loss: {avg_loss:.4f}, Test Loss: {avg_loss_test:.4f}")
-
-        all_losses.append(avg_loss)
-        all_losses_test.append(avg_loss_test)
-
-        torch.save(model_enc.state_dict(),model_path_enc,)
-        torch.save(model_adj.state_dict(),model_path_adj,)
-
-
-        if len(all_losses_test) >= 4:
-            if all_losses_test[-1] > all_losses_test[-4]:
-                logging.info(
-                    "Test loss has not gone down for 4 epochs - stopping early"
-                )
-                break
-    
-
-
-    logging.info("saved loss image")
-    plot_losses(graph_save_folder, f"{graph_name} train", all_losses)
-    plot_losses(graph_save_folder, f"{graph_name} test", all_losses_test)
-
-    logging.info("saved model")
-    torch.save(model_enc.state_dict(),model_path_enc,)
-    torch.save(model_adj.state_dict(),model_path_adj,)
-
-    return model_path_enc, model_path_adj, all_losses[-1]
-
-
-
-
-
-def run_epoch_adj(
-    loop, device, timesteps,
-    model_adj, optimizer,
-    batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-    mode
-):
     total_loss = 0.0
 
     for batch_idx, (target_assignments, proc_times, job_id, pos_job) in enumerate(loop):
@@ -288,26 +197,14 @@ def run_epoch_adj(
         features = features.to(device, dtype=torch.float32)
         target_assignments = target_assignments.to(device, dtype=torch.float32)
 
-
         B = target_assignments.shape[0]
         if B != batch_size:
             logging.warning(f"Skipping batch {batch_idx} with size {B}")
             continue
-                
 
         # Sample random timesteps
         t = torch.randint(0, timesteps, (batch_size,), device=device)
-
-        # Sample noise
-        noise = torch.randn_like(target_assignments)
-
-        # Apply forward diffusion
-        # TODO print the instance idx
-        # TODO ignore instances which gives the error
-        noised = (
-            sqrt_alphas_cumprod[t, None, None, None] * target_assignments
-            + sqrt_one_minus_alphas_cumprod[t, None, None, None] * noise
-        )
+        noise, noised = get_noised_x(t, target_assignments, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod)
 
         model_input = torch.cat([
             noised,
@@ -338,7 +235,75 @@ def run_epoch_adj(
     return loop, model_adj, total_loss / len(loop)
 
 
-def adj_diffusion(
+
+
+
+
+def get_dataset_loaders(train_dataset, test_dataset, batch_size: int = 32, subset: bool = False):
+    train_loader, test_loader = None, None
+
+    if subset:
+        train_subset_dataset = Subset(train_dataset, range(batch_size*5))
+        test_subset_dataset = Subset(test_dataset, range(batch_size*5))
+        train_loader = DataLoader(train_subset_dataset, batch_size=batch_size, shuffle=False)
+        test_loader = DataLoader(test_subset_dataset, batch_size=batch_size, shuffle=False)
+    else:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
+    logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
+    logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")
+    return train_loader, test_loader
+
+
+
+
+def get_models(model_type: str, n_base_features: int, n_embed_features, lr, device: str = "cuda"):
+    model_adj, model_enc, optimizer = None, None, None
+
+    if model_type == "f":
+        model_enc = deepinv.models.DiffUNet(
+            in_channels=n_base_features,
+            out_channels=n_embed_features,
+            pretrained=None
+        ).to(device)
+
+        model_adj = deepinv.models.DiffUNet(
+            in_channels=n_embed_features+ 1,
+            out_channels=1,
+            pretrained=None
+        ).to(device)
+
+        optimizer = torch.optim.Adam(
+            list(model_enc.parameters()) + list(model_adj.parameters()),
+            lr=lr
+        )
+
+    elif model_type == "adj":
+         model_adj = deepinv.models.DiffUNet(
+            in_channels=n_base_features + 1,
+            out_channels=1,
+            pretrained=None
+        ).to(device)
+         optimizer = torch.optim.Adam(model_adj.parameters(), lr=lr)
+
+    return model_adj, model_enc, optimizer
+
+
+def get_diffusion_schedule(beta_start, beta_end, timesteps, device = "cuda"):
+
+    betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
+    alphas = 1.0 - betas
+    alphas_cumprod = torch.cumprod(alphas, dim=0)
+    sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
+    sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
+
+    return sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod
+
+
+
+def diffusion(
+    model_type: str, # must be either "adj" for adjecency model or "f" for feature vector model
     loss_image_path,
     train_dataset,
     test_dataset,
@@ -355,42 +320,32 @@ def adj_diffusion(
     batch_size: int = 32
 ):
 
+    if model_type != "adj" or model_type != "f":
+        raise ValueError(f"model_type must be either adj or f .. but value was {model_type}")
 
-    #train_subset_dataset = Subset(train_dataset, range(32*5))
-    #test_subset_dataset = Subset(test_dataset, range(32*5))
-    #train_loader = DataLoader(train_subset_dataset, batch_size=32, shuffle=False)
-    #test_loader = DataLoader(test_subset_dataset, batch_size=32, shuffle=False)
+    # running different diffusion algorithms depening on the model type
+    run_epoch_func = None
+    if model_type == "adj":
+        run_epoch_func = run_epoch_adj
+    elif model_type == "f":
+        run_epoch_func = run_epoch_feature 
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)
+    train_loader, test_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size)
     logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
     logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")
     
-
-    model_adj = deepinv.models.DiffUNet(
-        in_channels=n_base_features + 1,
-        out_channels=1,
-        pretrained=None
-    ).to(device)
+    model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr)
 
     trainable_params = sum(p.numel() for p in model_adj.parameters() if p.requires_grad)
     logging.info(f"Amount of trainable parameters: {trainable_params}")
 
-    optimizer = torch.optim.Adam(model_adj.parameters(), lr=lr)
-
     beta_start = 1e-4
     beta_end = 0.02
     timesteps = 1000
-
-    betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
-    alphas = 1.0 - betas
-    alphas_cumprod = torch.cumprod(alphas, dim=0)
-    sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
-    sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
+    sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod = get_diffusion_schedule(beta_start, beta_end, timesteps)
 
     all_losses = []
     all_losses_test = []
-
     for epoch in range(num_epochs):
 
         train_loop = tqdm(
@@ -404,19 +359,23 @@ def adj_diffusion(
             unit="batch"
         )
 
-        train_loop, model_adj, avg_loss = run_epoch_adj(
+
+        train_loop, model_adj, avg_loss = run_epoch_func(
             train_loop, device, timesteps,
-            model_adj, optimizer,
+            model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
             mode="train"
         )
 
-        test_loop, model_adj, avg_loss_test = run_epoch_adj(
+        test_loop, model_adj, avg_loss_test = run_epoch_func(
             test_loop, device, timesteps,
-            model_adj, optimizer,
+            model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
             mode="test"
         )
+
+
+
 
         np.save(
             f"./losses/losses_epoch_{epoch+1}.npy",
@@ -432,12 +391,12 @@ def adj_diffusion(
         all_losses_test.append(avg_loss_test)
 
         torch.save(model_adj.state_dict(), model_path_adj)
+        if model_type == "f":
+            torch.save(model_enc.state_dict(), model_enc)
 
         if len(all_losses_test) >= 4:
             if all_losses_test[-1] > all_losses_test[-4]:
-                logging.info(
-                    "Test loss has not gone down for 4 epochs - stopping early"
-                )
+                logging.info("Test loss has not gone down for 4 epochs - stopping early")
                 break
     
 
@@ -446,6 +405,8 @@ def adj_diffusion(
     plot_losses(graph_save_folder, f"{graph_name} test", all_losses_test)
 
     torch.save(model_adj.state_dict(), model_path_adj)
+    if model_type == "f":
+        torch.save(model_enc.state_dict(), model_enc)
 
     return None, model_path_adj, all_losses[-1]
 
