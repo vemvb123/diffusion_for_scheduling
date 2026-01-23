@@ -223,11 +223,7 @@ def run_epoch_adj(loop, device, timesteps,
 
         pred = model_adj(model_input, t, type_t="timestep")
 
-        valid_h = 4
-        valid_w = 16
-        pred_valid  = pred[..., :valid_h, :valid_w]
-        noise_valid = noise[..., :valid_h, :valid_w]
-
+        pred_valid, noise_valid = mask_invalid(4, 16, pred, noise)
         loss = nn.MSELoss()(pred_valid, noise_valid)
 
         if mode == "train":
