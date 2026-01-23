@@ -99,6 +99,17 @@ def plot_losses(save_path, graph_name, losses):
     plt.savefig(f"{save_path}/{graph_name}.png")
 
 
+
+def mask_invalid(h, w, pred, noise):
+    valid_h = 4
+    valid_w = 16
+    pred_valid  = pred[..., :valid_h, :valid_w]
+    noise_valid = noise[..., :valid_h, :valid_w]
+    return pred_valid, noise_valid
+
+
+
+
 def run_epoch_feature(loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod, mode):
@@ -154,12 +165,8 @@ def run_epoch_feature(loop, device, timesteps,
         # Predict noise
         pred = model_adj(model_input, t, type_t="timestep")
         #logging.info(f"made prediction, {pred.shape}")
-        
-        # only considering the valid loss region
-        valid_h = 4
-        valid_w = 16
-        pred_valid  = pred[..., :valid_h, :valid_w]
-        noise_valid = noise[..., :valid_h, :valid_w]
+
+        pred_valid, noise_valid = mask_invalid(4, 16, pred, noise)
         loss = nn.MSELoss()(pred_valid,noise_valid)
         # loss = nn.MSELoss()(pred, noise)
         if mode == "train":
