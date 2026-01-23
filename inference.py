@@ -39,12 +39,7 @@ def feature_inference(proc_times, job_id, pos_job, model_path, n_samples, embed_
     beta_start = 1e-4
     beta_end = 0.02
     timesteps = 1000
-
-    betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
-    alphas = 1.0 - betas
-    alphas_cumprod = torch.cumprod(alphas, dim=0)
-    sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
-    sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
+    betas, alphas, alphas_cumprod, = get_inference_schedule(beta_start, beta_end, timesteps, device = "cuda")
 
     model.eval()
     
@@ -83,21 +78,7 @@ def feature_inference(proc_times, job_id, pos_job, model_path, n_samples, embed_
             ], dim=1)  # channels = 4
 
             predicted_noise = adj_model(inputs, t_tensor, type_t="timestep")
-                
-            alpha = alphas[t]
-            alpha_cumprod = alphas_cumprod[t]
-            beta = betas[t]
-
-            # skal jeg bruke predicted noise? eller nei, det er vell bare for shape... man x er jo her med cond, så må kanskje endre, så lik predicted noise
-            if t > 0:
-                noise = torch.randn_like(x)
-            else:
-                noise = torch.zeros_like(x) # ma ha maske??
-                # noise = 0
-        
-            x = (1 / torch.sqrt(alpha)) * (
-                x - (beta / torch.sqrt(1 - alpha_cumprod)) * predicted_noise
-            ) + torch.sqrt(beta) * noise
+            x = get_denoised(t, alphas, alphas_cumprod, betas, predicted_noise)
 
     # end timer
     end_time = time.perf_counter()
@@ -107,6 +88,34 @@ def feature_inference(proc_times, job_id, pos_job, model_path, n_samples, embed_
 
     return x, elapsed
 
+
+def get_inference_schedule(beta_start, beta_end, timesteps, device = "cuda"):
+    betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
+    alphas = 1.0 - betas
+    alphas_cumprod = torch.cumprod(alphas, dim=0)
+    # sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
+    # sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
+    return betas, alphas, alphas_cumprod
+
+
+def get_denoised(t, alphas, alphas_cumprod, betas, pred):
+
+    if t > 0:
+        noise = torch.randn_like(x)
+    else:
+        noise = torch.zeros_like(x) # ma ha maske??
+        # noise = 0
+ 
+    alpha = alphas[t]
+    alpha_cumprod = alphas_cumprod[t]
+    beta = betas[t]
+
+    x = (1 / torch.sqrt(alpha)) * (
+        x - (beta / torch.sqrt(1 - alpha_cumprod)) * pred
+    ) + torch.sqrt(beta) * noise
+
+    return x
+ 
 
 
 
@@ -123,12 +132,7 @@ def adj_inference(proc_times, job_id, pos_job, model_path, n_samples):
     beta_start = 1e-4
     beta_end = 0.02
     timesteps = 1000
-
-    betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
-    alphas = 1.0 - betas
-    alphas_cumprod = torch.cumprod(alphas, dim=0)
-    sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
-    sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
+    betas, alphas, alphas_cumprod, = get_inference_schedule(beta_start, beta_end, timesteps, device = "cuda")
 
     model.eval()
 
@@ -167,22 +171,8 @@ def adj_inference(proc_times, job_id, pos_job, model_path, n_samples):
             ], dim=1)  # channels = 4
 
             predicted_noise = model(inputs, t_tensor, type_t="timestep")
-                
-            alpha = alphas[t]
-            alpha_cumprod = alphas_cumprod[t]
-            beta = betas[t]
-
-            # skal jeg bruke predicted noise? eller nei, det er vell bare for shape... man x er jo her med cond, så må kanskje endre, så lik predicted noise
-            if t > 0:
-                noise = torch.randn_like(x)
-            else:
-                noise = torch.zeros_like(x) # ma ha maske??
-                # noise = 0
-        
-            x = (1 / torch.sqrt(alpha)) * (
-                x - (beta / torch.sqrt(1 - alpha_cumprod)) * predicted_noise
-            ) + torch.sqrt(beta) * noise
-            
+            x = get_denoised(t, alphas, alphas_cumprod, betas, predicted_noise)
+           
             if t % 100==0:
                 given_assignments.append(x.clone())
 
@@ -245,12 +235,7 @@ def guide_adj_inference(conditions, n_channels, model_path, n_to_make, batch_siz
     beta_start = 1e-4
     beta_end = 0.02
     timesteps = 1000
-
-    betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
-    alphas = 1.0 - betas
-    alphas_cumprod = torch.cumprod(alphas, dim=0)
-    sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
-    sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
+    betas, alphas, alphas_cumprod, = get_inference_schedule(beta_start, beta_end, timesteps, device = "cuda")
 
     model.eval()
 
