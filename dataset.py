@@ -18,55 +18,17 @@ logging.basicConfig(
 
 from scheduling_utils import make_instance, make_target
 
-from datetime import datetime
 
 import bisect
 
 from tensordict import TensorDict, from_dict
 from typing import Callable, Dict, List, Tuple
 
-from diffusion import diffusion
 
 import torch.nn.functional as F
 
-import sys
 
 from scheduling_utils import make_adj_with_order
-
-
-# 1 adj
-# 2 adj ordered
-# 3 f
-# 4 f ordered
-
-# maps file execution parameter (1-4) to some model to train
-model_to_train = None
-if len(sys.argv) > 1:
-    model_to_train = int(sys.argv[1])
-    logging.info(f"Training models nr {model_to_train}")
-else:
-    logging.info("Please provide a training number!")
-
-
-def map_file_parameter_to_model_type(model_to_train: int) -> Tuple[str, bool]:
-    model_type = None
-    order = None
-    if model_to_train < 3:
-        model_type = "adj"
-    elif model_to_train > 2:
-        model_type = "f"
-    if model_to_train == 2 or model_to_train == 4:
-        order = True
-    elif model_to_train == 1 or model_to_train == 3:
-        order = False
-
-    print("Using model: type: {type}, order: {order}")
-    if model_type == None or order == None:
-        raise ValueError("That model type dosent exist. pecify one between 1 and 2")
-
-    return model_type, order
-
-map_file_parameter_to_model_type(model_to_train)
 
 
 
@@ -213,14 +175,21 @@ class Dataset_RL4CO(Dataset):
 
 
 
-def make_dataset(n: int, dataset_folder: str, batch_size: int):
+def make_dataset(n: int, dataset_folder: str, 
+                 n_jobs, n_ma, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, 
+                 batch_size: int = 184):
+
     logging.info("Making dataset...")
 
     os.makedirs(dataset_folder, exist_ok=True)
-    batch_size = 184
     for i in range(0, n, batch_size):
         # lag instanse
-        env, td, generator_params = make_instance(4,4,4,5,50, batch_size)
+
+        env, td, generator_params = make_instance(n_ma=n_ma, n_jobs=n_jobs, 
+                                                  max_op_per_job=max_op_per_job, min_op_per_job=min_op_per_job, 
+                                                  max_proc_time=max_proc_time, min_proc_time=min_proc_time, 
+                                                  max_eligable_ma_per_op=n_ma, min_eligable_ma_per_op=n_ma, 
+                                                  batch_size=batch_size)
         # fa target fra instance 
         td_target, actions = make_target(env, td.copy(), True)
         # lagre json med: td, og optimale td koords
@@ -240,91 +209,114 @@ def make_dataset(n: int, dataset_folder: str, batch_size: int):
 
 
 
-def train_models(model_type: str, order: bool):
+def get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance: str) -> Dict:
 
-    jobs = 4
-    ma = 4
-    ops_per_job = 4
-    min_proc = 5
-    max_proc = 50
+    with open(filepath_brandimarte_instance, "r") as f:
+        lines = [line.strip() for line in f if line.strip()]
 
-    base_embed = 3
-    embed_size = 80
 
-    generator_params = {
-        "num_jobs": jobs,
-        "num_machines": ma,
-        "min_ops_per_job": ops_per_job,
-        "max_ops_per_job": ops_per_job,
-        "min_processing_time": min_proc,
-        "max_processing_time": max_proc,
-        "min_eligible_ma_per_op": ma,
-        "max_eligible_ma_per_op": ma,
+    # First line: number of jobs, number of machines
+    first = lines[0].split()
+    n_jobs = int(first[0])
+    n_machines = int(first[1])
+
+    # Stats
+    global_min_pt = float("inf")
+    global_max_pt = float("-inf")
+    min_ops = float("inf")
+    max_ops = float("-inf")
+
+    # New stats for machine options per operation
+    min_machine_options = float("inf")
+    max_machine_options = float("-inf")
+
+    # Loop through job lines
+    for i in range(1, 1 + n_jobs):
+        parts = list(map(int, lines[i].split()))
+        idx = 0
+
+        # Number of operations in this job
+        n_ops = parts[idx]
+        idx += 1
+
+        # Update min/max number of operations
+        min_ops = min(min_ops, n_ops)
+        max_ops = max(max_ops, n_ops)
+
+        # Loop through each operation
+        for _ in range(n_ops):
+            m_count = parts[idx]
+            idx += 1
+
+            # Track machine options stats
+            min_machine_options = min(min_machine_options, m_count)
+            max_machine_options = max(max_machine_options, m_count)
+
+            # m_count pairs of (machine, processing time)
+            for _ in range(m_count):
+                machine_id = parts[idx]        # machine index (not needed for stats)
+                proc_time = parts[idx + 1]     # processing time
+                idx += 2
+
+                # Track processing time
+                global_min_pt = min(global_min_pt, proc_time)
+                global_max_pt = max(global_max_pt, proc_time)
+
+
+    return {
+        "n_jobs": n_jobs,
+        "n_machines": n_machines,
+        "min_processing_time": global_min_pt,
+        "max_processing_time": global_max_pt,
+        "fewest_operations": min_ops,
+        "most_operations": max_ops,
+        "min_machine_options": min_machine_options,
+        "max_machine_options": max_machine_options
     }
-    # TODO full path
 
-    lrs = [1e-3, 1e-4, 1e-5, 1e-6]
-    testing_epochs = 2
-    run_epochs = 100
 
-    training_func = None
-    graph_name = None
-    if  model_type == "f": 
-        training_func = diffusion
-    elif model_type == "adj": 
-        training_func = diffusion
-    graph_name = f"model {model_type}, with order: {order}"
 
-    full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
 
-    loss_image_path = f'{full_path}/models/feature_v_adj'
-    graph_save_folder = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/graphs" 
 
-    train_dataset_path = f'{full_path}/data/with_targets/batched_444'
-    test_dataset_path = f'{full_path}/data/with_targets/test_batched_444'
+def main():
+    pass
+    ### Lag dataset
+    """
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/test_batched_444'
 
-    train_dataset = Dataset_RL4CO(train_dataset_path, generator_params, order)
-    test_dataset = Dataset_RL4CO(test_dataset_path, generator_params, order)
+    test_size = 20000
+    train_size = 100000
+    n = test_size
 
-    model_path_enc = f'{full_path}/models/feature_v_adj/enc_type_{model_type}_order_{order}.pth'
-    model_path_adj = f'{full_path}/models/feature_v_adj/adj_type_{model_type}_order_{order}.pth'
-    
-    best_loss = 1
-    best_lr = None
+    batch_size = 184
 
-    print(f"Began training model {model_type} order_{order} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+    make_dataset(20000)
+    """
 
-    for lr in lrs:
-        logging.info(f"Training with lr {lr}")
-        path_enc, path_adj, last_epoch_loss = training_func(
-            model_type, loss_image_path, train_dataset, test_dataset,
-            base_embed, embed_size, model_path_adj, model_path_enc,
-            graph_name, graph_save_folder, testing_epochs, lr
-        ) 
-        if best_loss > last_epoch_loss: 
-            best_lr = lr
-            best_loss = last_epoch_loss
 
-    print(f"Best lr found: {best_lr}, for model {model_type} order_{order} training full model now")
-    path_enc, path_adj, last_epoch_loss = training_func(
-        model_type, loss_image_path, train_dataset, test_dataset,
-        base_embed, embed_size, model_path_adj, model_path_enc,
-        graph_name, graph_save_folder, run_epochs, best_lr
+    ### Dekod parameterverdier for Brandimarte instanse
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt'
+    parameters = get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+    print(parameters)
+
+    test_size = 20000
+    train_size = 100000
+    n = train_size + test_size
+
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/batched_mk01_10j_6ma_6op'
+    make_dataset(
+        n, dataset_folder,
+        n_jobs=parameters['n_jobs'],
+        n_ma=parameters['n_machines'],
+        max_op_per_job=parameters['most_operations'],
+        min_op_per_job=parameters['fewest_operations'],
+        max_proc_time=parameters['max_processing_time'],
+        min_proc_time=parameters['min_processing_time'],
     )
 
-    print(f"Ended training model {model_type} order_{order} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 
 
-
-dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/test_batched_444'
-
-test_size = 20000
-train_size = 100000
-n = test_size
-
-batch_size = 184
-
-make_dataset(20000)
+main()
 
 
 # train_models(model_type, order)

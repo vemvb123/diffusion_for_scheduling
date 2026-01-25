@@ -38,19 +38,20 @@ params:
   3: minimum proc time
   4: maximum proc time
 """
+
 def make_instance(
-        ma: int, ops_per_job: int, jobs: int, min_proc: int, max_proc: int, batch_size: int
+    n_ma, n_jobs, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, max_eligable_ma_per_op, min_eligable_ma_per_op, batch_size
 ) -> Tuple[FJSPEnv, TensorDict, Dict]:
 
     generator_params = {
-        "num_jobs": jobs,
-        "num_machines": ma,
-        "min_ops_per_job": ops_per_job,
-        "max_ops_per_job": ops_per_job,
-        "min_processing_time": min_proc,
-        "max_processing_time": max_proc,
-        "min_eligible_ma_per_op": ma,
-        "max_eligible_ma_per_op": ma,
+        "num_jobs": n_jobs,
+        "num_machines": n_ma,
+        "min_ops_per_job": min_op_per_job,
+        "max_ops_per_job": max_op_per_job,
+        "min_processing_time": min_proc_time,
+        "max_processing_time": max_proc_time,
+        "min_eligible_ma_per_op": min_eligable_ma_per_op,
+        "max_eligible_ma_per_op": max_eligable_ma_per_op,
     }
 
     env = FJSPEnv(
