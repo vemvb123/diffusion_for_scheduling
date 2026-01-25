@@ -5,7 +5,7 @@ inference.py contains code for running inference with trained models
 
 import logging
 
-from inference.denoise import denoise_ddim, denoise_ddpm, get_inference_schedule
+from code.inference.denoise import denoise_ddim, denoise_ddpm, get_inference_schedule
 
 logging.basicConfig(
     level=logging.INFO,
@@ -82,7 +82,7 @@ def feature_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, e
             ], dim=1)  # channels = 4
 
             predicted_noise = adj_model(inputs, t_tensor, type_t="timestep")
-            x = denoise_ddpm(t, alphas, alphas_cumprod, betas, predicted_noise)
+            x = denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
 
     # end timer
     end_time = time.perf_counter()
@@ -91,6 +91,7 @@ def feature_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, e
     x = torch.clamp(x, 0, 1)
 
     return x, elapsed
+
 
 # når får tilbake x, så minsker jeg det jeg får til kun x innenfor dimensjonene
 def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples):
@@ -144,7 +145,8 @@ def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples):
             ], dim=1)  # channels = 4
 
             predicted_noise = model(inputs, t_tensor, type_t="timestep")
-            x = denoise_ddpm(t, alphas, alphas_cumprod, betas, predicted_noise)
+
+            x = denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
            
             if t % 100==0:
                 given_assignments.append(x.clone())
@@ -155,6 +157,7 @@ def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples):
 
     x = torch.clamp(x, 0, 1)
 
+    given_assignments.append(x.clone())
     return x, elapsed, given_assignments
 
 
@@ -168,7 +171,7 @@ def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples):
 
 
 
-def adj_inference_ddim(proc_times, job_id, pos_job, model_path, n_to_make, batch_size):
+def adj_inference_ddim(proc_times, job_id, pos_job, model_path, n_samples):
 
     device = "cuda"
 
@@ -187,16 +190,16 @@ def adj_inference_ddim(proc_times, job_id, pos_job, model_path, n_to_make, batch
     given_assignments = []
 
 
-    eta = 0.0
+    eta = 0.5
     # create a sequence of DDIM timesteps if you want fewer steps
     # simple linear spacing (e.g. 50 steps out of 1000)
-    ddim_steps = 50
-    seq = list(torch.linspace(timesteps-1, 0, ddim_steps).long().to(device))
-    
+    ddim_steps = 700
+    seq = list(torch.linspace(timesteps-1, 0, ddim_steps).long().to(device))    
+
     x = None
     with torch.no_grad():
         
-        x = torch.randn(n_to_make, 1, 20, 20).to(device)
+        x = torch.randn(n_samples, 1, 20, 20).to(device)
 
         # må fore inn maske...
         features = torch.cat([            
@@ -214,7 +217,7 @@ def adj_inference_ddim(proc_times, job_id, pos_job, model_path, n_to_make, batch
         for i in range(len(seq)):
             t = seq[i]                           # current timestep
             t_prev = seq[i+1] if i+1 < len(seq) else -1  # next in sequence
-            t_tensor = torch.full((n_to_make,), t, device=device, dtype=torch.long) 
+            t_tensor = torch.full((n_samples,), t, device=device, dtype=torch.long) 
 
             inputs = torch.cat([
                 x,
@@ -234,6 +237,7 @@ def adj_inference_ddim(proc_times, job_id, pos_job, model_path, n_to_make, batch
 
     x = torch.clamp(x, 0, 1)
 
+    given_assignments.append(x.clone())
     return x, elapsed, given_assignments
 
 

@@ -1,19 +1,46 @@
-Ops...
-Har trent modell. neste blir å bruke modellen for å lage datasett.
-Jeg burde ikke måtte endre logikken for skedulering.
---
-Hvis skal lage datasett, eller ha treningsdatasett, må kanskje endre skeduleringslogikk fordi mk01 varierer i størrelse...
-Tror dette gjelder kun for order
-..
-må kanskje endre datasett logikk. eks nå er kanskje masker satt i en viss størrelse...
-FOr onklig trening må kanskje endre conditioning også, siden ikke alle op kan eks mappes til hvilken som helst ma
-...
-hvis skal bruke order mer fremover... så burde føre inn kode for at man har order når datasett blir laget.
-Hvis man allerede har en order funk, så er det lett.
-...
-mye av det innenfor inference check_inference burde nok være i shceduling
 
-Kiler:
+
+
+OPS:
+når får fra inference...
+burde nok gjøre noe skjekk på om ikke op skeduleres til ugyldig ma
+
+
+
+# nøkkler tensordict
+
+start_op_per_job
+end_op_per_job
+proc_times
+pad_mask
+ops_adj
+job_ops_adj
+ops_job_map
+ops_sequence_order
+start_times
+finish_times
+ma_assignment
+busy_until
+num_eligible
+next_op
+ops_ma_adj
+op_scheduled
+job_in_process
+reward
+time
+job_done
+done
+action_mask
+lbs
+is_ready
+terminated
+proc_times
+
+
+
+
+# Kiler
+
 tspdiffuserTSPDiffuser: Diffusion Models as Learned Samplers for
 Traveling Salesperson Path Planning Problems
 https://arxiv.org/pdf/2406.02858

@@ -11,7 +11,7 @@ import sys
 from datetime import datetime
 
 from training.diffusion import diffusion
-from dataset import Dataset_RL4CO
+from code.dataset_code.dataset import Dataset_RL4CO
 
 
 # 1 adj

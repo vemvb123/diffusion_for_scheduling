@@ -3,228 +3,48 @@ results.py contains code for gathering results.
 Such as gathering mean makespan of scheduled instances, graphs, training results, etc
 """
 
-from inference.check_inference_utils import round_to_values, show_order_clear
+import code.inference.check_inference_utils as schedule
+from code.inference.check_inference_utils import check_when_inference_makes_final_schedule
+import code.inference.guidence as guidence
+import code.inference.inference as inference
 
+import code.scheduling.schedule as schedule
 
-from inference.guidence import guide_adj_inference
-from scheduling.scheduling_utils import get_td_from_path, make_instance, get_feature_adj_from_instance, make_adj_with_order
-from inference.inference import adj_inference_ddpm
+import code.dataset_code.utils as dataset_code
 
-from torchtyping import TensorType
-from typing import Callable, Dict, List, Tuple
-from torch import Tensor
 import torch
 
-import os
-import logging
-import bisect
 
 import matplotlib
+
+from code.scheduling.schedule import inferenced_schedule
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-
-
-
-
-def get_td_from_path(path: str, instance_idx: int) -> Tensor:
-    # Get sorted list of data files
-    files = sorted([f for f in os.listdir(path) if f.endswith(".pt")])
-    # Build file ranges
-    cum_sizes = []
-    ranges = []
-    total = 0
-
-    for fname in files:
-        start, end = map(int, fname.replace(".pt", "").split("_"))
-        size = end - start
-        cum_sizes.append(total)
-        ranges.append((start, end))
-        total += size
-
-    # Find which file contains the instance
-    file_idx = bisect.bisect_right(cum_sizes, instance_idx) - 1
-    if file_idx < 0:
-        raise ValueError(f"Instance {instance_idx} not found in {path}")
-
-    file_path = os.path.join(path, files[file_idx])
-
-    # Load with weights_only=False so that TensorDict objects (or other custom objects)
-    # can be unpickled properly. Only do this if the file is from a trusted source.
-    batch = torch.load(
-        file_path,
-        map_location="cpu",
-        weights_only=False,  # use full pickle, not restricted weights_only loader
-    )
-
-    # Compute local index within this batch
-    local_idx = instance_idx - cum_sizes[file_idx]
-    return batch[local_idx]
-
-
-
-
-def map_assignemnts_to_actions(assignments, order: bool):
-
-    # remove batch/channel dims if present
-    if assignments.dim() == 4:
-        assignments = assignments.squeeze(0).squeeze(0)  # (4,16)
-
-    H, W = assignments.shape  # H=4, W=16
-    section_width = 4
-    num_sections = W // section_width
-    """
-    actions = []
-    if order:
-        x = assignments
-
-        x = x.squeeze(0).squeeze(0)
-
-        # get all nonzero positions
-        rows, cols = torch.nonzero(x, as_tuple=True)
-
-        # get the values at those positions
-        vals = x[rows, cols]
-
-        # sort by value (1 → 16)
-        order = torch.argsort(vals)
-        rows = rows[order]
-        cols = cols[order]
-
-        # compute mapped values
-        sections = cols // 4
-        mapped = sections * 4 + (rows + 1)
-
-        return mapped.tolist()
-
-
-    # TODO inkluder dette igjen i funksjonen seinere
-    """
-    if order:
-        # order by largest value first
-        _, indices = torch.topk(assignments.flatten(), H * W)
-
-        for idx in indices:
-            row = idx // W
-            col = idx % W
-            section = col // section_width
-            action = section * H + row + 1
-            actions.append(action.item())
-
-    else:
-        cols_per_section = 4
-        actions = []
-
-        for col in range(assignments.shape[1]):
-            section_idx = col // cols_per_section
-            for row in range(assignments.shape[0]):
-                if assignments[row, col] == 1: 
-                    value = section_idx * cols_per_section + (row + 1)
-                    actions.append(value)
-
-        return actions
-
-
-def make_step(env, td, action):
-    td['action'] = torch.tensor([action])
-    td = env.step(td)['next']
-
-
-    return td
-
-
-
-
-def inferenced_schedule(assignments, order: bool, env, td, path_save_image: str):
-    actions = map_assignemnts_to_actions(assignments, order)
-    # print(assignments)
-    # print(td["opt_assignment"])
-    # print(actions)
-    # print(td["opt_actions"])
-    # exit()
-    td.del_("opt_assignment")
-    td.del_("opt_actions")
-
-    #print(td.shape)
-    #td = TensorDict.from_dict(td, auto_batch_size=True)
-    #print(td.shape)
-    #td = TensorDict(td, batch_size=[1])
-    #print(td.shape)
-
-    td = td.unsqueeze(0)
-    env.render(td, 0)
-
-
-    #---
-    while not td["done"].all():
-        # loop true indexer
-        # for en true index, se at maskinen den oppgaven skal skeduleres til ikke er opptatt
-        # det ses ved at: mapped = [((v - 1) % 4) + 1 for v in actions]  ... fra ctions
-        # hvis opptatt, gå til neste gå til neste true.
-        # så den oppgaven endelig kn skeduleres, skeduleres den, så starter du å loope true fra starten av
-        # time.sleep(10)
-        #print(td["time"])
-        #print(td["busy_until"])
-        #print(td["is_ready"])
-        #print(assignments)
-
-        if order:
-            pass
-
-        else:
-            ready_ops = torch.nonzero(td["is_ready"], as_tuple=True)[1]
-
-            ma_indices_for_actions = [((v - 1) % 4) for v in actions]  # 0‑based
-            # print("machine indices:", ma_indices_for_actions)
-
-            for op in ready_ops:
-                op = op.item()
-                machine_idx = ma_indices_for_actions[op]
-                busy_val = td["busy_until"][0, machine_idx]
-                current_time = td["time"][0]
-
-                if busy_val <= current_time:
-                    td['action'] = torch.tensor([actions[op]])
-                    td = env.step(td)['next']
-                    env.render(td, 0)
-                else:
-                    td["time"] = busy_val.unsqueeze(0)
-
-    if path_save_image:
-        plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
-    return td
-
-
-
-
-
-
-
-# første skedulerte har minst verdi, sist skedulerte har størst verdi
-def check_when_inference_makes_final_schedule(assignments_over_time: List[Tensor], final_assignment: Tensor, order: bool):
-    for i, assignment_at_time in enumerate(assignments_over_time):
-        assignment_at_time = assignment_at_time[:, :, :4, :16]
-        if order:
-            assignment_at_time = round_to_values(assignment_at_time, 16)
-        else:
-            assignment_at_time = show_order_clear(assignment_at_time, 16)
-
-        if torch.equal(assignment_at_time, assignments_over_time):
-            print(f"assignments are exactly the same at point {i}")
-            print(assignment_at_time)
-            print(final_assignment)
-            break
 
 
 
 
 def get_inference_result(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx):
+    w = 60
+    h = 10
+    n_jobs = 10
+
 
     # GETTING DATA OF TEST INSTANCE TO CHECK
-    td = get_td_from_path(dataset_folder, instance_idx)
+    td = dataset_code.get_td_from_path(dataset_folder, instance_idx)
 
-    env, td_ignore, generator_params = make_instance(4,4,4,5,50, batch_size=1)
+    env, td_ignore, generator_params = schedule.make_instance(
+        n_ma=4, 
+        n_jobs=4, 
+        max_op_per_job=4, 
+        min_op_per_job=4, 
+        max_proc_time=50, 
+        min_proc_time=5, 
+        max_eligable_ma_per_op=4, 
+        min_eligable_ma_per_op=4, 
+        batch_size=1
+    )
 
-    target_assignments, proc_times, job_id, pos_job = get_feature_adj_from_instance(td, env, order)
+    target_assignments, proc_times, job_id, pos_job = dataset_code.get_feature_adj_from_instance(td, env, order)
 
     target_assignments = target_assignments.unsqueeze(0)
     proc_times = proc_times.unsqueeze(0)
@@ -239,7 +59,7 @@ def get_inference_result(model_type: str, order: bool, adj_model_path, enc_model
     elapsed = None
     inference_assignments = None
     if model_type == "adj":
-        inference_assignments, elapsed, assignments_over_time = adj_inference_ddpm(proc_times, job_id, pos_job, adj_model_path, n_samples)
+        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_id, pos_job, adj_model_path, n_samples)
     elif model_type == "f":
         pass
     else:
@@ -247,40 +67,60 @@ def get_inference_result(model_type: str, order: bool, adj_model_path, enc_model
 
     print(f"Inference done. Took {elapsed} time")
 
-    inference_assignments = inference_assignments[:, :, :4, :16]
+    inference_assignments = inference_assignments[:, :, :h, :w]
 
 
     
     # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
     if order:
-        inference_assignments = show_order_clear(inference_assignments, 16)
+        inference_assignments = schedule.show_order_clear(inference_assignments, w)
     else:
-        inference_assignments = round_to_values(inference_assignments, 16)
+        inference_assignments = schedule.round_to_values(inference_assignments, w)
 
    # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESULT
     check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order)
 
     # SCHEDULING THE INFERENCED SCHEDULE
-    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/graphs"
+    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results"
     graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
     graph_save_path = f"{graph_folder}/{graph_name}"
 
-    td_scheduled = inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path)
+    td_scheduled = inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs)
 
     # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
     makespan = td_scheduled['time']
     print(makespan)
 
 
+
+
+
+
 # HER
-def compare_inference_guiding(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx):
+def compare_inference(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx):
+
+    w = 60
+    h = 10
+    n_jobs = 10
 
     # GETTING DATA OF TEST INSTANCE TO CHECK
-    td = get_td_from_path(dataset_folder, instance_idx)
+    td = dataset_code.get_td_from_path(dataset_folder, instance_idx)
 
-    env, td_ignore, generator_params = make_instance(4,4,4,5,50, batch_size=1)
+    env, td_ignore, generator_params = schedule.make_instance(
+        n_ma=4, 
+        n_jobs=4, 
+        max_op_per_job=4, 
+        min_op_per_job=4, 
+        max_proc_time=50, 
+        min_proc_time=5, 
+        max_eligable_ma_per_op=4, 
+        min_eligable_ma_per_op=4, 
+        batch_size=1
+    )
 
-    target_assignments, proc_times, job_id, pos_job = get_feature_adj_from_instance(td, env, order)
+
+
+    target_assignments, proc_times, job_id, pos_job = dataset_code.get_feature_adj_from_instance(td, env, order)
 
     target_assignments = target_assignments.unsqueeze(0)
     proc_times = proc_times.unsqueeze(0)
@@ -304,62 +144,72 @@ def compare_inference_guiding(model_type: str, order: bool, adj_model_path, enc_
     if model_type == "adj":
         print("running inference")
         # NORMAL INFERENCE
-        inference_assignments, elapsed, assignments_over_time = adj_inference_ddpm(proc_times, job_id, pos_job, adj_model_path, n_samples)
-        print("running guided inference")
+        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_id, pos_job, adj_model_path, n_samples)
+        print("running comparison inference")
+        # INFERENCE DDIM
+        comparison_inference_assignments, comparison_elapsed, comparison_assignments_over_time = inference.adj_inference_ddim(proc_times, job_id, pos_job, adj_model_path, n_samples)
         # INFERENCE GUIDE
-        guided_inference_assignments, guided_elapsed, guided_assignments_over_time, errors = guide_adj_inference(conditions,3+1, adj_model_path, n_samples, 1)
+        # guided_inference_assignments, guided_elapsed, guidence.guided_assignments_over_time, errors = guide_adj_inference(conditions,3+1, adj_model_path, n_samples, 1)
 
     elif model_type == "f":
         pass
     else:
         raise ValueError("Model type must be either adj or f")
-
-
-    guided_inference_assignments = guided_inference_assignments[:, :, :4, :16]
-    inference_assignments = inference_assignments[:, :, :4, :16]
-
-
     
+
+    print("skjekker når final result er...")
+    print(f"comparison of assignlents.. {len(comparison_assignments_over_time)}")
+    check_when_inference_makes_final_schedule(comparison_assignments_over_time, comparison_inference_assignments, order)
+    check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order)
+  
+    print(f"Inference took {elapsed} time")
+    print(f"ddim inference took {comparison_elapsed} time")
+
+    comparison_inference_assignments = comparison_inference_assignments[:, :, :h, :w]
+    inference_assignments = inference_assignments[:, :, :h, :w]
+
+     #for value in [x.item() for x in errors]:
+    #    print(value)
+ 
     # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
     #if order:
-    inference_assignments = round_to_values(inference_assignments, 16)
-    guided_inference_assignments = round_to_values(guided_inference_assignments, 16)
+    inference_assignments = schedule.round_to_values(inference_assignments, 16)
+    comparison_inference_assignments = schedule.round_to_values(comparison_inference_assignments, 16)
     #else:
     #    inference_assignments = show_order_clear(inference_assignments, 16)
     #    guided_inference_assignments = show_order_clear(guided_inference_assignments, 16)
 
     print("RESULT")
     print(inference_assignments)
-    print(guided_inference_assignments)
-
-    for value in [x.item() for x in errors]:
-        print(value)
-
-    check_when_inference_makes_final_schedule(guided_assignments_over_time, guided_inference_assignments, order)
-    check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order)
+    print(comparison_inference_assignments)
 
     # SCHEDULING THE INFERENCED SCHEDULE
-    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/graphs"
+    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results"
     graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
+    graph_name_comp = f"scheduled_model_type_{model_type} order_{order}_comp.png"
     graph_save_path = f"{graph_folder}/{graph_name}"
+    graph_save_path_comp = f"{graph_folder}/{graph_name_comp}"
 
     # TODO fjern
-    td_scheduled = inferenced_schedule(target_assignments, order, env, td.copy(), graph_save_path)
+    # td_scheduled = inferenced_schedule(target_assignments, order, env, td.copy(), graph_save_path)
     # TODO gjør seinere så ikke kommenter ut
-    # td_scheduled = inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path)
+    td_scheduled = inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs)
+    td_scheduled_comp = inferenced_schedule(comparison_inference_assignments, order, env, td.copy(), graph_save_path_comp, n_jobs)
 
     # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
-    makespan = td_scheduled['makespan']
+    makespan = td_scheduled['time']
+    makespan_comp = td_scheduled_comp['time']
     print(makespan)
+    print(makespan_comp)
 
 
 print("ran")
 
 
-"""
 
 model_type = "adj"
 order = False
+
 adj_model_path = None
 enc_model_path = None
 if order:
@@ -371,6 +221,6 @@ dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_pros
 instance_idx = 10
 
 print("inference result")
-get_inference_result(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
+# get_inference_result(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
+compare_inference(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
 exit()
-"""

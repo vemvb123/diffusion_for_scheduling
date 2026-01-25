@@ -1,7 +1,19 @@
 import torch
 
 
-def denoise_ddim(x_t, t, t_prev, alphas_cumprod, predicted_noise, eta):
+def denoise_ddim(x, t, t_prev, alphas_cumprod, predicted_noise, eta):
+    # 2) Compute predicted clean data estimate
+    alpha_t = alphas_cumprod[t]
+    pred_x0 = (x - torch.sqrt(1 - alpha_t) * predicted_noise) / torch.sqrt(alpha_t)
+
+    # 3) Compute deterministic DDIM update
+    alpha_prev = alphas_cumprod[t_prev] if t_prev >= 0 else alphas_cumprod[0]
+    sigma = eta * torch.sqrt((1 - alpha_prev) / (1 - alpha_t) * (1 - alpha_t / alpha_prev))
+    c = torch.sqrt(1 - alpha_prev - sigma * sigma)
+
+    x = torch.sqrt(alpha_prev) * pred_x0 + c * predicted_noise + sigma * torch.randn_like(x)
+    return x
+
     """
     Compute DDIM reverse update from timestep t -> t_prev.
     """
@@ -25,7 +37,7 @@ def denoise_ddim(x_t, t, t_prev, alphas_cumprod, predicted_noise, eta):
     return x_prev
 
 
-def denoise_ddpm(t, alphas, alphas_cumprod, betas, pred):
+def denoise_ddpm(x, t, alphas, alphas_cumprod, betas, pred):
 
     if t > 0:
         noise = torch.randn_like(x)

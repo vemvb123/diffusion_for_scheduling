@@ -1,4 +1,8 @@
+from typing import List
 import torch
+
+import code.inference.check_inference_utils as utils
+from torch import Tensor
 
 
 def round_to_values(x: torch.Tensor, n_values: int) -> torch.Tensor:
@@ -57,3 +61,19 @@ def show_order_clear(x, n_values):
 
     # reshape back to original
     return out.view_as(x)
+
+
+# første skedulerte har minst verdi, sist skedulerte har størst verdi
+def check_when_inference_makes_final_schedule(assignments_over_time: List[Tensor], final_assignment: Tensor, order: bool):
+    for i, assignment_at_time in enumerate(assignments_over_time):
+        assignment_at_time = assignment_at_time[:, :, :4, :16]
+        if order:
+            assignment_at_time = utils.round_to_values(assignment_at_time, 16)
+        else:
+            assignment_at_time = utils.show_order_clear(assignment_at_time, 16)
+
+        if torch.equal(assignment_at_time, final_assignment):
+            print(f"assignments are exactly the same at point {i}")
+            print(assignment_at_time)
+            print(final_assignment)
+            break

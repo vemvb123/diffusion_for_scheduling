@@ -2,13 +2,10 @@
 dataset.py contains code for making a dataset of instances
 """
 
-
-
 import logging
 import os
 import torch
-from torch.utils.data import Dataset
-from rl4co.envs import FJSPEnv
+from torch import Tensor
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,19 +13,16 @@ logging.basicConfig(
 )
 
 
-from scheduling.scheduling_utils import make_instance, make_target
-
+import code.scheduling.schedule as setcheduling_utils
 
 import bisect
 
 from tensordict import TensorDict, from_dict
-from typing import Callable, Dict, List, Tuple
-
+from typing import Dict, Tuple
 
 import torch.nn.functional as F
 
 
-from scheduling.scheduling_utils import make_adj_with_order
 
 
 
@@ -38,10 +32,9 @@ from scheduling.scheduling_utils import make_adj_with_order
 
 
 
-
-def expand_matrix(x: torch.Tensor, shape_to_make: Tuple[int, int], max_and_min: Tuple[int, int]) -> torch.Tensor:
-    min_val = max_and_min[0]
-    max_val = max_and_min[1]
+def expand_matrix(x: torch.Tensor, shape_to_make: Tuple[int, int]) -> torch.Tensor:
+    min_val = x.min()
+    max_val = x.max()
     x_norm = (x - min_val) / (max_val - min_val)
     x_norm = x_norm.clamp(0, 1)  # ensure range [0,1]
 
@@ -61,123 +54,49 @@ def expand_matrix(x: torch.Tensor, shape_to_make: Tuple[int, int], max_and_min: 
 
 
 
-def get_feature_adj_from_instance(td: TensorDict, env, order: bool) -> Tuple[
+def get_feature_adj_from_instance(td: TensorDict, env, order: bool, h: int, w: int) -> Tuple[
         torch.Tensor, # target assignments
         torch.Tensor, # proc times matrix
         torch.Tensor, # jobid matrix
-        torch.Tensor # pos in job matrix
+        torch.Tensor, # pos in job matrix
         ]:
 
+    # ASSIGNMENT
     assignments = None
     if order:
-        td_scheduled = make_adj_with_order(td['opt_actions'], td.copy(), env, order)
-        assignments = td_scheduled['ma_assignment']
-        # assignments = assignments.unsqueeze(0)
+        assignments = td["opt_assignment_order"]
+        assignments = assignments.unsqueeze(0)
     else:
         assignments = td['opt_assignment']
         assignments = assignments.unsqueeze(0)
 
-    assignments = expand_matrix(assignments, (20, 20), (0, 1))
+    assignments = expand_matrix(assignments, (w, h))
 
+    # PROC TIMES
     proc_times = td['proc_times']
     proc_times = proc_times.unsqueeze(0)
-    proc_times = expand_matrix(proc_times, (20,20), (5,50))
+    proc_times = expand_matrix(proc_times, (w, h))
 
-    # TODO endre hvis annerledes jobber
-    n_jobs = 4
+    # JOB OPS ADJ
+    job_ops_adj = td['job_ops_adj']
+    job_ops_adj = job_ops_adj.unsqueeze(0)
+    job_ops_adj = expand_matrix(job_ops_adj, (w, h))
 
-    # matrix for jobid
-    job_id = td['ops_job_map']
-    job_id = job_id.repeat(16, 1).unsqueeze(0)  # now shape is (1, 16, 16)
-    job_id = expand_matrix(job_id, (20,20), (0,n_jobs))
+    # OPS MA ADJ
+    ops_ma_adj = td['ops_ma_adj']
+    ops_ma_adj = ops_ma_adj.unsqueeze(0)
+    ops_ma_adj = expand_matrix(ops_ma_adj, (w, h))
 
-
-    # pos in job matrix
-    pos_job = torch.tensor([0, 1, 2, 3], dtype=torch.float)
-    pos_job = pos_job.repeat(4)  # shape (16,)
-    pos_job = pos_job.unsqueeze(0).repeat(16, 1)  # shape (16,16)
-    pos_job = pos_job.unsqueeze(0)
-    pos_job = expand_matrix(pos_job, (20,20), (0,n_jobs))
-
-    return assignments, proc_times, job_id, pos_job
+    return assignments, proc_times, job_ops_adj, ops_ma_adj
 
 
-
-
-
-
-class Dataset_RL4CO(Dataset):
-    def __init__(self, folder, generator_params, order,transform=None):
-        self.folder = folder
-        self.transform = transform
-        self.order = order
-        self.generator_params = generator_params
-        self.env = FJSPEnv(generator_params=self.generator_params)
-
-        self.files = sorted(
-            os.path.join(folder, f)
-            for f in os.listdir(folder)
-            if f.endswith(".pt")
-        )
-
-        # Precompute number of instances per file
-        self.file_sizes = []
-        for f in self.files:
-            td = torch.load(f, map_location="cpu", weights_only=False)
-            self.file_sizes.append(self._get_batch_size(td))
-
-        # Prefix sum for fast index lookup
-        self.cum_sizes = [0]
-        for size in self.file_sizes:
-            self.cum_sizes.append(self.cum_sizes[-1] + size)
-
-    def _get_batch_size(self, td):
-        """
-        Infer batch size from TensorDict or dict of tensors.
-        """
-        # Example for TensorDict
-        return td.batch_size[0]
-        # or, if plain dict:
-        # return next(iter(td.values())).shape[0]
-
-    def __len__(self):
-        return self.cum_sizes[-1]
-
-    def __getitem__(self, idx):
-        # Find which file this idx belongs to
-        file_idx = bisect.bisect_right(self.cum_sizes, idx) - 1
-        instance_idx = idx - self.cum_sizes[file_idx]
-
-        file_path = self.files[file_idx]
-        td = torch.load(
-            file_path,
-            map_location="cpu",
-            weights_only=False,
-        )
-
-        # Select a single instance from the batch
-        td_instance = td[instance_idx]
-
-        if self.transform:
-            td_instance = self.transform(td_instance)
-
-        target_assignments, proc_times, job_id, pos_job = \
-            get_feature_adj_from_instance(
-                td_instance, self.env, self.order
-            )
-
-        for data in [target_assignments, proc_times, job_id, pos_job]:
-            if torch.isnan(data).any():
-                raise ValueError("Assignment NaN values found in tensor")
-
-        return target_assignments, proc_times, job_id, pos_job
 
 
 
 
 def make_dataset(n: int, dataset_folder: str, 
                  n_jobs, n_ma, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, 
-                 target_model: str, batch_size: int = 184):
+                 target_model: str, order: bool, batch_size: int = 184):
 
     logging.info("Making dataset...")
 
@@ -185,17 +104,19 @@ def make_dataset(n: int, dataset_folder: str,
     for i in range(0, n, batch_size):
         # lag instanse
 
-        env, td, generator_params = make_instance(n_ma=n_ma, n_jobs=n_jobs, 
+        env, td, generator_params = setcheduling_utils.make_instance(n_ma=n_ma, n_jobs=n_jobs, 
                                                   max_op_per_job=max_op_per_job, min_op_per_job=min_op_per_job, 
                                                   max_proc_time=max_proc_time, min_proc_time=min_proc_time, 
                                                   max_eligable_ma_per_op=n_ma, min_eligable_ma_per_op=n_ma, 
                                                   batch_size=batch_size)
         # fa target fra instance 
-        td_target, actions = make_target(env, td.copy(), True, target_model)
+        td_target, actions, ordered_assignments = setcheduling_utils.make_target(env, td.copy(), True, target_model, order)
         # lagre json med: td, og optimale td koords
         td.set('opt_assignment', td_target['ma_assignment'])
         td.set('opt_actions', torch.tensor(actions))
-        # lagre coords i en json, med visse navn
+        if order:
+            td.set('opt_assignment_order', ordered_assignments)
+
         torch.save(td.copy(), f'{dataset_folder}/{i}_{i+batch_size}.pt')
 
         print(f'Made instance {i} to {i+batch_size}')
@@ -300,6 +221,7 @@ def main():
     parameters = get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
 
+
     test_size = 20000
     train_size = 100000
     n = train_size + test_size
@@ -314,16 +236,46 @@ def main():
         max_proc_time=parameters['max_processing_time'],
         min_proc_time=parameters['min_processing_time'],
         target_model='/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_10j_6ma_6op_mk01.ckpt',
+        order=True,
     )
+
+
+def get_td_from_path(path: str, instance_idx: int) -> Tensor:
+    # Get sorted list of data files
+    files = sorted([f for f in os.listdir(path) if f.endswith(".pt")])
+    # Build file ranges
+    cum_sizes = []
+    ranges = []
+    total = 0
+
+    for fname in files:
+        start, end = map(int, fname.replace(".pt", "").split("_"))
+        size = end - start
+        cum_sizes.append(total)
+        ranges.append((start, end))
+        total += size
+
+    # Find which file contains the instance
+    file_idx = bisect.bisect_right(cum_sizes, instance_idx) - 1
+    if file_idx < 0:
+        raise ValueError(f"Instance {instance_idx} not found in {path}")
+
+    file_path = os.path.join(path, files[file_idx])
+
+    # Load with weights_only=False so that TensorDict objects (or other custom objects)
+    # can be unpickled properly. Only do this if the file is from a trusted source.
+    batch = torch.load(
+        file_path,
+        map_location="cpu",
+        weights_only=False,  # use full pickle, not restricted weights_only loader
+    )
+
+    # Compute local index within this batch
+    local_idx = instance_idx - cum_sizes[file_idx]
+    return batch[local_idx]
 
 
 
 main()
-
-
 # train_models(model_type, order)
-
-
-
-
 

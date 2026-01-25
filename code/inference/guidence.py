@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 import torch
 
-from inference.denoise import denoise_ddpm, get_inference_schedule
+from code.inference.denoise import get_inference_schedule
 
 def guiding_function(x): #  is batch of instances
     # x has shape [1, 1, 20, 20]
