@@ -1,3 +1,13 @@
+Ops...
+Har trent modell. neste blir å bruke modellen for å lage datasett.
+Jeg burde ikke måtte endre logikken for skedulering.
+--
+Hvis skal lage datasett, eller ha treningsdatasett, må kanskje endre skeduleringslogikk fordi mk01 varierer i størrelse...
+Tror dette gjelder kun for order
+..
+
+
+
 Kiler:
 tspdiffuserTSPDiffuser: Diffusion Models as Learned Samplers for
 Traveling Salesperson Path Planning Problems

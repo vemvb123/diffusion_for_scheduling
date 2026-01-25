@@ -177,7 +177,7 @@ class Dataset_RL4CO(Dataset):
 
 def make_dataset(n: int, dataset_folder: str, 
                  n_jobs, n_ma, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, 
-                 batch_size: int = 184):
+                 target_model: str, batch_size: int = 184):
 
     logging.info("Making dataset...")
 
@@ -191,16 +191,17 @@ def make_dataset(n: int, dataset_folder: str,
                                                   max_eligable_ma_per_op=n_ma, min_eligable_ma_per_op=n_ma, 
                                                   batch_size=batch_size)
         # fa target fra instance 
-        td_target, actions = make_target(env, td.copy(), True)
+        td_target, actions = make_target(env, td.copy(), True, target_model)
         # lagre json med: td, og optimale td koords
         td.set('opt_assignment', td_target['ma_assignment'])
         td.set('opt_actions', torch.tensor(actions))
         # lagre coords i en json, med visse navn
         torch.save(td.copy(), f'{dataset_folder}/{i}_{i+batch_size}.pt')
 
-        logging.info(f'Made instance {i} to {i+batch_size}')
+        print(f'Made instance {i} to {i+batch_size}')
 
-    logging.info(f'Made all {i+batch_size} instances. Done making dataset')
+    print(f'Made all {i+batch_size} instances. Done making dataset')
+
 
 
 
@@ -298,6 +299,7 @@ def main():
     filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt'
     parameters = get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
+    return 
 
     test_size = 20000
     train_size = 100000

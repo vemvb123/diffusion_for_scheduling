@@ -25,24 +25,28 @@ from rl4co.utils.trainer import RL4COTrainer
 
 
 def train_model():
-    jobs = 4
-    ma = 4
-    max_proc = 50
-    min_proc = 5
-    op_per_job = 4
+    print("Beginning training of target model")
 
+    jobs = 10
+    ma = 6
+    max_proc = 6
+    min_proc = 1
+    max_op_per_job = 6
+    min_op_per_job = 5
+    max_eligable_ma_per_op = 6
+    min_eligable_ma_per_op = 1
 
 # Lets generate a more complex instance
 
     generator_params = {
       "num_jobs": jobs,  # the total number of jobs
       "num_machines": ma,  # the total number of machines that can process operations
-      "min_ops_per_job": op_per_job,  # minimum number of operatios per job
-      "max_ops_per_job": op_per_job,  # maximum number of operations per job
+      "min_ops_per_job": min_op_per_job,  # minimum number of operatios per job
+      "max_ops_per_job": max_op_per_job,  # maximum number of operations per job
       "min_processing_time": min_proc,  # the minimum time required for a machine to process an operation
       "max_processing_time": max_proc,  # the maximum time required for a machine to process an operation
-      "min_eligible_ma_per_op": ma,  # the minimum number of machines capable to process an operation
-      "max_eligible_ma_per_op": ma,  # the maximum number of machines capable to process an operation
+      "min_eligible_ma_per_op": min_eligable_ma_per_op,  # the minimum number of machines capable to process an operation
+      "max_eligible_ma_per_op": max_eligable_ma_per_op,  # the maximum number of machines capable to process an operation
     }
 
     env = FJSPEnv(
@@ -94,4 +98,4 @@ def train_model():
         print(f"saved model for {model_name}")
 
 
-# train_model()
+train_model()

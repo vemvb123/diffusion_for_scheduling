@@ -127,14 +127,9 @@ def schedule_actions_batch(env: FJSPEnv, actions: List, td: TensorDict) -> Tenso
 
 
 
-def make_target(env: FJSPEnv, td: TensorDict, in_ssh: bool) -> Tuple[TensorDict, List]:
+def make_target(env: FJSPEnv, td: TensorDict, in_ssh: bool, checkpoint_path) -> Tuple[TensorDict, List]:
 
-    lr_d = 1e-4
-
-    CHECKPOINT_PATH = None
-    if in_ssh: CHECKPOINT_PATH = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_{lr_d}.ckpt"
-    else: CHECKPOINT_PATH = f'/home/vemund/Dokumenter/koding/d_m/rl4co_ex/rl4co_model_0.0001.ckpt'
-    model = L2DModel.load_from_checkpoint(CHECKPOINT_PATH)
+    model = L2DModel.load_from_checkpoint(checkpoint_path)
     model = model.to("cpu")
 
     with torch.inference_mode():
