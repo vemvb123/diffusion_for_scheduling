@@ -1,8 +1,9 @@
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
+from deepinv.models.diffunet import DiffUNet
 
-
+import torch
 import os
 
 from torch.utils.data import DataLoader, Subset
@@ -60,13 +61,13 @@ def get_models(model_type: str, n_base_features: int, n_embed_features, lr, devi
     model_adj, model_enc, optimizer = None, None, None
 
     if model_type == "f":
-        model_enc = deepinv.models.DiffUNet(
+        model_enc = DiffUNet(
             in_channels=n_base_features,
             out_channels=n_embed_features,
             pretrained=None
         ).to(device)
 
-        model_adj = deepinv.models.DiffUNet(
+        model_adj = DiffUNet(
             in_channels=n_embed_features+ 1,
             out_channels=1,
             pretrained=None
@@ -78,7 +79,7 @@ def get_models(model_type: str, n_base_features: int, n_embed_features, lr, devi
         )
 
     elif model_type == "adj":
-         model_adj = deepinv.models.DiffUNet(
+         model_adj = DiffUNet(
             in_channels=n_base_features + 1,
             out_channels=1,
             pretrained=None

@@ -3,7 +3,9 @@ results.py contains code for gathering results.
 Such as gathering mean makespan of scheduled instances, graphs, training results, etc
 """
 
-from code.inference.check_inference_utils import round_to_values, show_order_clear
+from inference.check_inference_utils import round_to_values, show_order_clear
+
+
 from inference.guidence import guide_adj_inference
 from scheduling.scheduling_utils import get_td_from_path, make_instance, get_feature_adj_from_instance, make_adj_with_order
 from inference.inference import adj_inference_ddpm
@@ -351,9 +353,10 @@ def compare_inference_guiding(model_type: str, order: bool, adj_model_path, enc_
     print(makespan)
 
 
+print("ran")
 
 
-
+"""
 
 model_type = "adj"
 order = False
@@ -370,11 +373,4 @@ instance_idx = 10
 print("inference result")
 get_inference_result(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
 exit()
-   
-
-
-
-
-
-
-
+"""

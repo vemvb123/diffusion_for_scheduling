@@ -6,7 +6,7 @@ diffusion.py contains code for training diffusion models
 
 import logging
 
-from code.training.noising import get_diffusion_schedule, get_noised_x
+from training.noising import get_diffusion_schedule, get_noised_x
 from training.utils import get_dataset_loaders, get_models, mask_invalid, plot_losses
 
 logging.basicConfig(
@@ -30,7 +30,6 @@ import torch.nn as nn
 
 
 from diffusers import UNet1DModel
-from deepinv.models.diffunet import DiffUNet
 
 
 
