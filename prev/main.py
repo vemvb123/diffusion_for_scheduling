@@ -23,10 +23,10 @@ from rl4co.utils.trainer import RL4COTrainer
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-import scheduling_utils
+import scheduling.scheduling_utils as scheduling_utils
 # logging.info(1)
-import diffusion
-import inference
+import training.diffusion as diffusion
+import inference.inference as inference
 import importlib
 # logging.info(2)
 importlib.reload(diffusion)
@@ -59,7 +59,7 @@ def main():
     dim_y=16
     pad_x=20
     pad_y=20
-    x, time = inference.adj_inference(proc_instance, model_path, n_samples, dim_x, dim_y, pad_x, pad_y)
+    x, time = inference.adj_inference_ddpm(proc_instance, model_path, n_samples, dim_x, dim_y, pad_x, pad_y)
     # rund opp de n største verdiene
     logging.info("fasan i satan")
     x = x[0, 0, :16, :16]

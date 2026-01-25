@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 import deepinv
 import torch.nn as nn
 from typing import Tuple
-import scheduling_utils
+import scheduling.scheduling_utils as scheduling_utils
 # import new_dataset
 
 import sys

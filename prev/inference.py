@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import torch
 from PIL import Image
 import torchvision.io as io
-import scheduling_utils
+import scheduling.scheduling_utils as scheduling_utils
 from torchvision import datasets, transforms
 
 from tqdm import tqdm

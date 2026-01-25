@@ -16,7 +16,7 @@ logging.basicConfig(
 )
 
 
-from scheduling_utils import make_instance, make_target
+from scheduling.scheduling_utils import make_instance, make_target
 
 
 import bisect
@@ -28,7 +28,7 @@ from typing import Callable, Dict, List, Tuple
 import torch.nn.functional as F
 
 
-from scheduling_utils import make_adj_with_order
+from scheduling.scheduling_utils import make_adj_with_order
 
 
 
