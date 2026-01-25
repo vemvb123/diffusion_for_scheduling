@@ -27,6 +27,7 @@ from rl4co.utils.trainer import RL4COTrainer
 def train_model():
     print("Beginning training of target model")
 
+    name = "10j_6ma_6op_mk01"
     jobs = 10
     ma = 6
     max_proc = 6
@@ -93,7 +94,7 @@ def train_model():
         
         trainer.fit(model)
 
-        model_name = f'models/rl4co_model_{lr}.ckpt'
+        model_name = f'models/rl4co_model_{lr}_{name}.ckpt'
         trainer.save_checkpoint(model_name)
         print(f"saved model for {model_name}")
 

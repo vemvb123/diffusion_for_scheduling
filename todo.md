@@ -5,7 +5,8 @@ Jeg burde ikke måtte endre logikken for skedulering.
 Hvis skal lage datasett, eller ha treningsdatasett, må kanskje endre skeduleringslogikk fordi mk01 varierer i størrelse...
 Tror dette gjelder kun for order
 ..
-
+må kanskje endre datasett logikk. eks nå er kanskje masker satt i en viss størrelse...
+FOr onklig trening må kanskje endre conditioning også, siden ikke alle op kan eks mappes til hvilken som helst ma
 
 
 Kiler:
