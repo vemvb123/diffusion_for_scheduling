@@ -10,6 +10,8 @@ FOr onklig trening må kanskje endre conditioning også, siden ikke alle op kan 
 ...
 hvis skal bruke order mer fremover... så burde føre inn kode for at man har order når datasett blir laget.
 Hvis man allerede har en order funk, så er det lett.
+...
+mye av det innenfor inference check_inference burde nok være i shceduling
 
 Kiler:
 tspdiffuserTSPDiffuser: Diffusion Models as Learned Samplers for

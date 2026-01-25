@@ -6,7 +6,7 @@ diffusion.py contains code for training diffusion models
 
 import logging
 
-from training.scheduling import get_diffusion_schedule, get_noised_x
+from code.training.noising import get_diffusion_schedule, get_noised_x
 from training.utils import get_dataset_loaders, get_models, mask_invalid, plot_losses
 
 logging.basicConfig(
@@ -262,9 +262,9 @@ def diffusion(
 
 
 
-
+        losses_folder = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/losses"
         np.save(
-            f"./losses/losses_epoch_{epoch+1}.npy",
+            f"{losses_folder}/losses_epoch_{epoch+1}.npy",
             np.array(all_losses)
         )
 
