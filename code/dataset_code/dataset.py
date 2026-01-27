@@ -10,12 +10,15 @@ import os
 
 
 class Dataset_RL4CO(Dataset):
-    def __init__(self, folder, generator_params, order,transform=None):
+    def __init__(self, folder, generator_params, order, h, w, transform=None):
         self.folder = folder
         self.transform = transform
         self.order = order
         self.generator_params = generator_params
         self.env = FJSPEnv(generator_params=self.generator_params)
+        self.w = w
+        self.h = h
+
 
         self.files = sorted(
             os.path.join(folder, f)
@@ -47,8 +50,6 @@ class Dataset_RL4CO(Dataset):
         return self.cum_sizes[-1]
 
     def __getitem__(self, idx):
-        h = 20
-        w = 60
         # Find which file this idx belongs to
         file_idx = bisect.bisect_right(self.cum_sizes, idx) - 1
         instance_idx = idx - self.cum_sizes[file_idx]
@@ -66,9 +67,8 @@ class Dataset_RL4CO(Dataset):
         if self.transform:
             td_instance = self.transform(td_instance)
 
-        target_assignments, proc_times, job_id, pos_job = \
-            utils.get_feature_adj_from_instance(
-                td_instance, self.env, self.order
+        target_assignments, proc_times, job_id, pos_job = utils.get_feature_adj_from_instance(
+                td_instance, self.env, self.order, self.h, self.w
             )
 
         for data in [target_assignments, proc_times, job_id, pos_job]:

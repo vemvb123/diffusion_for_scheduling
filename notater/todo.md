@@ -4,6 +4,33 @@
 OPS:
 når får fra inference...
 burde nok gjøre noe skjekk på om ikke op skeduleres til ugyldig ma
+Kan gjøre dette med å bare skjekke den ene adj greia som viser hvilken op kan være på hvilken ma.
+
+Lag noe som kan få resultater fra en batch i inference.
+Så jeg eks får et snitt for:
+feasibility - genereres nok op, gis op til riktige ma, i hvor stor grad op følger sekvens
+makespan
+generasjonstid (dette blir ikke et snitt, med for hele batchen)
+
+
+# raskere inference
+## llm
+block wise kv caching .... tror kanskje noe av dette funker som maske .. man kan gjøre noe for at modell ignore et sted, ikke sett
+confidence-aware parallell decoding - tokens confidently predicted gets unmasked in parallell
+kanskje man kan ha noe confidence for hele sched, så bruke ddim til a stoppe tidlig.
+
+Kan rpøve å implementere block wise kv caching og condfidence aware parrallell decoding, kan teste med 444
+Men burde kanskje endre treninga også etterhvert, eller?
+
+
+## andre metoder
+ddim
+progressive / learned distillation
+latent space diffuion - opererer i compressed space
+feture caching
+
+
+
 
 
 

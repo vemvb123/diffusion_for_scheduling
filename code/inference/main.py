@@ -3,8 +3,8 @@ results.py contains code for gathering results.
 Such as gathering mean makespan of scheduled instances, graphs, training results, etc
 """
 
-import code.inference.check_inference_utils as schedule
-from code.inference.check_inference_utils import check_when_inference_makes_final_schedule
+import code.inference.utils as schedule
+from code.inference.utils import check_when_inference_makes_final_schedule
 import code.inference.guidence as guidence
 import code.inference.inference as inference
 

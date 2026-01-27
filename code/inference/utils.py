@@ -1,7 +1,7 @@
 from typing import List
 import torch
 
-import code.inference.check_inference_utils as utils
+import code.inference.utils as utils
 from torch import Tensor
 
 
