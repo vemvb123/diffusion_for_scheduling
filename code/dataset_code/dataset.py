@@ -80,16 +80,12 @@ class Dataset_RL4CO(Dataset):
         target_assignments, proc_times, job_ops_adj, ops_ma_adj = utils.get_feature_adj_from_instance(
                 td_instance, self.env, self.order, self.h, self.w
             )
-        """
-        logging.info(target_assignments)
-        logging.info(proc_times)
-        logging.info(job_ops_adj)
-        logging.info(ops_ma_adj)
-        logging.info("exiting")
-        exit()
-        """
+
         for i, data in enumerate([target_assignments, proc_times, job_ops_adj, ops_ma_adj]):
             if torch.isnan(data).any():
                 raise ValueError(f"Assignment NaN values found in tensor, at {i}")
 
         return target_assignments, proc_times, job_ops_adj, ops_ma_adj
+
+
+

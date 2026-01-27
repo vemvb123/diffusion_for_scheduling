@@ -30,26 +30,34 @@ import time
 
 
 
-
 def expand_matrix(x: torch.Tensor, shape_to_make: Tuple[int, int]) -> torch.Tensor:
     min_val = x.min()
     max_val = x.max()
-    x_norm = (x - min_val) / (max_val - min_val)
-    x_norm = x_norm.clamp(0, 1)  # ensure range [0,1]
 
-    h = None
-    w = None
-    if len(x_norm.shape) == 2:
+    # Avoid divide by zero
+    if max_val == min_val:
+        x_norm = torch.zeros_like(x)   # or ones_like(x), depending on intent
+    else:
+        x_norm = (x - min_val) / (max_val - min_val)
+
+    x_norm = x_norm.clamp(0, 1)
+
+    # get height/width
+    if x_norm.ndim == 2:
         h, w = x_norm.shape
     else:
         _, h, w = x_norm.shape
 
+    # compute padding
     pad_bottom = shape_to_make[0] - h
-    pad_right = shape_to_make[1] - w
+    pad_right  = shape_to_make[1] - w
+
+    # pad
     x_padded = F.pad(x_norm, (0, pad_right, 0, pad_bottom), value=0.0)
 
-    # x_final = x_padded.unsqueeze(1)
     return x_padded
+
+
 
 
 
@@ -88,11 +96,8 @@ def get_feature_adj_from_instance(td: TensorDict, env, order: bool, h: int, w: i
 
     # OPS MA ADJ
     ops_ma_adj = td['ops_ma_adj']
-    #logging.info(job_ops_adj)
     ops_ma_adj = ops_ma_adj.unsqueeze(0)
     ops_ma_adj = expand_matrix(ops_ma_adj, (w, h))
-    #logging.info(job_ops_adj)
-    #logging.info("after get feature")
     return assignments, proc_times, job_ops_adj, ops_ma_adj
 
 

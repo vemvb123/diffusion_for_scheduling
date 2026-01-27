@@ -1,5 +1,6 @@
 import code.dataset_code.utils as utils
-
+import code.scheduling.schedule as schedule
+from code.dataset_code.dataset import Dataset_RL4CO
 
 def main():
     ### Lag dataset
@@ -49,4 +50,32 @@ def main():
     )
     print("Done making mk01 dataset")
 
-main()
+
+
+def check_dataset():
+
+    generator_params = {
+        'n_jobs':4,
+        'n_machines':4,
+        'max_op_per_job':4,
+        'min_op_per_job':4,
+        'max_proc_time':50,
+        'min_proc_time':5,
+        'max_eligable_ma_per_op':4,
+        'min_eligable_ma_per_op':4,
+    }
+
+
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444'
+    dataset = Dataset_RL4CO(
+        folder=dataset_folder,
+        generator_params=generator_params,
+        order=True,
+        w=24,
+        h=24
+    )
+    dataset[0]
+
+
+# check_dataset()
+#main()
