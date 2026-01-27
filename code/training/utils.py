@@ -32,9 +32,7 @@ def plot_losses(save_path, graph_name, losses):
     plt.savefig(f"{save_path}/{graph_name}.png")
 
 
-def mask_invalid(h, w, pred, noise):
-    valid_h = 4
-    valid_w = 16
+def mask_invalid(valid_h, valid_w, pred, noise):
     pred_valid  = pred[..., :valid_h, :valid_w]
     noise_valid = noise[..., :valid_h, :valid_w]
     return pred_valid, noise_valid

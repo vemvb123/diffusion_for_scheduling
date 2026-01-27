@@ -6,8 +6,8 @@ diffusion.py contains code for training diffusion models
 
 import logging
 
-from training.noising import get_diffusion_schedule, get_noised_x
-from training.utils import get_dataset_loaders, get_models, mask_invalid, plot_losses
+from code.training.noising import get_diffusion_schedule, get_noised_x
+from code.training.utils import get_dataset_loaders, get_models, mask_invalid, plot_losses
 
 logging.basicConfig(
     level=logging.INFO,
@@ -134,7 +134,7 @@ def run_epoch_feature(loop, device, timesteps,
 
 def run_epoch_adj(loop, device, timesteps,
             model_adj, model_enc, optimizer,
-            batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod, mode):
+            batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod, mode, valid_h, valid_w):
 
 
     total_loss = 0.0
@@ -169,7 +169,7 @@ def run_epoch_adj(loop, device, timesteps,
 
         pred = model_adj(model_input, t, type_t="timestep")
 
-        pred_valid, noise_valid = mask_invalid(4, 16, pred, noise)
+        pred_valid, noise_valid = mask_invalid(valid_h, valid_w, pred, noise)
         loss = nn.MSELoss()(pred_valid, noise_valid)
 
         if mode == "train":
@@ -184,29 +184,44 @@ def run_epoch_adj(loop, device, timesteps,
     return loop, model_adj, total_loss / len(loop)
 
 
+def count_nan_indices(loader):
+    total_nans = 0
 
+    for batch in loader:
+        target_assignments, proc_times, job_ops_adj, ops_ma_adj = batch
 
+        B = target_assignments.shape[0]
 
+        for i in range(B):
+            if (
+                torch.isnan(target_assignments[i]).any() or
+                torch.isnan(proc_times[i]).any() or
+                torch.isnan(job_ops_adj[i]).any() or
+                torch.isnan(ops_ma_adj[i]).any()
+            ):
+                total_nans += 1
+    logging.info(f"Total instances with NaN values: {total_nans}")
+    return total_nans
 
 def diffusion(
     model_type: str, # must be either "adj" for adjecency model or "f" for feature vector model
-    loss_image_path,
     train_dataset,
     test_dataset,
-    n_base_features: int,
     n_embed_features: int,
     model_path_adj: str,
     model_path_enc: str,      # keep this for signature match
     graph_name: str,
     graph_save_folder: str,
+    valid_h, valid_w,
     num_epochs: int = 100,
     lr: float = 1e-3,
     device: str = "cuda",
-    batch_size: int = 32
+    batch_size: int = 32,
 ):
+    n_base_features = train_dataset.n_base_features
 
-    if model_type != "adj" or model_type != "f":
-        raise ValueError(f"model_type must be either adj or f .. but value was {model_type}")
+    if model_type != "adj" and model_type != "f":
+        raise ValueError(f"model_type must be either adj or f .. but value was #{model_type}#")
 
     # running different diffusion algorithms depening on the model type
     run_epoch_func = None
@@ -216,6 +231,12 @@ def diffusion(
         run_epoch_func = run_epoch_feature 
 
     train_loader, test_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size)
+    #count_nan_indices(train_loader)
+    #count_nan_indices(test_loader)
+    #logging.info("exit")
+    #exit()
+
+
     logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
     logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")
     
@@ -249,14 +270,14 @@ def diffusion(
             train_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-            mode="train"
+            mode="train", valid_h=valid_h, valid_w=valid_w
         )
 
         test_loop, model_adj, avg_loss_test = run_epoch_func(
             test_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-            mode="test"
+            mode="test", valid_h=valid_h, valid_w=valid_w
         )
 
 

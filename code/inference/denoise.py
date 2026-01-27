@@ -63,3 +63,5 @@ def get_inference_schedule(beta_start, beta_end, timesteps, device = "cuda"):
     # sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
     # sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
     return betas, alphas, alphas_cumprod
+
+

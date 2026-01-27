@@ -7,10 +7,9 @@ import code.inference.utils as schedule
 from code.inference.utils import check_when_inference_makes_final_schedule
 import code.inference.guidence as guidence
 import code.inference.inference as inference
-
+import code.inference.cache_inference as cache_inference
 import code.scheduling.schedule as schedule
-
-import code.dataset_code.utils as dataset_code
+import code.dataset_code.utils as dataset_utils
 
 import torch
 
@@ -23,14 +22,84 @@ matplotlib.use('Agg')
 
 
 
-def get_inference_result(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx):
-    w = 60
-    h = 10
-    n_jobs = 10
-
+def get_inference_result_cached(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs):
 
     # GETTING DATA OF TEST INSTANCE TO CHECK
-    td = dataset_code.get_td_from_path(dataset_folder, instance_idx)
+    td = dataset_utils.get_td_from_path(dataset_folder, instance_idx)
+
+    ## Lag datasett for brandimarte instanse mk01
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt'
+    parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+
+    env, td_ignore, generator_params = schedule.make_instance(
+        n_ma=parameters['n_machines'], 
+        n_jobs=parameters['n_jobs'], 
+        max_op_per_job=parameters['most_operations'], 
+        min_op_per_job=parameters['fewest_operations'], 
+        max_proc_time=parameters['max_processing_time'], 
+        min_proc_time=parameters['min_processing_time'], 
+        max_eligable_ma_per_op=parameters['max_machine_options'], 
+        min_eligable_ma_per_op=parameters['min_machine_options'], 
+        batch_size=1
+    )
+
+    target_assignments, f1, f2, f3 = dataset_utils.get_feature_adj_from_instance(td, env, order)
+
+    target_assignments = target_assignments.unsqueeze(0)
+    f1 = f1.unsqueeze(0)
+    f2 = f2.unsqueeze(0)
+    f3 = f3.unsqueeze(0)
+
+    # GETTING THE INFERENCED RESULT
+    embed_size = 80
+    n_samples = 1
+
+    print("Running inference")
+    elapsed = None
+    inference_assignments = None
+    if model_type == "adj":
+        inference_assignments, elapsed, assignments_over_time = cache_inference.adj_inference_ddpm(f1, f2, f3, adj_model_path, n_samples, h, w)
+    elif model_type == "f":
+        pass
+    else:
+        raise ValueError("Model type must be either adj or f")
+
+    print(f"Inference done. Took {elapsed} time")
+
+    inference_assignments = inference_assignments[:, :, :h, :w]
+
+
+    
+    # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
+    if order:
+        inference_assignments = schedule.show_order_clear(inference_assignments, w)
+    else:
+        inference_assignments = schedule.round_to_values(inference_assignments, w)
+
+   # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESULT
+    check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order)
+
+    # SCHEDULING THE INFERENCED SCHEDULE
+    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results"
+    graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
+    graph_save_path = f"{graph_folder}/{graph_name}"
+
+    td_scheduled = inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs)
+
+    # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
+    makespan = td_scheduled['time']
+    print(makespan)
+
+
+
+
+
+
+def get_inference_result_mk10(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs):
+
+    # GETTING DATA OF TEST INSTANCE TO CHECK
+    td = dataset_utils.get_td_from_path(dataset_folder, instance_idx)
 
     env, td_ignore, generator_params = schedule.make_instance(
         n_ma=4, 
@@ -44,7 +113,7 @@ def get_inference_result(model_type: str, order: bool, adj_model_path, enc_model
         batch_size=1
     )
 
-    target_assignments, proc_times, job_id, pos_job = dataset_code.get_feature_adj_from_instance(td, env, order)
+    target_assignments, proc_times, job_id, pos_job = dataset_utils.get_feature_adj_from_instance(td, env, order)
 
     target_assignments = target_assignments.unsqueeze(0)
     proc_times = proc_times.unsqueeze(0)
@@ -94,8 +163,6 @@ def get_inference_result(model_type: str, order: bool, adj_model_path, enc_model
 
 
 
-
-
 # HER
 def compare_inference(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx):
 
@@ -104,7 +171,7 @@ def compare_inference(model_type: str, order: bool, adj_model_path, enc_model_pa
     n_jobs = 10
 
     # GETTING DATA OF TEST INSTANCE TO CHECK
-    td = dataset_code.get_td_from_path(dataset_folder, instance_idx)
+    td = dataset_utils.get_td_from_path(dataset_folder, instance_idx)
 
     env, td_ignore, generator_params = schedule.make_instance(
         n_ma=4, 
@@ -120,7 +187,7 @@ def compare_inference(model_type: str, order: bool, adj_model_path, enc_model_pa
 
 
 
-    target_assignments, proc_times, job_id, pos_job = dataset_code.get_feature_adj_from_instance(td, env, order)
+    target_assignments, proc_times, job_id, pos_job = dataset_utils.get_feature_adj_from_instance(td, env, order)
 
     target_assignments = target_assignments.unsqueeze(0)
     proc_times = proc_times.unsqueeze(0)
@@ -208,7 +275,7 @@ print("ran")
 
 
 model_type = "adj"
-order = False
+order = True
 
 adj_model_path = None
 enc_model_path = None
@@ -217,10 +284,17 @@ if order:
 else:
     adj_model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/feature_v_adj/adj_type_1.pth'
 
-dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/with_targets/test_batched_444'
+
+dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01_TEST'
 instance_idx = 10
 
 print("inference result")
 # get_inference_result(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
-compare_inference(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
+# compare_inference(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
+
+w = 64
+h = 24
+n_jobs = 10
+
+get_inference_result_cached(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs)
 exit()

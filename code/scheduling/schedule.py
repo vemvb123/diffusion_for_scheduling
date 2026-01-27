@@ -45,6 +45,8 @@ def make_instance(
     n_ma, n_jobs, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, max_eligable_ma_per_op, min_eligable_ma_per_op, batch_size
 ) -> Tuple[FJSPEnv, TensorDict, Dict]:
 
+    
+
     generator_params = {
         "num_jobs": n_jobs,
         "num_machines": n_ma,

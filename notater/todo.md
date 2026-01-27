@@ -1,6 +1,6 @@
 
 
-
+# tenke over
 OPS:
 når får fra inference...
 burde nok gjøre noe skjekk på om ikke op skeduleres til ugyldig ma
@@ -13,6 +13,13 @@ makespan
 generasjonstid (dette blir ikke et snitt, med for hele batchen)
 
 
+# gjøre
+før trening... Ta flere av instansene inn i et testfolder. Du kan ikke trene på instanser, så bruke de samme når du skjekker inference
+lage 444 datasett på nytt
+trene 444 modell
+lag inferene tingen for order også..
+
+
 # raskere inference
 ## llm
 block wise kv caching .... tror kanskje noe av dette funker som maske .. man kan gjøre noe for at modell ignore et sted, ikke sett
@@ -21,7 +28,6 @@ kanskje man kan ha noe confidence for hele sched, så bruke ddim til a stoppe ti
 
 Kan rpøve å implementere block wise kv caching og condfidence aware parrallell decoding, kan teste med 444
 Men burde kanskje endre treninga også etterhvert, eller?
-
 
 ## andre metoder
 ddim

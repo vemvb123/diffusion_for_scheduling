@@ -13,7 +13,7 @@ logging.basicConfig(
 )
 
 
-import code.scheduling.schedule as scheduling_utils
+import code.scheduling.schedule as schedule
 
 import bisect
 
@@ -70,31 +70,43 @@ def get_feature_adj_from_instance(td: TensorDict, env, order: bool, h: int, w: i
         assignments = assignments.unsqueeze(0)
 
     assignments = expand_matrix(assignments, (w, h))
+    #logging.info(assignments)
 
     # PROC TIMES
     proc_times = td['proc_times']
+    #logging.info(proc_times)
     proc_times = proc_times.unsqueeze(0)
     proc_times = expand_matrix(proc_times, (w, h))
+    #logging.info(proc_times)
 
     # JOB OPS ADJ
     job_ops_adj = td['job_ops_adj']
+    #logging.info(job_ops_adj)
     job_ops_adj = job_ops_adj.unsqueeze(0)
     job_ops_adj = expand_matrix(job_ops_adj, (w, h))
+    #logging.info(job_ops_adj)
 
     # OPS MA ADJ
     ops_ma_adj = td['ops_ma_adj']
+    #logging.info(job_ops_adj)
     ops_ma_adj = ops_ma_adj.unsqueeze(0)
     ops_ma_adj = expand_matrix(ops_ma_adj, (w, h))
-
+    #logging.info(job_ops_adj)
+    #logging.info("after get feature")
     return assignments, proc_times, job_ops_adj, ops_ma_adj
 
 
 
+def print_info_about_dataset(td: TensorDict):
+    print(td["opt_assignment_order"].shape)
+    print(td["opt_assignment"].shape)
+    print(td["opt_assignment"][0])
+    print(td["opt_assignment_order"][0])
 
 
 
 def make_dataset(n: int, dataset_folder: str, 
-                 n_jobs, n_ma, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, 
+                 n_jobs, n_ma, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, max_eligable_ma_per_op, min_eligable_ma_per_op,
                  target_model: str, order: bool, batch_size: int = 1280):
 
     logging.info("Making dataset...")
@@ -102,21 +114,28 @@ def make_dataset(n: int, dataset_folder: str,
     os.makedirs(dataset_folder, exist_ok=True)
     for i in range(0, n, batch_size):
         # lag instanse
+        env, td, generator_params = schedule.make_instance(
+            n_ma=n_ma, n_jobs=n_jobs, 
+            max_op_per_job=max_op_per_job, 
+            min_op_per_job=min_op_per_job, 
+            max_proc_time=max_proc_time, 
+            min_proc_time=min_proc_time, 
+            max_eligable_ma_per_op=max_eligable_ma_per_op, 
+            min_eligable_ma_per_op=min_eligable_ma_per_op, 
+            batch_size=batch_size)
+        # fa target fra instance
 
-        env, td, generator_params = scheduling_utils.make_instance(n_ma=n_ma, n_jobs=n_jobs, 
-                                                  max_op_per_job=max_op_per_job, min_op_per_job=min_op_per_job, 
-                                                  max_proc_time=max_proc_time, min_proc_time=min_proc_time, 
-                                                  max_eligable_ma_per_op=n_ma, min_eligable_ma_per_op=n_ma, 
-                                                  batch_size=batch_size)
-        # fa target fra instance 
-
-        td_target, actions, ordered_assignments = scheduling_utils.make_target(env, td.copy(), target_model, order)
+        td_target, actions, ordered_assignments = schedule.make_target(env, td.copy(), target_model, order)
 
         # lagre json med: td, og optimale td koords
         td.set('opt_assignment', td_target['ma_assignment'])
         td.set('opt_actions', torch.tensor(actions))
         if order:
             td.set('opt_assignment_order', ordered_assignments)
+
+        # TODO hvis du vil sjekke data, for testring
+        #print_info_about_dataset(td)
+        #exit()
 
         torch.save(td.copy(), f'{dataset_folder}/{i}_{i+batch_size}.pt')
 

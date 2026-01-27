@@ -1,5 +1,12 @@
 import code.dataset_code.utils as utils
 
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(filename)s:%(lineno)d - %(message)s"
+)
+
+
 import torch
 from rl4co.envs import FJSPEnv
 from torch.utils.data import Dataset
@@ -18,6 +25,9 @@ class Dataset_RL4CO(Dataset):
         self.env = FJSPEnv(generator_params=self.generator_params)
         self.w = w
         self.h = h
+
+        # TODO endre verdi hvis endrer datasett
+        self.n_base_features = 3
 
 
         self.files = sorted(
@@ -67,12 +77,19 @@ class Dataset_RL4CO(Dataset):
         if self.transform:
             td_instance = self.transform(td_instance)
 
-        target_assignments, proc_times, job_id, pos_job = utils.get_feature_adj_from_instance(
+        target_assignments, proc_times, job_ops_adj, ops_ma_adj = utils.get_feature_adj_from_instance(
                 td_instance, self.env, self.order, self.h, self.w
             )
-
-        for data in [target_assignments, proc_times, job_id, pos_job]:
+        """
+        logging.info(target_assignments)
+        logging.info(proc_times)
+        logging.info(job_ops_adj)
+        logging.info(ops_ma_adj)
+        logging.info("exiting")
+        exit()
+        """
+        for i, data in enumerate([target_assignments, proc_times, job_ops_adj, ops_ma_adj]):
             if torch.isnan(data).any():
-                raise ValueError("Assignment NaN values found in tensor")
+                raise ValueError(f"Assignment NaN values found in tensor, at {i}")
 
-        return target_assignments, proc_times, job_id, pos_job
+        return target_assignments, proc_times, job_ops_adj, ops_ma_adj
