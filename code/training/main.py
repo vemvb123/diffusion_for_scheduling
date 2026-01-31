@@ -16,10 +16,10 @@ import code.training.diffusion as training
 from code.dataset_code.dataset import Dataset_RL4CO
 
 
-# 1 adj
-# 2 adj ordered
-# 3 f
-# 4 f ordered
+# 1 adj ordered
+# 2 adj
+# 3 f ordered
+# 4 f
 
 # maps file execution parameter (1-4) to some model to train
 model_to_train = None
@@ -38,9 +38,9 @@ def map_file_parameter_to_model_type(model_to_train: int) -> Tuple[str, bool]:
     elif model_to_train > 2:
         model_type = "f"
     if model_to_train == 2 or model_to_train == 4:
-        order = True
-    elif model_to_train == 1 or model_to_train == 3:
         order = False
+    elif model_to_train == 1 or model_to_train == 3:
+        order = True
 
     logging.info(f"Using model ... type: {model_type}, order: {order}")
     if model_type == None or order == None:
