@@ -94,7 +94,7 @@ def feature_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, e
 
 
 # når får tilbake x, så minsker jeg det jeg får til kun x innenfor dimensjonene
-def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples):
+def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, h_when_masked, w_when_masked):
 
     device = "cuda"
 
@@ -117,7 +117,7 @@ def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples):
         
         # creating a matrix, everything out side of the submatrix dim_x,dim_y has the value 1, while the matrix dim_x,dim_y has a random value.
         # similair to how x was masked during training
-        x = torch.randn(n_samples, 1, 20, 20).to(device)
+        x = torch.randn(n_samples, 1, h_when_masked, w_when_masked).to(device)
         # Set rows outside dim_x to 1
         #x[:, :, dim_x:, :] = 1
         # Set columns outside dim_y to 1 (for rows inside dim_x)

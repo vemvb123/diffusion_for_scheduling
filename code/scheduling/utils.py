@@ -26,63 +26,47 @@ def get_clear_sequence(assignments):
     return out.view(assignments.shape)
 
 
-# brukes til å skedulere fra inference
 def map_assignemnts_to_actions(assignments, order: bool, n_jobs: int):
 
     # remove batch/channel dims if present
-    if assignments.dim() == n_jobs:
-        assignments = assignments.squeeze(0).squeeze(0)  # (4,16)
+    if assignments.dim() > 2:
+        assignments = assignments.squeeze(0).squeeze(0)  # (H, W)
 
-    H, W = assignments.shape  # H=4, W=16
-    section_width = n_jobs # tror skal være samme verdi som mengde jobber
-    num_sections = W // section_width
-    """
+    H, W = assignments.shape  # e.g. H=4, W=16
+    cols_per_section = n_jobs
+    num_sections = W // cols_per_section
+
     actions = []
+
     if order:
-        x = assignments
+        # ---- ORDERED MODE ----
 
-        x = x.squeeze(0).squeeze(0)
+        # Get all non-zero positions
+        nonzero = torch.nonzero(assignments, as_tuple=False)
 
-        # get all nonzero positions
-        rows, cols = torch.nonzero(x, as_tuple=True)
+        # Extract their values
+        values = assignments[nonzero[:, 0], nonzero[:, 1]]
 
-        # get the values at those positions
-        vals = x[rows, cols]
+        # Sort by value (1 -> 2 -> 3 -> ...)
+        sorted_idx = torch.argsort(values)
 
-        # sort by value (1 → 16)
-        order = torch.argsort(vals)
-        rows = rows[order]
-        cols = cols[order]
+        for idx in sorted_idx:
+            row = nonzero[idx, 0].item()
+            col = nonzero[idx, 1].item()
 
-        # compute mapped values
-        sections = cols // 4
-        mapped = sections * 4 + (rows + 1)
+            section_idx = col // cols_per_section
+            action = section_idx * cols_per_section + (row +1)
+            actions.append(action)
 
-        return mapped.tolist()
-
-
-    # TODO inkluder dette igjen i funksjonen seinere
-    """
-    if order:
-        # order by largest value first
-        _, indices = torch.topk(assignments.flatten(), H * W)
-
-        for idx in indices:
-            row = idx // W
-            col = idx % W
-            section = col // section_width
-            action = section * H + row + 1
-            actions.append(action.item())
 
     else:
-        cols_per_section = n_jobs
-        actions = []
-
-        for col in range(assignments.shape[1]):
+        # ---- BINARY MODE ----
+        for col in range(W):
             section_idx = col // cols_per_section
-            for row in range(assignments.shape[0]):
+            for row in range(H):
                 if assignments[row, col] == 1:
-                    value = section_idx * cols_per_section + (row + 1)
-                    actions.append(value)
+                    action = section_idx * cols_per_section + (row + 1)
+                    actions.append(action)
 
-        return actions
+
+    return actions

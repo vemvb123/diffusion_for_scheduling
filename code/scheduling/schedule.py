@@ -10,7 +10,7 @@ import os
 import logging
 import bisect
 
-from code.scheduling.utils import map_assignemnts_to_actions
+import code.scheduling.utils as utils
 
 logging.basicConfig(
     level=logging.INFO,
@@ -164,44 +164,138 @@ def make_step(env, td, action):
 
     return td
 
+import time
+# import code.dataset_code.utils as dataset_utils
 
-def inferenced_schedule(assignments, order: bool, env, td, path_save_image: str, n_jobs: int):
-    actions = map_assignemnts_to_actions(assignments, order, n_jobs)
-    # print(assignments)
-    # print(td["opt_assignment"])
-    # print(actions)
-    # print(td["opt_actions"])
-    # exit()
+
+# TODO FJERN
+def get_td_from_path(path: str, instance_idx: int) -> Tensor:
+    # Get sorted list of data files
+    files = sorted([f for f in os.listdir(path) if f.endswith(".pt")])
+    # Build file ranges
+    cum_sizes = []
+    ranges = []
+    total = 0
+
+    for fname in files:
+        start, end = map(int, fname.replace(".pt", "").split("_"))
+        size = end - start
+        cum_sizes.append(total)
+        ranges.append((start, end))
+        total += size
+
+    # Find which file contains the instance
+    file_idx = bisect.bisect_right(cum_sizes, instance_idx) - 1
+    if file_idx < 0:
+        raise ValueError(f"Instance {instance_idx} not found in {path}")
+
+    file_path = os.path.join(path, files[file_idx])
+
+    # Load with weights_only=False so that TensorDict objects (or other custom objects)
+    # can be unpickled properly. Only do this if the file is from a trusted source.
+    batch = torch.load(
+        file_path,
+        map_location="cpu",
+        weights_only=False,  # use full pickle, not restricted weights_only loader
+    )
+
+    # Compute local index within this batch
+    local_idx = instance_idx - cum_sizes[file_idx]
+    return batch[local_idx]
+
+
+def inferenced_schedule():
+    # TODO før tilbake ukommentert
+        # assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int):
+    """ 
+    actions = utils.map_assignemnts_to_actions(assignments, order, n_jobs)
+
     td.del_("opt_assignment")
+    td.del_("opt_assignment_order")
     td.del_("opt_actions")
-
-    #print(td.shape)
-    #td = TensorDict.from_dict(td, auto_batch_size=True)
-    #print(td.shape)
-    #td = TensorDict(td, batch_size=[1])
-    #print(td.shape)
 
     td = td.unsqueeze(0)
     env.render(td, 0)
 
 
-    #---
-    while not td["done"].all():
-        # loop true indexer
-        # for en true index, se at maskinen den oppgaven skal skeduleres til ikke er opptatt
-        # det ses ved at: mapped = [((v - 1) % 4) + 1 for v in actions]  ... fra ctions
-        # hvis opptatt, gå til neste gå til neste true.
-        # så den oppgaven endelig kn skeduleres, skeduleres den, så starter du å loope true fra starten av
-        # time.sleep(10)
-        #print(td["time"])
-        #print(td["busy_until"])
-        #print(td["is_ready"])
-        #print(assignments)
+    """
+    assignments = torch.tensor([[[[ 0.,  0.,  0.,  0.,  0.,  0.,  0., 16.,  0.,  0.,  0.,  0.,  1.,  5., 11.,  0.],
+          [ 0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  4.,  8., 14.,  0.,  0.,  0., 0.,  0.],
+          [ 0.,  0.,  0.,  0.,  3.,  6., 10.,  0.,  0.,  0.,  0., 15.,  0.,  0., 0.,  0.],
+          [ 2.,  7.,  9., 12.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0., 0., 13.]]]], device='cuda:0')
+    order = True
+    n_jobs = 4
 
-        if order:
-            pass
+    actions = utils.map_assignemnts_to_actions(assignments, order, n_jobs)
+    # actions = [13, 4, 7, 10, 13, 7, 4, 10, 4, 7, 13, 4, 16, 10, 11, 5]
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444_TEST'
+    instance_idx = 10
+    td = get_td_from_path(dataset_folder, instance_idx)
+    td = td.unsqueeze(0)
 
-        else:
+    env, td_ignore, generator_params = make_instance(
+        n_ma=4, 
+        n_jobs=4, 
+        max_op_per_job=4, 
+        min_op_per_job=4, 
+        max_proc_time=50, 
+        min_proc_time=5, 
+        max_eligable_ma_per_op=4, 
+        min_eligable_ma_per_op=4, 
+        batch_size=1
+    )
+
+    env.render(td, 0)
+    model_type = "adj"
+    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/444"
+    graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
+    path_save_image = f"{graph_folder}/{graph_name}"
+    n_machines = 4
+
+
+    # antar at order assignments da inneholder større og større verdi for hver order
+    #if order:
+        # TODO hvordan håndtere/se skeduleringsfeil i seq    
+        # se på verdier fra inferenced
+        # map hver verdi til en action, i sekvensen assignments gir
+        # .. alt det gjør du fr loopen
+        # så når loopen starter, looper du igjennom lista av actions
+
+        # ops: td gir ikke oppgaver klare, men maskiner,
+        #  og det gis i format som teller opp, så når ma1 er klar første gang sier den 0, så neste gang sier den 1
+        # men når det er ops, så trur jeg den teller ned... så eks første kolonne er 1,2,3,4 osv...
+
+        # looper action i actions
+        # ser på is ready, som gir klare maskiner
+        # mapper ops og actions
+        # - har spenn for hver maskin
+        # - 0-3,4-7,8-11,12-5
+        # - hvis ac er innenfor en av de tilgjengelige spenna, så kan den skeduleres, eller må den hoppe i tid
+        # - da hopper den i tid til den maskinen er klar
+        # tar action, og skedulerer den ut
+
+        # får klare maskiner (rl4co gir format 0,4,8,12), så teller den 1 opp etter en skedulering, til eks 1,4,8,12
+    if order:
+
+
+        for action in actions:
+            # machine index that this action refers to
+            ma_to_use = (action - 1) % n_machines
+
+            while td["busy_until"][0, ma_to_use].item() > td["time"].item():
+                invalid_action = torch.tensor([0])  
+                td["action"] = invalid_action
+
+                td = env.step(td)["next"]
+                env.render(td, 0)
+
+            td["action"] = torch.tensor([action])
+            td = env.step(td)["next"]
+            env.render(td, 0)
+
+
+    else:
+        while not td["done"].all():
             ready_ops = torch.nonzero(td["is_ready"], as_tuple=True)[1]
 
             ma_indices_for_actions = [((v - 1) % n_jobs) for v in actions]  # 0‑based
@@ -213,6 +307,8 @@ def inferenced_schedule(assignments, order: bool, env, td, path_save_image: str,
                 busy_val = td["busy_until"][0, machine_idx]
                 current_time = td["time"][0]
 
+                # td["time"] = busy_val.unsqueeze(0)
+
                 if busy_val <= current_time:
                     td['action'] = torch.tensor([actions[op]])
                     td = env.step(td)['next']
@@ -220,12 +316,15 @@ def inferenced_schedule(assignments, order: bool, env, td, path_save_image: str,
                 else:
                     td["time"] = busy_val.unsqueeze(0)
 
+    print("done")
+    print(td["ma_assignment"])
     if path_save_image:
         plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
+        print(f"Saved scheduled image at path {path_save_image}")
     return td
 
 
-
+inferenced_schedule()
 
 
 
