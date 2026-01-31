@@ -204,10 +204,7 @@ def get_td_from_path(path: str, instance_idx: int) -> Tensor:
     return batch[local_idx]
 
 
-def inferenced_schedule():
-    # TODO før tilbake ukommentert
-        # assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int):
-    """ 
+def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int ):
     actions = utils.map_assignemnts_to_actions(assignments, order, n_jobs)
 
     td.del_("opt_assignment")
@@ -217,40 +214,6 @@ def inferenced_schedule():
     td = td.unsqueeze(0)
     env.render(td, 0)
 
-
-    """
-    assignments = torch.tensor([[[[ 0.,  0.,  0.,  0.,  0.,  0.,  0., 16.,  0.,  0.,  0.,  0.,  1.,  5., 11.,  0.],
-          [ 0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  4.,  8., 14.,  0.,  0.,  0., 0.,  0.],
-          [ 0.,  0.,  0.,  0.,  3.,  6., 10.,  0.,  0.,  0.,  0., 15.,  0.,  0., 0.,  0.],
-          [ 2.,  7.,  9., 12.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0., 0., 13.]]]], device='cuda:0')
-    order = True
-    n_jobs = 4
-
-    actions = utils.map_assignemnts_to_actions(assignments, order, n_jobs)
-    # actions = [13, 4, 7, 10, 13, 7, 4, 10, 4, 7, 13, 4, 16, 10, 11, 5]
-    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444_TEST'
-    instance_idx = 10
-    td = get_td_from_path(dataset_folder, instance_idx)
-    td = td.unsqueeze(0)
-
-    env, td_ignore, generator_params = make_instance(
-        n_ma=4, 
-        n_jobs=4, 
-        max_op_per_job=4, 
-        min_op_per_job=4, 
-        max_proc_time=50, 
-        min_proc_time=5, 
-        max_eligable_ma_per_op=4, 
-        min_eligable_ma_per_op=4, 
-        batch_size=1
-    )
-
-    env.render(td, 0)
-    model_type = "adj"
-    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/444"
-    graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
-    path_save_image = f"{graph_folder}/{graph_name}"
-    n_machines = 4
 
 
     # antar at order assignments da inneholder større og større verdi for hver order
@@ -275,25 +238,26 @@ def inferenced_schedule():
         # tar action, og skedulerer den ut
 
         # får klare maskiner (rl4co gir format 0,4,8,12), så teller den 1 opp etter en skedulering, til eks 1,4,8,12
-    if order:
+    # if order:
 
 
-        for action in actions:
-            # machine index that this action refers to
-            ma_to_use = (action - 1) % n_machines
+    for action in actions:
+        # machine index that this action refers to
+        ma_to_use = (action - 1) % n_machines
 
-            while td["busy_until"][0, ma_to_use].item() > td["time"].item():
-                invalid_action = torch.tensor([0])  
-                td["action"] = invalid_action
+        while td["busy_until"][0, ma_to_use].item() > td["time"].item():
+            invalid_action = torch.tensor([0])  
+            td["action"] = invalid_action
 
-                td = env.step(td)["next"]
-                env.render(td, 0)
-
-            td["action"] = torch.tensor([action])
             td = env.step(td)["next"]
             env.render(td, 0)
 
+        td["action"] = torch.tensor([action])
+        td = env.step(td)["next"]
+        env.render(td, 0)
 
+
+    """
     else:
         while not td["done"].all():
             ready_ops = torch.nonzero(td["is_ready"], as_tuple=True)[1]
@@ -316,6 +280,7 @@ def inferenced_schedule():
                 else:
                     td["time"] = busy_val.unsqueeze(0)
 
+    """
     print("done")
     print(td["ma_assignment"])
     if path_save_image:
@@ -324,7 +289,7 @@ def inferenced_schedule():
     return td
 
 
-inferenced_schedule()
+# inferenced_schedule()
 
 
 

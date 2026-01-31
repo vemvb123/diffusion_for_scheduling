@@ -32,10 +32,28 @@ def plot_losses(save_path, graph_name, losses):
     plt.savefig(f"{save_path}/{graph_name}.png")
 
 
-def mask_invalid(valid_h, valid_w, pred, noise):
+def mask_invalid(valid_h, valid_w, pred, noise, ops_ma_adj):
+    # 1. Crop spatially
     pred_valid  = pred[..., :valid_h, :valid_w]
     noise_valid = noise[..., :valid_h, :valid_w]
+
+    if ops_ma_adj is None:
+        return pred_valid, noise_valid
+
+    ops_ma_adj_valid = ops_ma_adj[..., :valid_h, :valid_w]
+
+    # 2. If ops_ma_adj has at least one valid cell, apply it
+    if ops_ma_adj_valid.any():
+        # Ensure mask is boolean
+        mask = ops_ma_adj_valid.bool()
+
+        # Select only valid cells
+        pred_valid  = pred_valid[mask]
+        noise_valid = noise_valid[mask]
+
+    # 3. If ops_ma_adj is all zeros → ignore it
     return pred_valid, noise_valid
+
 
 
 def get_dataset_loaders(train_dataset, test_dataset, batch_size: int = 32, subset: bool = False):

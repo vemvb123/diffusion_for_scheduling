@@ -42,7 +42,7 @@ def map_file_parameter_to_model_type(model_to_train: int) -> Tuple[str, bool]:
     elif model_to_train == 1 or model_to_train == 3:
         order = False
 
-    logging.info("Using model: type: {type}, order: {order}")
+    logging.info(f"Using model ... type: {model_type}, order: {order}")
     if model_type == None or order == None:
         raise ValueError("That model type dosent exist. pecify one between 1 and 2")
 
@@ -169,8 +169,8 @@ def mk01():
     w = 64
     valid_h = 6
     valid_w = 60
-    testing_epochs = 2
-    run_epochs = 100
+    testing_epochs = 1
+    run_epochs = 50
 
 
     graph_name = f"model {model_type}, with order: {order}"
@@ -189,8 +189,8 @@ def mk01():
     
 
 
-generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = four()
-#generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk01()
+# generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = four()
+generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk01()
 
 train_models(model_type, order,
     generator_params,

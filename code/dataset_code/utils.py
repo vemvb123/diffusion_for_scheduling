@@ -77,27 +77,27 @@ def get_feature_adj_from_instance(td: TensorDict, env, order: bool, h: int, w: i
         assignments = td['opt_assignment']
         assignments = assignments.unsqueeze(0)
 
-    assignments = expand_matrix(assignments, (w, h))
+    assignments = expand_matrix(assignments, (h, w))
     #logging.info(assignments)
 
     # PROC TIMES
     proc_times = td['proc_times']
-    #logging.info(proc_times)
     proc_times = proc_times.unsqueeze(0)
-    proc_times = expand_matrix(proc_times, (w, h))
+    proc_times = expand_matrix(proc_times, (h, w))
     #logging.info(proc_times)
 
     # JOB OPS ADJ
     job_ops_adj = td['job_ops_adj']
     #logging.info(job_ops_adj)
     job_ops_adj = job_ops_adj.unsqueeze(0)
-    job_ops_adj = expand_matrix(job_ops_adj, (w, h))
+    job_ops_adj = expand_matrix(job_ops_adj, (h, w))
     #logging.info(job_ops_adj)
 
     # OPS MA ADJ
     ops_ma_adj = td['ops_ma_adj']
     ops_ma_adj = ops_ma_adj.unsqueeze(0)
-    ops_ma_adj = expand_matrix(ops_ma_adj, (w, h))
+    ops_ma_adj = expand_matrix(ops_ma_adj, (h, w))
+
     return assignments, proc_times, job_ops_adj, ops_ma_adj
 
 

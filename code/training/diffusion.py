@@ -139,12 +139,12 @@ def run_epoch_adj(loop, device, timesteps,
 
     total_loss = 0.0
 
-    for batch_idx, (target_assignments, proc_times, job_id, pos_job) in enumerate(loop):
+    for batch_idx, (target_assignments, proc_times, job_ops_adj, ops_ma_adj) in enumerate(loop):
 
         features = torch.cat([
             proc_times,
-            job_id,
-            pos_job,
+            job_ops_adj,
+            ops_ma_adj,
         ], dim=1)
 
         features = features.to(device, dtype=torch.float32)
@@ -169,7 +169,7 @@ def run_epoch_adj(loop, device, timesteps,
 
         pred = model_adj(model_input, t, type_t="timestep")
 
-        pred_valid, noise_valid = mask_invalid(valid_h, valid_w, pred, noise)
+        pred_valid, noise_valid = mask_invalid(valid_h, valid_w, pred, noise, ops_ma_adj)
         loss = nn.MSELoss()(pred_valid, noise_valid)
 
         if mode == "train":
