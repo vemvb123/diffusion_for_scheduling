@@ -5,7 +5,105 @@ import time
 
 import code.inference.denoise as denoise
 
-def apply_confidence_mask(x, columns_done, columns_done_values, threshold):
+
+
+def apply_confidence_mask(x, columns_done, columns_done_values, threshold, order, n_ops):
+    if order:
+        return apply_confidence_mask_order(x, columns_done, columns_done_values, threshold, n_ops)
+    else:
+        return apply_confidence_mask_no_order(x, columns_done, columns_done_values, threshold)
+
+
+
+def apply_confidence_mask_order(
+    x, columns_done, columns_done_values, threshold, n_ops
+):
+    """
+    Vectorized: commit confident columns across the whole batch at once.
+
+    Args:
+        x: tensor of shape (B, 1, W, H)
+        columns_done: list of column indices already locked
+        columns_done_values: tensor same shape as x, storing committed values
+        threshold: float, closeness threshold for a discrete level
+        n_ops: number of discrete levels
+
+    Returns:
+        x: tensor with done columns applied
+        columns_done: updated list of locked columns
+        columns_done_values: updated committed values
+    """
+    B, C, W, H = x.shape
+    device = x.device
+
+    # define discrete levels
+    levels = torch.tensor([(i + 1) / n_ops for i in range(n_ops)], device=device)
+    level_claimed = torch.zeros_like(levels, dtype=torch.bool)
+
+    # figure which columns are left to check
+    all_columns = torch.arange(H, device=device)
+    columns_to_check = [c.item() for c in all_columns if c.item() not in columns_done]
+
+    if len(columns_to_check) == 0:
+        return x, columns_done, columns_done_values
+
+    # extract values of columns not done
+    x_sub = x[:, 0, :, columns_to_check]  # shape (B, W, n_cols)
+
+    # for each batch and each column, find the best matching level
+    for col_idx_local, col_global in enumerate(columns_to_check):
+        # values shape: B x W
+        vals = x_sub[..., col_idx_local]
+
+        # normalize column to [0,1] across current batch
+        col_min = vals.amin(dim=1, keepdim=True)
+        col_max = vals.amax(dim=1, keepdim=True)
+
+        # avoid division by zero
+        norm = torch.where(
+            col_max == col_min,
+            torch.zeros_like(vals),
+            (vals - col_min) / (col_max - col_min),
+        )
+
+        # for each batch
+        for b in range(B):
+            if col_global in columns_done:
+                continue
+
+            # compute diffs to levels
+            diffs = torch.abs(levels.unsqueeze(0) - norm[b].unsqueeze(1))  # W x n_ops
+
+            # find best match over values and levels
+            best_val_idx, best_level_idx = torch.unravel_index(
+                torch.argmin(diffs), diffs.shape
+            )
+            best_dist = diffs[best_val_idx, best_level_idx]
+
+            # if close enough & level not claimed
+            if best_dist <= threshold and not level_claimed[best_level_idx]:
+                # lock this column
+                commit_val = levels[best_level_idx].item()
+
+                # update done
+                if col_global not in columns_done:
+                    columns_done.append(col_global)
+
+                # update committed values for this batch
+                columns_done_values[b, 0, :, col_global] = 0
+                columns_done_values[b, 0, best_val_idx, col_global] = commit_val
+
+                level_claimed[best_level_idx] = True
+
+                # override x with committed
+                x[b, 0, :, col_global] = columns_done_values[b, 0, :, col_global]
+
+    return x, columns_done, columns_done_values
+
+
+
+
+def apply_confidence_mask_no_order(x, columns_done, columns_done_values, threshold):
     """
     Vectorized: commit confident columns across the whole batch at once.
 
@@ -69,7 +167,7 @@ def apply_confidence_mask(x, columns_done, columns_done_values, threshold):
 
 
 # når får tilbake x, så minsker jeg det jeg får til kun x innenfor dimensjonene
-def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, order: bool):
+def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, order: bool, h, w):
 
 
 
@@ -97,7 +195,7 @@ def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, order
 
     with torch.no_grad():
         
-        x = torch.randn(n_samples, 1, 20, 20).to(device)
+        x = torch.randn(n_samples, 1, h, w).to(device)
 
         features = torch.cat([            
             proc_times,
@@ -117,12 +215,11 @@ def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, order
             inputs = torch.cat([
                 x,
                 features,
-            ], dim=1)  # channels = 4
+            ], dim=1)  
 
             predicted_noise = model(inputs, t_tensor, type_t="timestep")
 
             x = denoise.denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
-
 
             x, columns_done, columns_done_values = apply_confidence_mask(x, columns_done, columns_done_values, threshold)
 

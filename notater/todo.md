@@ -1,4 +1,8 @@
 
+# TODO
+Når skal skjekke chache inference... Skjekk at vediarnir or n_ops vert riktige.
+
+
 
 # tenke over
 OPS:
