@@ -70,3 +70,50 @@ def map_assignemnts_to_actions(assignments, order: bool, n_jobs: int):
 
 
     return actions
+
+
+
+
+import torch
+def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
+    if assignments.dim() > 2:
+        assignments = assignments.squeeze(0).squeeze(0)
+
+    H, W = assignments.shape
+
+    if isinstance(n_jobs, int):
+        widths = [n_jobs] * (W // n_jobs)
+    else:
+        widths = n_jobs
+
+    stride = max(widths)
+    section_starts = torch.cumsum(
+        torch.tensor([0] + widths[:-1]), dim=0
+    )
+
+    actions = []
+
+    if order:
+        nonzero = torch.nonzero(assignments, as_tuple=False)
+        values = assignments[nonzero[:, 0], nonzero[:, 1]]
+        sorted_idx = torch.argsort(values)
+
+        for i in sorted_idx:
+            row, col = nonzero[i].tolist()
+            section_idx = int((section_starts <= col).sum() - 1)
+            action = section_idx * stride + (row + 1)
+            actions.append(action)
+
+    else:
+        for col in range(W):
+            section_idx = int((section_starts <= col).sum() - 1)
+            for row in range(H):
+                if assignments[row, col] == 1:
+                    action = section_idx * stride + (row + 1)
+                    actions.append(action)
+
+    # ✅ correct padding
+    max_len = sum(widths)
+    actions += [0] * (max_len - len(actions))
+
+    return torch.tensor(actions, dtype=torch.int64)

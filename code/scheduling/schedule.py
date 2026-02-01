@@ -240,7 +240,7 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
         # får klare maskiner (rl4co gir format 0,4,8,12), så teller den 1 opp etter en skedulering, til eks 1,4,8,12
     # if order:
 
-
+    print(actions)
     for action in actions:
         # machine index that this action refers to
         ma_to_use = (action - 1) % n_machines

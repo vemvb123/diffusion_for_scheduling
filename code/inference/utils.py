@@ -101,11 +101,14 @@ def show_order_clear(x, n_values, valid_slots):
     device = x.device
     x = x.to(device)
     valid_slots = valid_slots.to(device)
+    print("flats")
+    print(x.shape)
+    print(valid_slots.shape)
+
 
     # Flatten
     flat_x = x.flatten()
     flat_vs = valid_slots.flatten()
-
     # Check if there is any valid slot at all
     has_any_valid = flat_vs.any()
 

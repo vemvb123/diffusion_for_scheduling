@@ -1,8 +1,12 @@
 
 # TODO
+
 Når skal skjekke chache inference... Skjekk at vediarnir or n_ops vert riktige.
 
+lage funk for se om order respekterer seq
+lage så får masse løsninger, så plukker den beste
 
+bytt ut diffusion scheduerling med sånn annen type.. ikke schedule som i fjssp, men sånn schedule som generelt i diffusion
 
 # tenke over
 OPS:

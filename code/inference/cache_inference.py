@@ -157,6 +157,7 @@ def apply_confidence_mask_no_order(x, columns_done, columns_done_values, thresho
 
     # override x with committed values
     if len(columns_done) > 0:
+
         x[:, 0, :, columns_done] = columns_done_values[:, 0, :, columns_done]
 
     return x, columns_done, columns_done_values
@@ -165,9 +166,8 @@ def apply_confidence_mask_no_order(x, columns_done, columns_done_values, thresho
 
 
 
-
 # når får tilbake x, så minsker jeg det jeg får til kun x innenfor dimensjonene
-def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, order: bool, h, w):
+def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, order: bool, h, w, after_ts_check, valid_h, valid_w, n_ops, threshold ):
 
 
 
@@ -189,18 +189,26 @@ def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, order
     
     x = None
 
-    threshold = 0.6
     columns_done = []
-    columns_done_values = torch.zeros_like(x)  # same shape as x
 
+    columns_done_values = torch.zeros_like(proc_times)  # same shape as x
+    columns_done_values = columns_done_values.to("cuda")
+
+    """
+    for thing in [proc_times,, job_ops_adj, ops_ma_adj]:
+        print(thing.shape)
+    print("exit")
+    exit()
+    """
+    done_at_t = None
     with torch.no_grad():
         
         x = torch.randn(n_samples, 1, h, w).to(device)
 
         features = torch.cat([            
             proc_times,
-            job_id,
-            pos_job,
+            job_ops_adj,
+            ops_ma_adj,
         ], dim=1)
 
         features = features.to(device, dtype=torch.float32)
@@ -221,10 +229,16 @@ def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, order
 
             x = denoise.denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
 
-            x, columns_done, columns_done_values = apply_confidence_mask(x, columns_done, columns_done_values, threshold)
 
+            n_ops = 16 # TODO endre for order
+            if after_ts_check <= (timesteps - t):
+                x, columns_done, columns_done_values = apply_confidence_mask(x, columns_done, 
+                                                                             columns_done_values, threshold, order, n_ops)
 
-           
+            required = set(range(n_ops))  # {0,1,...,15}
+            if required.issubset(set(columns_done)) and done_at_t == None:
+                done_at_t = timesteps - t
+
             if t % 100==0:
                 given_assignments.append(x.clone())
 
@@ -235,7 +249,7 @@ def adj_inference_ddpm(proc_times, job_id, pos_job, model_path, n_samples, order
     x = torch.clamp(x, 0, 1)
 
     given_assignments.append(x.clone())
-    return x, elapsed, given_assignments
+    return x, elapsed, given_assignments, columns_done, done_at_t
 
 
 """

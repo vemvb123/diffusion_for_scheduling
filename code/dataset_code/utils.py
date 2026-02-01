@@ -61,7 +61,7 @@ def expand_matrix(x: torch.Tensor, shape_to_make: Tuple[int, int]) -> torch.Tens
 
 
 
-def get_feature_adj_from_instance(td: TensorDict, env, order: bool, h: int, w: int) -> Tuple[
+def get_feature_adj_from_instance(td: TensorDict, env, order: bool, h: int, w: int, include_ops_sequence: bool = False) -> Tuple[
         torch.Tensor, # target assignments
         torch.Tensor, # proc times matrix
         torch.Tensor, # jobid matrix
@@ -97,6 +97,9 @@ def get_feature_adj_from_instance(td: TensorDict, env, order: bool, h: int, w: i
     ops_ma_adj = td['ops_ma_adj']
     ops_ma_adj = ops_ma_adj.unsqueeze(0)
     ops_ma_adj = expand_matrix(ops_ma_adj, (h, w))
+
+    if include_ops_sequence:
+        return assignments, proc_times, job_ops_adj, ops_ma_adj, td["ops_sequence_order"], td["opt_actions"]
 
     return assignments, proc_times, job_ops_adj, ops_ma_adj
 
@@ -140,8 +143,18 @@ def make_dataset(n: int, dataset_folder: str,
 
         # TODO hvis du vil sjekke data, for testring
         #print_info_about_dataset(td)
-        #exit()
+        """
+        print("ass order")
+        print(td[10]["opt_assignment"])
+        print(td[10]["opt_assignment_order"])
+        #print(td_target[10]["ops_ma_adj"])
+        #print(td[10]["ops_ma_adj"])
+        #print(td_target[10]["ops_sequence_order"])
+        print(td[10]["ops_sequence_order"])
 
+        print(td[10]["opt_actions"])
+        exit()
+        """
         torch.save(td.copy(), f'{dataset_folder}/{i}_{i+batch_size}.pt')
 
         print(f'Made instance {i} to {i+batch_size}')

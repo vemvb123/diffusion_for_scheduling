@@ -3,7 +3,7 @@ results.py contains code for gathering results.
 Such as gathering mean makespan of scheduled instances, graphs, training results, etc
 """
 import code.inference.utils as utils
-import code.inference.utils as schedule_utils
+import code.scheduling.utils as schedule_utils
 import code.inference.guidence as guidence
 import code.inference.inference as inference
 import code.inference.cache_inference as cache_inference
@@ -17,33 +17,236 @@ import matplotlib
 
 matplotlib.use('Agg')
 
+import torch
+
+import torch
+
+
+import torch
+
+import torch
+
+
+import torch
+
+def extract_env_actions(ma_seq_matrix: torch.Tensor,
+                        ops_sequence_order: torch.Tensor,
+                        n_jobs: int,
+                        max_ops_per_job: int) -> torch.Tensor:
+
+    """
+    Reconstruct the RL4CO FJSP action sequence from a completed schedule matrix.
+
+    Args:
+        ma_seq_matrix: Tensor of shape (1,1,n_machines,n_cols) with schedule ranks.
+        ops_sequence_order: Tensor of length n_cols, gives op index within job.
+        n_jobs: number of jobs
+        max_ops_per_job: maximum operations per job
+
+    Returns:
+        LongTensor: shape (total_scheduled_ops,) with action indices in env format.
+    """
+    # Squeeze out batch dims -> shape (n_machines, n_cols)
+    ma = ma_seq_matrix.squeeze(0).squeeze(0)
+    n_machines, n_cols = ma.shape
+
+    # We'll collect (rank, job, op_idx, machine)
+    schedule_entries = []
+
+    for m in range(n_machines):
+        for c in range(n_cols):
+            rank = int(ma[m, c].item())
+            if rank > 0:
+                op_idx_in_job = int(ops_sequence_order[c].item())
+                job_id = c // max_ops_per_job
+                schedule_entries.append((rank, job_id, op_idx_in_job, m))
+
+    # Sort entries by global schedule rank ascending,
+    # and tie-break by machine index ascending (as per your mapping rule).
+    schedule_entries.sort(key=lambda x: (x[0], x[3]))
+
+    # Convert entries to RL4CO env action IDs
+    # RL4CO env actions are flat IDs where:
+    # action_id = machine * n_jobs + job_id
+    action_seq = []
+    for rank, job_id, op_idx_in_job, machine in schedule_entries:
+        # Compute the flat action index
+        action_id = machine * n_jobs + job_id
+        action_seq.append(action_id)
+
+    return torch.tensor(action_seq, dtype=torch.long)
 
 
 
-def get_inference_result_cached(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs):
 
-    # GETTING DATA OF TEST INSTANCE TO CHECK
+def assert_sequence_respected(ma_seq_matrix, ops_sequence_order):
+    """
+    Raise RuntimeError if any real operation sequence is violated.
+    Uses only ops_sequence_order to identify blocks of ops.
+    """
+
+    # squeeze to real 2D: (n_machines, n_columns)
+    ma = ma_seq_matrix.squeeze(0).squeeze(0)
+
+    n = ops_sequence_order.numel()
+    i = 0
+
+    while i < n:
+        # skip padded zeros at the end
+        if ops_sequence_order[i].item() == 0 and i > 0 and ops_sequence_order[i-1].item() == 0:
+            # once we hit a run of zeros that follows another zero, we break
+            break
+
+        # start new block
+        current_op = ops_sequence_order[i].item()
+        block_start = i
+
+        # collect contiguous columns with the same `current_op`
+        while i < n and ops_sequence_order[i].item() == current_op:
+            i += 1
+        block_end = i  # exclusive end
+
+        # check increasing schedule rank within this block
+        prev_rank = -1
+        for col in range(block_start, block_end):
+            # get schedule rank from ma matrix
+            col_vals = ma[:, col]
+            nonzeros = col_vals[col_vals > 0]
+            if nonzeros.numel() == 0:
+                # if there’s no assignment for this column, skip
+                # (only padded columns at the end should lack assignments)
+                continue
+
+            rank = int(nonzeros[0].item())
+            if rank <= prev_rank:
+                raise RuntimeError(
+                    f"Sequence violation in columns {block_start}-{block_end - 1}: "
+                    f"rank {rank} at col {col} <= previous {prev_rank}"
+                )
+            prev_rank = rank
+
+    print("✔ Sequence OK — no violations!")
+
+
+
+
+
+
+
+def check_if_respects_sequence(inferenced, max_n_ops):
+    B, C, W, H = inferenced.shape
+    assert C == 1, "Expected C=1 in the inferenced"
+
+    for b in range(B):
+        mat = inferenced[b, 0]  # shape: W x H
+
+        # slide across columns in blocks of max_n_ops
+        start = 0
+        while start < H:
+            # take up to max_n_ops columns (may be shorter at end)
+            block = mat[:, start : min(start + max_n_ops, H)]
+
+            single_vals = []
+            for col_idx in range(block.shape[1]):
+                col = block[:, col_idx]
+
+                # find all nonzero values in the column
+                nonzeros = col[col != 0]
+
+                # if exactly 1 nonzero, record it; if 0 nonzeros, ignore
+                if len(nonzeros) == 1:
+                    single_vals.append(nonzeros.item())
+                elif len(nonzeros) > 1:
+                    # if multiple nonzero values, this is still an error
+                    raise AssertionError(
+                        f"Column {start + col_idx} in batch {b} "
+                        f"has multiple nonzero values"
+                    )
+
+            # Now check strictly increasing sequence among recorded values
+            for i in range(len(single_vals) - 1):
+                if not (single_vals[i] < single_vals[i + 1]):
+                    raise AssertionError(
+                        f"Values not strictly increasing in columns "
+                        f"{start}..{start + block.shape[1] - 1}: {single_vals}"
+                    )
+
+            start += max_n_ops
+
+    print("All column groups passed the increasing test!")
+
+
+
+
+
+
+def get_inference_result(problem_type, instance_idx, model_type, order: bool):
+    # instantiate all return values as None
+    (td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, valid_h, valid_w) = (None,) * 10
+
+    if problem_type == "444":
+
+        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444_TEST'
+        env, td_ignore, generator_params = schedule.make_instance(
+            n_ma=4, 
+            n_jobs=4, 
+            max_op_per_job=4, 
+            min_op_per_job=4, 
+            max_proc_time=50, 
+            min_proc_time=5, 
+            max_eligable_ma_per_op=4, 
+            min_eligable_ma_per_op=4, 
+            batch_size=1
+        )
+        mask_h = 24
+        mask_w = 24
+        valid_h = 4
+        valid_w = 16
+        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/444/adj_type_adj_order_{order}.pth"
+
+    elif problem_type == "mk01":
+
+        filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt'
+        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
+        parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+
+        env, td_ignore, generator_params = schedule.make_instance(
+            n_ma=parameters['n_machines'], 
+            n_jobs=parameters['n_jobs'], 
+            max_op_per_job=parameters['most_operations'], 
+            min_op_per_job=parameters['fewest_operations'], 
+            max_proc_time=parameters['max_processing_time'], 
+            min_proc_time=parameters['min_processing_time'], 
+            max_eligable_ma_per_op=parameters['max_machine_options'], 
+            min_eligable_ma_per_op=parameters['min_machine_options'], 
+            batch_size=1
+        )
+        print(parameters)
+
+        mask_h = 24
+        mask_w = 64
+        valid_h = 6
+        valid_w = 60
+        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
+
+
+
     td = dataset_utils.get_td_from_path(dataset_folder, instance_idx)
+    target_assignments, proc_times, job_ops_adj, ops_ma_adj, ops_sequence_order, opt_actions = dataset_utils.get_feature_adj_from_instance(td, env, order, mask_h, mask_w, True)
 
-    ## Lag datasett for brandimarte instanse mk01
-    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
-    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt'
-    parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
-
-    env, td_ignore, generator_params = schedule.make_instance(
-        n_ma=parameters['n_machines'], 
-        n_jobs=parameters['n_jobs'], 
-        max_op_per_job=parameters['most_operations'], 
-        min_op_per_job=parameters['fewest_operations'], 
-        max_proc_time=parameters['max_processing_time'], 
-        min_proc_time=parameters['min_processing_time'], 
-        max_eligable_ma_per_op=parameters['max_machine_options'], 
-        min_eligable_ma_per_op=parameters['min_machine_options'], 
-        batch_size=1
-    )
-
-    target_assignments, proc_times, job_ops_adj, ops_ma_adj = dataset_utils.get_feature_adj_from_instance(td, env, order)
-
+    # TODO skjekk i morra for mk01
+    n_ops = int(torch.count_nonzero(target_assignments[:, :valid_h, :valid_w]))
+    """
+    print(n_ops)
+    levels = torch.tensor([(i + 1) / n_ops for i in range(n_ops)], device="cuda")
+    unique_vals = torch.unique(target_assignments[:, :valid_h, :valid_w])              # get unique values
+    sorted_desc = unique_vals.sort(descending=True) # sort high → low
+    print("lik??")
+    print(sorted_desc.values)  # tensor([7, 5, 3, 2, 1, 0]) 
+    print(levels)
+    print("exit")
+    exit()
+    """
     target_assignments = target_assignments.unsqueeze(0)
     proc_times = proc_times.unsqueeze(0)
     job_ops_adj = job_ops_adj.unsqueeze(0)
@@ -56,8 +259,14 @@ def get_inference_result_cached(model_type: str, order: bool, adj_model_path, en
     print("Running inference")
     elapsed = None
     inference_assignments = None
+    columns_done = None
     if model_type == "adj":
-        inference_assignments, elapsed, assignments_over_time = cache_inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, h, w)
+        # inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w)
+        after_ts_check = 700
+        print("beginning on cache")
+        threshold = 0.02
+        #inference_assignments, elapsed, assignments_over_time, columns_done, done_at_t = cache_inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, order, mask_h, mask_w, after_ts_check, valid_h, valid_w, n_ops, threshold )
+        print("ran inference")
     elif model_type == "f":
         pass
     else:
@@ -65,104 +274,67 @@ def get_inference_result_cached(model_type: str, order: bool, adj_model_path, en
 
     print(f"Inference done. Took {elapsed} time")
 
-    inference_assignments = inference_assignments[:, :, :h, :w]
+    # inference_assignments = inference_assignments[:, :, :valid_h, :valid_w]
+    if order:
+        
+        ops_ma_adj = ops_ma_adj[:, :, :valid_h, :valid_w]
+        target_assignments = target_assignments[:, :, :valid_h, :valid_w]
+        #target_assignments = target_assignments.unsqueeze(0)
+        # print(inference_assignments.shape)
+        print(target_assignments.shape)
+        print(ops_ma_adj.shape)
+        print(target_assignments)
+        #check_if_respects_sequence(target_assignments, n_ops)
+        # target_assignments = target_assignments[:, :, :valid_h, valid_w]
+        target_assignments = utils.show_order_clear(target_assignments, n_ops, ops_ma_adj)
+        print(target_assignments)
+        print(ops_sequence_order)
+
+        # assert_sequence_respected(target_assignments, ops_sequence_order)
+        n_jobs = 10
+ 
+        max_ops_per_job = 6
+        # actions = extract_env_actions(target_assignments, ops_sequence_order, n_jobs, max_ops_per_job)
+        n_jobs = [6,5,6,5,6,5,6,5,6,5, 5]
+        actions = schedule_utils.map_assignments_to_actions_text(target_assignments, True, n_jobs)
+        print(actions)
+        print(opt_actions)
+        exit()
 
 
-    
+
+    # print(f"columns done: {columns_done}")
+    # print(f"done at t: {done_at_t}")
+
+    return td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time
+
+
+
+def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs):
+    print("inside get inference cached")
+    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time = get_inference_result("mk01", instance_idx, model_type, order)
+    ops_ma_adj = ops_ma_adj[:, :, :h, :w]
     # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
     if order:
         inference_assignments = utils.show_order_clear(inference_assignments, w, ops_ma_adj)
     else:
         inference_assignments = utils.round_to_values(inference_assignments, w, ops_ma_adj)
-
+    print("result")
+    print(inference_assignments)
    # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESULT
-    utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order)
+    utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj)
 
     # SCHEDULING THE INFERENCED SCHEDULE
     graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results"
     graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
     graph_save_path = f"{graph_folder}/{graph_name}"
 
-    td_scheduled = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs)
+    n_machines = 4
+    td_scheduled = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs, n_machines)
 
     # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
     makespan = td_scheduled['time']
     print(makespan)
-
-
-
-
-
-
-def get_inference_result_mk10(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs):
-
-    # GETTING DATA OF TEST INSTANCE TO CHECK
-    td = dataset_utils.get_td_from_path(dataset_folder, instance_idx)
-
-    ## Lag datasett for brandimarte instanse mk01
-    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
-    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt'
-    parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
-
-    env, td_ignore, generator_params = schedule.make_instance(
-        n_ma=parameters['n_machines'], 
-        n_jobs=parameters['n_jobs'], 
-        max_op_per_job=parameters['most_operations'], 
-        min_op_per_job=parameters['fewest_operations'], 
-        max_proc_time=parameters['max_processing_time'], 
-        min_proc_time=parameters['min_processing_time'], 
-        max_eligable_ma_per_op=parameters['max_machine_options'], 
-        min_eligable_ma_per_op=parameters['min_machine_options'], 
-        batch_size=1
-    )
-
-    target_assignments, proc_times, job_ops_adj, ops_ma_adj = dataset_utils.get_feature_adj_from_instance(td, env, order)
-
-    target_assignments = target_assignments.unsqueeze(0)
-    proc_times = proc_times.unsqueeze(0)
-    job_ops_adj = job_ops_adj.unsqueeze(0)
-    ops_ma_adj = ops_ma_adj.unsqueeze(0)
-
-    # GETTING THE INFERENCED RESULT
-    embed_size = 80
-    n_samples = 1
-
-    print("Running inference")
-    elapsed = None
-    inference_assignments = None
-    if model_type == "adj":
-        inference_assignments, elapsed, assignments_over_time = cache_inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, h, w)
-    elif model_type == "f":
-        pass
-    else:
-        raise ValueError("Model type must be either adj or f")
-
-    print(f"Inference done. Took {elapsed} time")
-
-    inference_assignments = inference_assignments[:, :, :h, :w]
-
-
-    
-    # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
-    if order:
-        inference_assignments = utils.show_order_clear(inference_assignments, w, ops_ma_adj)
-    else:
-        inference_assignments = utils.round_to_values(inference_assignments, w, ops_ma_adj)
-
-   # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESULT
-    utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order)
-
-    # SCHEDULING THE INFERENCED SCHEDULE
-    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results"
-    graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
-    graph_save_path = f"{graph_folder}/{graph_name}"
-
-    td_scheduled = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs)
-
-    # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
-    makespan = td_scheduled['time']
-    print(makespan)
-
 
 
 # HER
@@ -270,158 +442,7 @@ def compare_inference(model_type: str, order: bool, adj_model_path, enc_model_pa
     print(makespan)
     print(makespan_comp)
 
-
-def get_inference_result_mk01(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs):
- 
-    # GETTING DATA OF TEST INSTANCE TO CHECK
-    td = dataset_utils.get_td_from_path(dataset_folder, instance_idx)
-
-    env, td_ignore, generator_params = schedule.make_instance(
-        n_ma=4, 
-        n_jobs=4, 
-        max_op_per_job=4, 
-        min_op_per_job=4, 
-        max_proc_time=50, 
-        min_proc_time=5, 
-        max_eligable_ma_per_op=4, 
-        min_eligable_ma_per_op=4, 
-        batch_size=1
-    )
-
-    h_when_masked = 24
-    w_when_masked = 24
-
-    target_assignments, proc_times, job_ops_adj, ops_ma_adj = dataset_utils.get_feature_adj_from_instance(td, env, order, h_when_masked, w_when_masked)
-
-    target_assignments = target_assignments.unsqueeze(0)
-    proc_times = proc_times.unsqueeze(0)
-    job_ops_adj = job_ops_adj.unsqueeze(0)
-    ops_ma_adj = ops_ma_adj.unsqueeze(0)
-
-    # GETTING THE INFERENCED RESULT
-    embed_size = 80
-    n_samples = 1
-
-    print("Running inference")
-    elapsed = None
-    inference_assignments = None
-    if model_type == "adj":
-        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, h_when_masked, w_when_masked)
-    elif model_type == "f":
-        pass
-    else:
-        raise ValueError("Model type must be either adj or f")
-
-    print(f"Inference done. Took {elapsed} time")
-
-    
-
-    inference_assignments = inference_assignments[:, :, :h, :w]
-    ops_ma_adj = ops_ma_adj[:, :, :h, :w]
-    
-    # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
-    if order:
-        inference_assignments = utils.show_order_clear(inference_assignments, w, ops_ma_adj)
-    else:
-        inference_assignments = utils.round_to_values(inference_assignments, w, ops_ma_adj)
-
-    print("Produced inference assignments:")
-    print(inference_assignments)
-
-   # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESULT
-    utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj)
-
-    # SCHEDULING THE INFERENCED SCHEDULE
-    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/444"
-    graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
-    graph_save_path = f"{graph_folder}/{graph_name}"
-
-    td_scheduled = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs)
-
-    # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
-    makespan = td_scheduled['time']
-    print(makespan)
-
    
-
-def get_inference_result_444(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs):
-
-    # GETTING DATA OF TEST INSTANCE TO CHECK
-    td = dataset_utils.get_td_from_path(dataset_folder, instance_idx)
-
-    env, td_ignore, generator_params = schedule.make_instance(
-        n_ma=4, 
-        n_jobs=4, 
-        max_op_per_job=4, 
-        min_op_per_job=4, 
-        max_proc_time=50, 
-        min_proc_time=5, 
-        max_eligable_ma_per_op=4, 
-        min_eligable_ma_per_op=4, 
-        batch_size=1
-    )
-
-    h_when_masked = 24
-    w_when_masked = 24
-
-    target_assignments, proc_times, job_ops_adj, ops_ma_adj = dataset_utils.get_feature_adj_from_instance(td, env, order, h_when_masked, w_when_masked)
-
-    target_assignments = target_assignments.unsqueeze(0)
-    proc_times = proc_times.unsqueeze(0)
-    job_ops_adj = job_ops_adj.unsqueeze(0)
-    ops_ma_adj = ops_ma_adj.unsqueeze(0)
-
-    # GETTING THE INFERENCED RESULT
-    embed_size = 80
-    n_samples = 1
-
-    print("Running inference")
-    elapsed = None
-    inference_assignments = None
-    if model_type == "adj":
-        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, h_when_masked, w_when_masked)
-    elif model_type == "f":
-        pass
-    else:
-        raise ValueError("Model type must be either adj or f")
-
-    print(f"Inference done. Took {elapsed} time")
-
-    
-
-    inference_assignments = inference_assignments[:, :, :h, :w]
-    ops_ma_adj = ops_ma_adj[:, :, :h, :w]
-    
-    # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
-    if order:
-        inference_assignments = utils.show_order_clear(inference_assignments, w, ops_ma_adj)
-    else:
-        inference_assignments = utils.round_to_values(inference_assignments, w, ops_ma_adj)
-
-    print("Produced inference assignments:")
-    print(inference_assignments)
-
-   # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESULT
-    utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj)
-
-    # SCHEDULING THE INFERENCED SCHEDULE
-    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/444"
-    graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
-    graph_save_path = f"{graph_folder}/{graph_name}"
-
-    td_scheduled = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs)
-
-    # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
-    makespan = td_scheduled['time']
-    print(makespan)
-
-
-
-
-
-
-
-
 
 print("ran")
 
@@ -432,23 +453,29 @@ order = True
 
 enc_model_path = None
 adj_model_path = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/444/adj_type_adj_order_{order}.pth'
-adj_model_path = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/444/adj_type_adj_order_{order}.pth'
 
-# dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444_TEST'
-dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01_TEST'
+dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444_TEST'
+# dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01_TEST'
 instance_idx = 10
 
 print("inference result")
-w = 60
-h = 10
+# w = 64
+# h = 24
+w = 16
+h = 4
 n_jobs = 4
 # get_inference_result_444(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs)
 # compare_inference(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
-get_inference_result_mk01(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs)
+# get_inference_result_mk01(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs)
 
 # w = 64
 # h = 24
 # n_jobs = 10
-
-# get_inference_result_cached(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs)
+model_type = "adj"
+order = True
+instance_i = 10
+w = 16
+h = 4
+n_jobs = 4
+get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs)
 # exit()
