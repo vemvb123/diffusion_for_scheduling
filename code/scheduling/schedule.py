@@ -204,8 +204,34 @@ def get_td_from_path(path: str, instance_idx: int) -> Tensor:
     return batch[local_idx]
 
 
-def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int ):
-    actions = utils.map_assignemnts_to_actions(assignments, order, n_jobs)
+
+def infer_n_jobs(ops_sequence_order: torch.Tensor):
+    n_jobs = []
+    count = 1
+
+    for i in range(1, len(ops_sequence_order)):
+        # if sequence continues (0→1→2→...)
+        if ops_sequence_order[i] == ops_sequence_order[i - 1] + 1:
+            count += 1
+        else:
+            n_jobs.append(count)
+            count = 1
+
+    # append last job
+    n_jobs.append(count)
+
+    return n_jobs
+
+
+def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, ops_sequence_order ):
+    #actions = utils.map_assignemnts_to_actions(assignments, order, n_jobs)
+
+    n_jobs = infer_n_jobs(ops_sequence_order) # example [6,5,6,5,6,5,6,5,6,5, 5]
+    actions = utils.map_assignments_to_actions_text(assignments, True, n_jobs)
+
+    print("herskjekkda")
+    print(actions)
+    print(td["opt_actions"])
 
     td.del_("opt_assignment")
     td.del_("opt_assignment_order")
@@ -252,9 +278,10 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
             td = env.step(td)["next"]
             env.render(td, 0)
 
-        td["action"] = torch.tensor([action])
-        td = env.step(td)["next"]
-        env.render(td, 0)
+        if action != 0:
+            td["action"] = torch.tensor([action])
+            td = env.step(td)["next"]
+            env.render(td, 0)
 
 
     """

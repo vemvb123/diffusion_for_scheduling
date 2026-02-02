@@ -19,15 +19,21 @@ matplotlib.use('Agg')
 
 import torch
 
-import torch
+
+def zero_only_columns(x):
+    # (if on CUDA) bring it to CPU for processing
+    x_cpu = x.cpu()
+
+    # remove leading batch dimension if present
+    x2 = x_cpu.squeeze(0)  # now shape is [num_rows, num_columns]
+
+    # find columns where all rows are zero
+    zero_cols = (x2 == 0).all(dim=0).nonzero(as_tuple=True)[0].tolist()
+    return zero_cols
 
 
-import torch
-
-import torch
 
 
-import torch
 
 def extract_env_actions(ma_seq_matrix: torch.Tensor,
                         ops_sequence_order: torch.Tensor,
@@ -77,57 +83,81 @@ def extract_env_actions(ma_seq_matrix: torch.Tensor,
     return torch.tensor(action_seq, dtype=torch.long)
 
 
-
-
 def assert_sequence_respected(ma_seq_matrix, ops_sequence_order):
     """
     Raise RuntimeError if any real operation sequence is violated.
-    Uses only ops_sequence_order to identify blocks of ops.
+
+    Rules:
+    - Ignore the LAST section (block) entirely.
+    - For every other section:
+        * Column ranks must strictly increase
+        * No column may contain only zeros
     """
+    print("in assert")
+    print(ma_seq_matrix.shape)
+    ma = ma_seq_matrix.squeeze(0).squeeze(0)  # (n_machines, n_columns)
+    ops = ops_sequence_order.tolist()
+    n = len(ops)
 
-    # squeeze to real 2D: (n_machines, n_columns)
-    ma = ma_seq_matrix.squeeze(0).squeeze(0)
-
-    n = ops_sequence_order.numel()
+    # --- build blocks ---
+    blocks = []
     i = 0
-
     while i < n:
-        # skip padded zeros at the end
-        if ops_sequence_order[i].item() == 0 and i > 0 and ops_sequence_order[i-1].item() == 0:
-            # once we hit a run of zeros that follows another zero, we break
-            break
-
-        # start new block
-        current_op = ops_sequence_order[i].item()
-        block_start = i
-
-        # collect contiguous columns with the same `current_op`
-        while i < n and ops_sequence_order[i].item() == current_op:
+        op = ops[i]
+        start = i
+        while i < n and ops[i] == op:
             i += 1
-        block_end = i  # exclusive end
+        end = i
+        blocks.append((op, start, end))
 
-        # check increasing schedule rank within this block
+    # --- ignore the last block ---
+    blocks_to_check = blocks[:-1]
+
+    # --- validate blocks ---
+    for op, start, end in blocks_to_check:
         prev_rank = -1
-        for col in range(block_start, block_end):
-            # get schedule rank from ma matrix
+
+        for col in range(start, end):
             col_vals = ma[:, col]
             nonzeros = col_vals[col_vals > 0]
-            if nonzeros.numel() == 0:
-                # if there’s no assignment for this column, skip
-                # (only padded columns at the end should lack assignments)
-                continue
 
+
+            if nonzeros.numel() == 0:
+                # unique non-zero values in the whole matrix
+                unique_nonzero = torch.unique(ma[ma > 0])
+                n_unique = unique_nonzero.numel()
+
+                # check whether last section (last block in whole matrix) is all zeros
+                last_start, last_end = blocks_to_check[-1][1], blocks_to_check[-1][2]
+                last_section_all_zero = (ma[:, last_start:last_end] == 0).all().item()
+
+                # check if any column has more than one unique non-zero value
+                cols_with_multiple_values = []
+                for col_idx in range(ma.shape[1]):
+                    vals = torch.unique(ma[:, col_idx][ma[:, col_idx] > 0])
+                    if vals.numel() > 1:
+                        cols_with_multiple_values.append((col_idx, vals.tolist()))
+
+                raise RuntimeError(
+                    f"seq order: {ops_sequence_order}. "
+                    f"Zero-only column {col} in operation block {op}. "
+                    f"Unique non-zero values in ma_seq_matrix: {n_unique}. "
+                    f"Last section all zeros: {last_section_all_zero}. "
+                    f"Columns with multiple non-zero values (col_idx: values): {cols_with_multiple_values}"
+                )
+
+
+            # ❌ must strictly increase
             rank = int(nonzeros[0].item())
             if rank <= prev_rank:
                 raise RuntimeError(
-                    f"Sequence violation in columns {block_start}-{block_end - 1}: "
+                    f"Sequence violation in block {op}: "
                     f"rank {rank} at col {col} <= previous {prev_rank}"
                 )
+
             prev_rank = rank
 
     print("✔ Sequence OK — no violations!")
-
-
 
 
 
@@ -174,9 +204,6 @@ def check_if_respects_sequence(inferenced, max_n_ops):
             start += max_n_ops
 
     print("All column groups passed the increasing test!")
-
-
-
 
 
 
@@ -235,7 +262,6 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
     target_assignments, proc_times, job_ops_adj, ops_ma_adj, ops_sequence_order, opt_actions = dataset_utils.get_feature_adj_from_instance(td, env, order, mask_h, mask_w, True)
 
     # TODO skjekk i morra for mk01
-    n_ops = int(torch.count_nonzero(target_assignments[:, :valid_h, :valid_w]))
     """
     print(n_ops)
     levels = torch.tensor([(i + 1) / n_ops for i in range(n_ops)], device="cuda")
@@ -261,11 +287,14 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
     inference_assignments = None
     columns_done = None
     if model_type == "adj":
-        # inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w)
-        after_ts_check = 700
+        after_ts_check = 900
         print("beginning on cache")
         threshold = 0.02
-        #inference_assignments, elapsed, assignments_over_time, columns_done, done_at_t = cache_inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, order, mask_h, mask_w, after_ts_check, valid_h, valid_w, n_ops, threshold )
+        n_ops = int(torch.count_nonzero(target_assignments))
+        # inference_assignments, elapsed, assignments_over_time, columns_done, done_at_t = cache_inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, order, mask_h, mask_w, after_ts_check, valid_h, valid_w, n_ops, threshold )
+        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w)
+        # print(done_at_t)
+        print(columns_done)
         print("ran inference")
     elif model_type == "f":
         pass
@@ -274,63 +303,48 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
 
     print(f"Inference done. Took {elapsed} time")
 
-    # inference_assignments = inference_assignments[:, :, :valid_h, :valid_w]
-    if order:
-        
-        ops_ma_adj = ops_ma_adj[:, :, :valid_h, :valid_w]
-        target_assignments = target_assignments[:, :, :valid_h, :valid_w]
-        #target_assignments = target_assignments.unsqueeze(0)
-        # print(inference_assignments.shape)
-        print(target_assignments.shape)
-        print(ops_ma_adj.shape)
-        print(target_assignments)
-        #check_if_respects_sequence(target_assignments, n_ops)
-        # target_assignments = target_assignments[:, :, :valid_h, valid_w]
-        target_assignments = utils.show_order_clear(target_assignments, n_ops, ops_ma_adj)
-        print(target_assignments)
-        print(ops_sequence_order)
+    inference_assignments = inference_assignments[:, :, :valid_h, :valid_w]
+    ops_ma_adj = ops_ma_adj[:, :, :valid_h, :valid_w]
 
-        # assert_sequence_respected(target_assignments, ops_sequence_order)
-        n_jobs = 10
- 
-        max_ops_per_job = 6
-        # actions = extract_env_actions(target_assignments, ops_sequence_order, n_jobs, max_ops_per_job)
-        n_jobs = [6,5,6,5,6,5,6,5,6,5, 5]
-        actions = schedule_utils.map_assignments_to_actions_text(target_assignments, True, n_jobs)
-        print(actions)
-        print(opt_actions)
-        exit()
-
-
-
-    # print(f"columns done: {columns_done}")
-    # print(f"done at t: {done_at_t}")
-
-    return td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time
+    return td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w
 
 
 
 def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs):
     print("inside get inference cached")
-    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time = get_inference_result("mk01", instance_idx, model_type, order)
-    ops_ma_adj = ops_ma_adj[:, :, :h, :w]
+    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w = get_inference_result("mk01", instance_idx, model_type, order)
     # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
-    if order:
-        inference_assignments = utils.show_order_clear(inference_assignments, w, ops_ma_adj)
-    else:
-        inference_assignments = utils.round_to_values(inference_assignments, w, ops_ma_adj)
+    print("herkafaen")
+    print(inference_assignments.shape)
+    print(ops_ma_adj.shape)
+    print(target_assignments.shape)
+    target_assignments = target_assignments[:, :, :valid_h, :valid_w]
+    print(target_assignments.shape)
     print("result")
     print(inference_assignments)
-   # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESULT
-    utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj)
+    zero_cols = zero_only_columns(inference_assignments)
+    print(f"zeo cols: {zero_cols}")
+    n_ops = int(torch.count_nonzero(target_assignments))
+    if order:
+        inference_assignments = utils.show_order_clear(inference_assignments, n_ops, ops_ma_adj)
+    else:
+        inference_assignments = utils.round_to_values(inference_assignments, w, ops_ma_adj)
+    print(inference_assignments)
+    # inference_assignments = utils.show_order_clear(inference_assignments, n_ops, ops_ma_adj)
+    assert_sequence_respected(inference_assignments, td["ops_sequence_order"])
+   # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESUeckT
+    utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj, valid_h, valid_w)
 
     # SCHEDULING THE INFERENCED SCHEDULE
-    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results"
+    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/mk01"
     graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
     graph_save_path = f"{graph_folder}/{graph_name}"
 
-    n_machines = 4
-    td_scheduled = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs, n_machines)
+    n_machines = 6
+    td_scheduled = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs, n_machines, ops_sequence_order=td["ops_sequence_order"])
+    
+
+
 
     # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
     makespan = td_scheduled['time']

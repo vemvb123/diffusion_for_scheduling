@@ -1,4 +1,12 @@
 
+
+Runding:
+Når runder så tar de globalt største verdiene, og setter dem for allokasjoner,
+så resulterer det gjerne i at skedual ikke har allokasjoner for noen operasjoner
+
+
+
+
 # TODO
 
 Når skal skjekke chache inference... Skjekk at vediarnir or n_ops vert riktige.

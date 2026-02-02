@@ -7,99 +7,77 @@ import code.inference.denoise as denoise
 
 
 
-def apply_confidence_mask(x, columns_done, columns_done_values, threshold, order, n_ops):
+def apply_confidence_mask(x, columns_done, columns_done_values, threshold, order, n_ops, denoised):
     if order:
-        return apply_confidence_mask_order(x, columns_done, columns_done_values, threshold, n_ops)
+        return apply_confidence_mask_order(x, columns_done, columns_done_values, threshold, n_ops, denoised)
     else:
         return apply_confidence_mask_no_order(x, columns_done, columns_done_values, threshold)
 
 
 
+
 def apply_confidence_mask_order(
-    x, columns_done, columns_done_values, threshold, n_ops
+    x, columns_done, columns_done_values, threshold, n_ops, denoised
 ):
     """
-    Vectorized: commit confident columns across the whole batch at once.
-
-    Args:
-        x: tensor of shape (B, 1, W, H)
-        columns_done: list of column indices already locked
-        columns_done_values: tensor same shape as x, storing committed values
-        threshold: float, closeness threshold for a discrete level
-        n_ops: number of discrete levels
-
-    Returns:
-        x: tensor with done columns applied
-        columns_done: updated list of locked columns
-        columns_done_values: updated committed values
+    Commit confident columns using denoised values, only updating x for not-yet-locked columns.
     """
     B, C, W, H = x.shape
     device = x.device
 
-    # define discrete levels
     levels = torch.tensor([(i + 1) / n_ops for i in range(n_ops)], device=device)
     level_claimed = torch.zeros_like(levels, dtype=torch.bool)
 
-    # figure which columns are left to check
+    # columns not yet locked
     all_columns = torch.arange(H, device=device)
     columns_to_check = [c.item() for c in all_columns if c.item() not in columns_done]
-
     if len(columns_to_check) == 0:
         return x, columns_done, columns_done_values
 
-    # extract values of columns not done
-    x_sub = x[:, 0, :, columns_to_check]  # shape (B, W, n_cols)
+    # extract candidate columns from denoised
+    denoised_sub = denoised[:, 0, :, columns_to_check]  # B x W x n_cols
 
-    # for each batch and each column, find the best matching level
     for col_idx_local, col_global in enumerate(columns_to_check):
-        # values shape: B x W
-        vals = x_sub[..., col_idx_local]
+        vals = denoised_sub[..., col_idx_local]  # B x W
 
-        # normalize column to [0,1] across current batch
+        # normalize column to [0,1] per batch
         col_min = vals.amin(dim=1, keepdim=True)
         col_max = vals.amax(dim=1, keepdim=True)
-
-        # avoid division by zero
         norm = torch.where(
             col_max == col_min,
             torch.zeros_like(vals),
             (vals - col_min) / (col_max - col_min),
         )
 
-        # for each batch
         for b in range(B):
             if col_global in columns_done:
                 continue
 
-            # compute diffs to levels
             diffs = torch.abs(levels.unsqueeze(0) - norm[b].unsqueeze(1))  # W x n_ops
-
-            # find best match over values and levels
-            best_val_idx, best_level_idx = torch.unravel_index(
-                torch.argmin(diffs), diffs.shape
-            )
+            best_val_idx, best_level_idx = torch.unravel_index(torch.argmin(diffs), diffs.shape)
             best_dist = diffs[best_val_idx, best_level_idx]
 
-            # if close enough & level not claimed
             if best_dist <= threshold and not level_claimed[best_level_idx]:
-                # lock this column
+                # lock column
                 commit_val = levels[best_level_idx].item()
+                columns_done.append(col_global)
 
-                # update done
-                if col_global not in columns_done:
-                    columns_done.append(col_global)
-
-                # update committed values for this batch
-                columns_done_values[b, 0, :, col_global] = 0
+                # commit in columns_done_values
+                columns_done_values[b, 0, :, col_global] = 0.0
                 columns_done_values[b, 0, best_val_idx, col_global] = commit_val
 
                 level_claimed[best_level_idx] = True
 
-                # override x with committed
-                x[b, 0, :, col_global] = columns_done_values[b, 0, :, col_global]
+    # finally, update x **only for columns not locked yet**
+    unlocked_columns = [c for c in all_columns if c.item() not in columns_done]
+    if len(unlocked_columns) > 0:
+        x[:, 0, :, unlocked_columns] = denoised[:, 0, :, unlocked_columns]
+
+    # ensure committed columns stay locked
+    if len(columns_done) > 0:
+        x[:, 0, :, columns_done] = columns_done_values[:, 0, :, columns_done]
 
     return x, columns_done, columns_done_values
-
 
 
 
@@ -227,13 +205,15 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
 
             predicted_noise = model(inputs, t_tensor, type_t="timestep")
 
-            x = denoise.denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
+            denoised = None
+            if after_ts_check <= (timesteps - t):
+                denoised = denoise.denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
+            else:
+                x = denoise.denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
 
-
-            n_ops = 16 # TODO endre for order
             if after_ts_check <= (timesteps - t):
                 x, columns_done, columns_done_values = apply_confidence_mask(x, columns_done, 
-                                                                             columns_done_values, threshold, order, n_ops)
+                                                                             columns_done_values, threshold, order, n_ops, denoised)
 
             required = set(range(n_ops))  # {0,1,...,15}
             if required.issubset(set(columns_done)) and done_at_t == None:

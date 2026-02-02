@@ -113,6 +113,7 @@ def show_order_clear(x, n_values, valid_slots):
     has_any_valid = flat_vs.any()
 
     if has_any_valid:
+        print("has some invalid, show order")
         # Mask invalid slots by setting them to -inf
         neg_inf = torch.finfo(flat_x.dtype).min
         masked_x = torch.where(flat_vs.bool(), flat_x, neg_inf)
@@ -139,15 +140,14 @@ def show_order_clear(x, n_values, valid_slots):
 
 
 
-
 # første skedulerte har minst verdi, sist skedulerte har størst verdi
-def check_when_inference_makes_final_schedule(assignments_over_time: List[Tensor], final_assignment: Tensor, order: bool, valid_slots: Tensor):
+def check_when_inference_makes_final_schedule(assignments_over_time: List[Tensor], final_assignment: Tensor, order: bool, valid_slots: Tensor, valid_h, valid_w):
     for i, assignment_at_time in enumerate(assignments_over_time):
-        assignment_at_time = assignment_at_time[:, :, :4, :16]
+        assignment_at_time = assignment_at_time[:, :, :valid_h, :valid_w]
         if order:
-            assignment_at_time = utils.round_to_values(assignment_at_time, 16, valid_slots)
+            assignment_at_time = utils.round_to_values(assignment_at_time, valid_w, valid_slots)
         else:
-            assignment_at_time = utils.show_order_clear(assignment_at_time, 16, valid_slots)
+            assignment_at_time = utils.show_order_clear(assignment_at_time, valid_w, valid_slots)
 
         if torch.equal(assignment_at_time, final_assignment):
             print(f"assignments are exactly the same at point {i}")
