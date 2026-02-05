@@ -3,10 +3,10 @@ inference.py contains code for running inference with trained models
 """
 
 
-import logging
 
 from code.inference.denoise import denoise_ddpm, get_inference_schedule
 
+import logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(filename)s:%(lineno)d - %(message)s"
