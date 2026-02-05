@@ -231,11 +231,6 @@ def diffusion(
         run_epoch_func = run_epoch_feature 
 
     train_loader, test_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size)
-    #count_nan_indices(train_loader)
-    #count_nan_indices(test_loader)
-    #logging.info("exit")
-    #exit()
-
 
     logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
     logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")

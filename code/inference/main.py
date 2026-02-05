@@ -2,6 +2,7 @@
 results.py contains code for gathering results.
 Such as gathering mean makespan of scheduled instances, graphs, training results, etc
 """
+import code.inference.experimental
 import code.inference.utils as utils
 import code.scheduling.utils as schedule_utils
 import code.inference.guidence as guidence
@@ -187,7 +188,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         # inference_assignments, elapsed, assignments_over_time, columns_done, done_at_t = cache_inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, order, mask_h, mask_w, after_ts_check, valid_h, valid_w, n_ops, threshold )
         # ::: erstatter bactehes
         t_replace = 995
-        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
+        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
         # ::: erstatter IKKE batches
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w)
         eta = 0.9
@@ -313,10 +314,10 @@ def compare_inference(model_type: str, order: bool, adj_model_path, enc_model_pa
     if model_type == "adj":
         print("running inference")
         # NORMAL INFERENCE
-        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples)
+        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples)
         print("running comparison inference")
         # INFERENCE DDIM
-        comparison_inference_assignments, comparison_elapsed, comparison_assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples)
+        comparison_inference_assignments, comparison_elapsed, comparison_assignments_over_time = code.inference.experimental.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples)
         # INFERENCE GUIDE
         # guided_inference_assignments, guided_elapsed, guidence.guided_assignments_over_time, errors = guide_adj_inference(conditions,3+1, adj_model_path, n_samples, 1)
 
