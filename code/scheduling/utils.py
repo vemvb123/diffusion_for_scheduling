@@ -119,3 +119,63 @@ def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
     actions += [0] * (max_len - len(actions))
 
     return torch.tensor(actions, dtype=torch.int64)
+
+
+def zero_only_columns(x):
+    # (if on CUDA) bring it to CPU for processing
+    x_cpu = x.cpu()
+
+    # remove leading batch dimension if present
+    x2 = x_cpu.squeeze(0)  # now shape is [num_rows, num_columns]
+
+    # find columns where all rows are zero
+    zero_cols = (x2 == 0).all(dim=0).nonzero(as_tuple=True)[0].tolist()
+    return zero_cols
+
+
+def extract_env_actions(ma_seq_matrix: torch.Tensor,
+                        ops_sequence_order: torch.Tensor,
+                        n_jobs: int,
+                        max_ops_per_job: int) -> torch.Tensor:
+
+    """
+    Reconstruct the RL4CO FJSP action sequence from a completed schedule matrix.
+
+    Args:
+        ma_seq_matrix: Tensor of shape (1,1,n_machines,n_cols) with schedule ranks.
+        ops_sequence_order: Tensor of length n_cols, gives op index within job.
+        n_jobs: number of jobs
+        max_ops_per_job: maximum operations per job
+
+    Returns:
+        LongTensor: shape (total_scheduled_ops,) with action indices in env format.
+    """
+    # Squeeze out batch dims -> shape (n_machines, n_cols)
+    ma = ma_seq_matrix.squeeze(0).squeeze(0)
+    n_machines, n_cols = ma.shape
+
+    # We'll collect (rank, job, op_idx, machine)
+    schedule_entries = []
+
+    for m in range(n_machines):
+        for c in range(n_cols):
+            rank = int(ma[m, c].item())
+            if rank > 0:
+                op_idx_in_job = int(ops_sequence_order[c].item())
+                job_id = c // max_ops_per_job
+                schedule_entries.append((rank, job_id, op_idx_in_job, m))
+
+    # Sort entries by global schedule rank ascending,
+    # and tie-break by machine index ascending (as per your mapping rule).
+    schedule_entries.sort(key=lambda x: (x[0], x[3]))
+
+    # Convert entries to RL4CO env action IDs
+    # RL4CO env actions are flat IDs where:
+    # action_id = machine * n_jobs + job_id
+    action_seq = []
+    for rank, job_id, op_idx_in_job, machine in schedule_entries:
+        # Compute the flat action index
+        action_id = machine * n_jobs + job_id
+        action_seq.append(action_id)
+
+    return torch.tensor(action_seq, dtype=torch.long)
