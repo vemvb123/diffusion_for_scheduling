@@ -1,5 +1,9 @@
 
 
+Noe a fikse..
+det er faktisk noe feil med skeduleringa, det kan ses at operasjoner venter unødvendig lenge med å bli skedulert.
+Det er ikke noe i skedualet, men noe i den faktisk skeduleringsalgoritma
+
 Runding:
 Når runder så tar de globalt største verdiene, og setter dem for allokasjoner,
 så resulterer det gjerne i at skedual ikke har allokasjoner for noen operasjoner

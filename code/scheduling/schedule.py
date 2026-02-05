@@ -2,7 +2,7 @@
 scheduling_utils.py contains all code that does scheduling
 """
 
-
+from joblib import Parallel, delayed
 
 import time
 import random
@@ -243,120 +243,49 @@ def do_actions(actions, n_machines, td, env):
             td["action"] = torch.tensor([action])
             td = env.step(td)["next"]
             env.render(td, 0)
-    makespans = td["busy_until"].max(dim=1).values  
-    return makespans, td
+    return td
 
 
 
 def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, error_list, ops_sequence_order):
-    #actions = utils.map_assignemnts_to_actions(assignments, order, n_jobs)
-    print("in inferenced")
-    print(assignments.shape)
-    n_jobs = infer_n_jobs(ops_sequence_order) # example [6,5,6,5,6,5,6,5,6,5, 5]
+    print(f"assignments shape: {assignments.shape}")
+    n_jobs = infer_n_jobs(ops_sequence_order) 
 
-    #map_assignments_to_actions_batch_process = vmap(utils.map_assignments_to_actions_text, in_dims=(0, None, None), out_dims=0)
-    #actions = map_assignments_to_actions_batch_process(assignments, True, n_jobs)
-    all_actions = []
-    for b_instance in assignments:
-        print("shape batch")
-        print(b_instance.shape)
-        actions = utils.map_assignments_to_actions_text(b_instance, True, n_jobs)
-        all_actions.append(actions)
-    all_actions = torch.stack(all_actions, dim=0)  # creates new batch dimension
+    print(f"making actions for assignments with {os.cpu_count()} processors")
+    B = assignments.size(0)
+    all_actions = Parallel(n_jobs=os.cpu_count())(
+        delayed(utils.map_assignments_to_actions_text)( assignments[b], True, n_jobs )
+        for b in range(B)
+    )
+    all_actions = torch.stack(all_actions)
     all_actions = all_actions.to(torch.int64) 
-    print("herskjekkda")
-    #print(actions)
-    #print(td["opt_actions"])
-    print(all_actions.shape)
 
+    print(f"all actions shape: {all_actions.shape}")
     td.del_("opt_assignment")
     td.del_("opt_assignment_order")
     td.del_("opt_actions")
-
     td = td.unsqueeze(0)
 
 
+    feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0]
+    tds = Parallel(n_jobs=os.cpu_count())(
+        delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env )
+        for f_i in feasible_indecies
+    )
 
-    # antar at order assignments da inneholder større og større verdi for hver order
-    #if order:
-        # TODO hvordan håndtere/se skeduleringsfeil i seq    
-        # se på verdier fra inferenced
-        # map hver verdi til en action, i sekvensen assignments gir
-        # .. alt det gjør du fr loopen
-        # så når loopen starter, looper du igjennom lista av actions
+    makespans = [
+        td["busy_until"].max(dim=1).values
+        for td in tds
+    ]
 
-        # ops: td gir ikke oppgaver klare, men maskiner,
-        #  og det gis i format som teller opp, så når ma1 er klar første gang sier den 0, så neste gang sier den 1
-        # men når det er ops, så trur jeg den teller ned... så eks første kolonne er 1,2,3,4 osv...
-
-        # looper action i actions
-        # ser på is ready, som gir klare maskiner
-        # mapper ops og actions
-        # - har spenn for hver maskin
-        # - 0-3,4-7,8-11,12-5
-        # - hvis ac er innenfor en av de tilgjengelige spenna, så kan den skeduleres, eller må den hoppe i tid
-        # - da hopper den i tid til den maskinen er klar
-        # tar action, og skedulerer den ut
-
-        # får klare maskiner (rl4co gir format 0,4,8,12), så teller den 1 opp etter en skedulering, til eks 1,4,8,12
-    # if order:
-
-
-    tds = []
-    times = []
-    print("scheduling one by one")
-    j = 0
-    for action_list in all_actions:
-        if error_list[j] == 0:
-            print(f"scheduling {j}")
-            time, sched_td = do_actions(action_list, n_machines, td.copy(), env)
-            print(time)
-            times.append(time)
-            tds.append(sched_td)
-        j+=1
-
-    min_time = min(times)
-    min_index = times.index(min_time)
-    td_best = tds[min_index]
-
+    print(f"makespans: {makespans}")
+    print(f"best makespan: {min(makespans)}")
+    td_best = tds[ makespans.index( min(makespans) ) ]
     env.render(td_best, 0)
-    print(f"best time: {min_time} at index {min_index}")
-    """
-    else:
-        while not td["done"].all():
-            ready_ops = torch.nonzero(td["is_ready"], as_tuple=True)[1]
-
-            ma_indices_for_actions = [((v - 1) % n_jobs) for v in actions]  # 0‑based
-            # print("machine indices:", ma_indices_for_actions)
-
-            for op in ready_ops:
-                op = op.item()
-                machine_idx = ma_indices_for_actions[op]
-                busy_val = td["busy_until"][0, machine_idx]
-                current_time = td["time"][0]
-
-                # td["time"] = busy_val.unsqueeze(0)
-
-                if busy_val <= current_time:
-                    td['action'] = torch.tensor([actions[op]])
-                    td = env.step(td)['next']
-                    env.render(td, 0)
-                else:
-                    td["time"] = busy_val.unsqueeze(0)
-
-    """
-    print("done")
-    print(td_best["ma_assignment"])
     if path_save_image:
         plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
         print(f"Saved scheduled image at path {path_save_image}")
     return td_best
-
-
-# inferenced_schedule()
-
-
-
 
 
 

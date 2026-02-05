@@ -35,7 +35,6 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
 
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logging.info(f"Amount of trainable parameters: {trainable_params}")
-    exit()
 
 
     # beta start var opprinnelig 1e-4
