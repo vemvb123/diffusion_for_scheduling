@@ -75,9 +75,11 @@ def map_assignemnts_to_actions(assignments, order: bool, n_jobs: int):
 
 
 import torch
+
+
 def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
     if assignments.dim() > 2:
-        assignments = assignments.squeeze(0).squeeze(0)
+        assignments = assignments.squeeze(0) # .squeeze(0)
 
     H, W = assignments.shape
 

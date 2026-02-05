@@ -223,22 +223,57 @@ def infer_n_jobs(ops_sequence_order: torch.Tensor):
     return n_jobs
 
 
-def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, ops_sequence_order ):
+from functorch import vmap
+
+
+def do_actions(actions, n_machines, td, env):
+
+    for action in actions:
+        # machine index that this action refers to
+        ma_to_use = (action - 1) % n_machines
+
+        while td["busy_until"][0, ma_to_use].item() > td["time"].item():
+            invalid_action = torch.tensor([0])  
+            td["action"] = invalid_action
+
+            td = env.step(td)["next"]
+            env.render(td, 0)
+
+        if action != 0:
+            td["action"] = torch.tensor([action])
+            td = env.step(td)["next"]
+            env.render(td, 0)
+    makespans = td["busy_until"].max(dim=1).values  
+    return makespans, td
+
+
+
+def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, error_list, ops_sequence_order):
     #actions = utils.map_assignemnts_to_actions(assignments, order, n_jobs)
-
+    print("in inferenced")
+    print(assignments.shape)
     n_jobs = infer_n_jobs(ops_sequence_order) # example [6,5,6,5,6,5,6,5,6,5, 5]
-    actions = utils.map_assignments_to_actions_text(assignments, True, n_jobs)
 
+    #map_assignments_to_actions_batch_process = vmap(utils.map_assignments_to_actions_text, in_dims=(0, None, None), out_dims=0)
+    #actions = map_assignments_to_actions_batch_process(assignments, True, n_jobs)
+    all_actions = []
+    for b_instance in assignments:
+        print("shape batch")
+        print(b_instance.shape)
+        actions = utils.map_assignments_to_actions_text(b_instance, True, n_jobs)
+        all_actions.append(actions)
+    all_actions = torch.stack(all_actions, dim=0)  # creates new batch dimension
+    all_actions = all_actions.to(torch.int64) 
     print("herskjekkda")
-    print(actions)
-    print(td["opt_actions"])
+    #print(actions)
+    #print(td["opt_actions"])
+    print(all_actions.shape)
 
     td.del_("opt_assignment")
     td.del_("opt_assignment_order")
     td.del_("opt_actions")
 
     td = td.unsqueeze(0)
-    env.render(td, 0)
 
 
 
@@ -266,24 +301,26 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
         # får klare maskiner (rl4co gir format 0,4,8,12), så teller den 1 opp etter en skedulering, til eks 1,4,8,12
     # if order:
 
-    print(actions)
-    for action in actions:
-        # machine index that this action refers to
-        ma_to_use = (action - 1) % n_machines
 
-        while td["busy_until"][0, ma_to_use].item() > td["time"].item():
-            invalid_action = torch.tensor([0])  
-            td["action"] = invalid_action
+    tds = []
+    times = []
+    print("scheduling one by one")
+    j = 0
+    for action_list in all_actions:
+        if error_list[j] == 0:
+            print(f"scheduling {j}")
+            time, sched_td = do_actions(action_list, n_machines, td.copy(), env)
+            print(time)
+            times.append(time)
+            tds.append(sched_td)
+        j+=1
 
-            td = env.step(td)["next"]
-            env.render(td, 0)
+    min_time = min(times)
+    min_index = times.index(min_time)
+    td_best = tds[min_index]
 
-        if action != 0:
-            td["action"] = torch.tensor([action])
-            td = env.step(td)["next"]
-            env.render(td, 0)
-
-
+    env.render(td_best, 0)
+    print(f"best time: {min_time} at index {min_index}")
     """
     else:
         while not td["done"].all():
@@ -309,11 +346,11 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
 
     """
     print("done")
-    print(td["ma_assignment"])
+    print(td_best["ma_assignment"])
     if path_save_image:
         plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
         print(f"Saved scheduled image at path {path_save_image}")
-    return td
+    return td_best
 
 
 # inferenced_schedule()

@@ -83,127 +83,17 @@ def extract_env_actions(ma_seq_matrix: torch.Tensor,
     return torch.tensor(action_seq, dtype=torch.long)
 
 
-def assert_sequence_respected(ma_seq_matrix, ops_sequence_order):
-    """
-    Raise RuntimeError if any real operation sequence is violated.
-
-    Rules:
-    - Ignore the LAST section (block) entirely.
-    - For every other section:
-        * Column ranks must strictly increase
-        * No column may contain only zeros
-    """
-    print("in assert")
-    print(ma_seq_matrix.shape)
-    ma = ma_seq_matrix.squeeze(0).squeeze(0)  # (n_machines, n_columns)
-    ops = ops_sequence_order.tolist()
-    n = len(ops)
-
-    # --- build blocks ---
-    blocks = []
-    i = 0
-    while i < n:
-        op = ops[i]
-        start = i
-        while i < n and ops[i] == op:
-            i += 1
-        end = i
-        blocks.append((op, start, end))
-
-    # --- ignore the last block ---
-    blocks_to_check = blocks[:-1]
-
-    # --- validate blocks ---
-    for op, start, end in blocks_to_check:
-        prev_rank = -1
-
-        for col in range(start, end):
-            col_vals = ma[:, col]
-            nonzeros = col_vals[col_vals > 0]
-
-
-            if nonzeros.numel() == 0:
-                # unique non-zero values in the whole matrix
-                unique_nonzero = torch.unique(ma[ma > 0])
-                n_unique = unique_nonzero.numel()
-
-                # check whether last section (last block in whole matrix) is all zeros
-                last_start, last_end = blocks_to_check[-1][1], blocks_to_check[-1][2]
-                last_section_all_zero = (ma[:, last_start:last_end] == 0).all().item()
-
-                # check if any column has more than one unique non-zero value
-                cols_with_multiple_values = []
-                for col_idx in range(ma.shape[1]):
-                    vals = torch.unique(ma[:, col_idx][ma[:, col_idx] > 0])
-                    if vals.numel() > 1:
-                        cols_with_multiple_values.append((col_idx, vals.tolist()))
-
-                raise RuntimeError(
-                    f"seq order: {ops_sequence_order}. "
-                    f"Zero-only column {col} in operation block {op}. "
-                    f"Unique non-zero values in ma_seq_matrix: {n_unique}. "
-                    f"Last section all zeros: {last_section_all_zero}. "
-                    f"Columns with multiple non-zero values (col_idx: values): {cols_with_multiple_values}"
-                )
-
-
-            # ❌ must strictly increase
-            rank = int(nonzeros[0].item())
-            if rank <= prev_rank:
-                raise RuntimeError(
-                    f"Sequence violation in block {op}: "
-                    f"rank {rank} at col {col} <= previous {prev_rank}"
-                )
-
-            prev_rank = rank
-
-    print("✔ Sequence OK — no violations!")
 
 
 
 
 
-def check_if_respects_sequence(inferenced, max_n_ops):
-    B, C, W, H = inferenced.shape
-    assert C == 1, "Expected C=1 in the inferenced"
 
-    for b in range(B):
-        mat = inferenced[b, 0]  # shape: W x H
 
-        # slide across columns in blocks of max_n_ops
-        start = 0
-        while start < H:
-            # take up to max_n_ops columns (may be shorter at end)
-            block = mat[:, start : min(start + max_n_ops, H)]
 
-            single_vals = []
-            for col_idx in range(block.shape[1]):
-                col = block[:, col_idx]
 
-                # find all nonzero values in the column
-                nonzeros = col[col != 0]
 
-                # if exactly 1 nonzero, record it; if 0 nonzeros, ignore
-                if len(nonzeros) == 1:
-                    single_vals.append(nonzeros.item())
-                elif len(nonzeros) > 1:
-                    # if multiple nonzero values, this is still an error
-                    raise AssertionError(
-                        f"Column {start + col_idx} in batch {b} "
-                        f"has multiple nonzero values"
-                    )
 
-            # Now check strictly increasing sequence among recorded values
-            for i in range(len(single_vals) - 1):
-                if not (single_vals[i] < single_vals[i + 1]):
-                    raise AssertionError(
-                        f"Values not strictly increasing in columns "
-                        f"{start}..{start + block.shape[1] - 1}: {single_vals}"
-                    )
-
-            start += max_n_ops
-
-    print("All column groups passed the increasing test!")
 
 
 
@@ -280,19 +170,30 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
 
     # GETTING THE INFERENCED RESULT
     embed_size = 80
-    n_samples = 1
+
 
     print("Running inference")
     elapsed = None
     inference_assignments = None
     columns_done = None
     if model_type == "adj":
-        after_ts_check = 900
+        after_ts_check = 995
         print("beginning on cache")
         threshold = 0.02
+        # SAMPLES
+        n_samples = 32
         n_ops = int(torch.count_nonzero(target_assignments))
+
         # inference_assignments, elapsed, assignments_over_time, columns_done, done_at_t = cache_inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, order, mask_h, mask_w, after_ts_check, valid_h, valid_w, n_ops, threshold )
-        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w)
+        # ::: erstatter bactehes
+        t_replace = 995
+        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
+        # ::: erstatter IKKE batches
+        #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w)
+        eta = 0.9
+        ddim_steps = 1000
+        #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
+
         # print(done_at_t)
         print(columns_done)
         print("ran inference")
@@ -322,18 +223,32 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     print(target_assignments.shape)
     print("result")
     print(inference_assignments)
-    zero_cols = zero_only_columns(inference_assignments)
-    print(f"zeo cols: {zero_cols}")
+    #zero_cols = zero_only_columns(inference_assignments)
+    #print(f"zeo cols: {zero_cols}")
     n_ops = int(torch.count_nonzero(target_assignments))
+    print("show")
+    print(n_ops)
+    print(inference_assignments.shape)
     if order:
         inference_assignments = utils.show_order_clear(inference_assignments, n_ops, ops_ma_adj)
     else:
         inference_assignments = utils.round_to_values(inference_assignments, w, ops_ma_adj)
+    print("the assignments")
     print(inference_assignments)
     # inference_assignments = utils.show_order_clear(inference_assignments, n_ops, ops_ma_adj)
-    assert_sequence_respected(inference_assignments, td["ops_sequence_order"])
-   # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESUeckT
-    utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj, valid_h, valid_w)
+    
+    dups = utils.count_duplicate_instances(inference_assignments)
+    print(f"amount of same instances: {dups}")
+
+    report, total_errors, error_list = utils.assert_sequence_respected(inference_assignments, td["ops_sequence_order"])
+    for key, value in report.items():
+        if value["total"] == 0:
+            print(f"{key} .. {value} .. NO ERRORS")
+        else:
+            print(f"{key} .. {value}")
+    print(f"Total errors: {total_errors}")
+    # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESUeckT
+    # utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj, valid_h, valid_w)
 
     # SCHEDULING THE INFERENCED SCHEDULE
     graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/mk01"
@@ -341,7 +256,7 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     graph_save_path = f"{graph_folder}/{graph_name}"
 
     n_machines = 6
-    td_scheduled = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs, n_machines, ops_sequence_order=td["ops_sequence_order"])
+    td_scheduled = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"])
     
 
 
