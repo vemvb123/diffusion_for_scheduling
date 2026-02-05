@@ -29,27 +29,20 @@ if len(sys.argv) > 1:
 else:
     logging.info("Please provide a training number!")
 
+timesteps = None
+if model_to_train == 1:
+    timesteps = 200
+elif model_to_train == 2:
+    timesteps = 500
+elif model_to_train == 3:
+    timesteps = 800
 
-def map_file_parameter_to_model_type(model_to_train: int) -> Tuple[str, bool]:
-    model_type = None
-    order = None
-    if model_to_train < 3:
-        model_type = "adj"
-    elif model_to_train > 2:
-        model_type = "f"
-    if model_to_train == 2 or model_to_train == 4:
-        order = False
-    elif model_to_train == 1 or model_to_train == 3:
-        order = True
 
-    logging.info(f"Using model ... type: {model_type}, order: {order}")
-    if model_type == None or order == None:
-        raise ValueError("That model type dosent exist. pecify one between 1 and 2")
 
-    return model_type, order
 
-model_type, order = map_file_parameter_to_model_type(model_to_train)
 
+model_type = "adj"
+order = True
 
 def train_models(
     model_type, order,
@@ -67,19 +60,20 @@ def train_models(
     train_dataset = Dataset_RL4CO(train_dataset_path, generator_params, order, h, w)
     test_dataset = Dataset_RL4CO(test_dataset_path, generator_params, order, h, w)
 
-    lrs = [1e-3, 1e-4, 1e-5, 1e-6]
-   
+    lrs = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+
+       
     best_loss = 1
     best_lr = None
 
-    logging.info(f"Began training model {model_type} order_{order} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+    logging.info(f"Began training timestep model {timesteps} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 
     for lr in lrs:
         logging.info(f"Training with lr {lr}")
         path_enc, path_adj, last_epoch_loss = training.diffusion(
             model_type, train_dataset, test_dataset,
             embed_size, model_path_adj, model_path_enc,
-            graph_name, graph_save_folder, valid_h, valid_w, testing_epochs, lr
+            graph_name, graph_save_folder, valid_h, valid_w, timesteps, testing_epochs, lr
         ) 
         if best_loss > last_epoch_loss: 
             best_lr = lr
@@ -89,7 +83,7 @@ def train_models(
     path_enc, path_adj, last_epoch_loss = training.diffusion(
         model_type, train_dataset, test_dataset,
         embed_size, model_path_adj, model_path_enc,
-        graph_name, graph_save_folder, valid_h, valid_w, run_epochs, best_lr
+        graph_name, graph_save_folder, valid_h, valid_w, timesteps, run_epochs, best_lr
     )
 
     logging.info(f"Ended training model {model_type} order_{order} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
@@ -150,18 +144,6 @@ def mk01():
         "min_eligible_ma_per_op": parameters['min_machine_options'],
         "max_eligible_ma_per_op": parameters['max_machine_options'],
     }
-    """
-    generator_params = {
-        "num_jobs": 4,
-        "num_machines": 4,
-        "min_ops_per_job": 4,
-        "max_ops_per_job": 4,
-        "min_processing_time": 5,
-        "max_processing_time": 50,
-        "min_eligible_ma_per_op": 4,
-        "max_eligible_ma_per_op": 4,
-    }
-    """
 
     embed_size = 80
 
@@ -173,17 +155,18 @@ def mk01():
     run_epochs = 50
 
 
-    graph_name = f"model {model_type}, with order: {order}"
+    graph_name = f"model {timesteps}, with order: {order}"
 
     full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
 
-    graph_save_folder = f"{full_path}/results/mk01" 
+    graph_save_folder = f"{full_path}/results/timestep_mk01" 
+
     train_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01'
     test_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01_TEST'
 
     
-    model_path_enc = f'{full_path}/models/mk01/enc_type_{model_type}_order_{order}.pth'
-    model_path_adj = f'{full_path}/models/mk01/adj_type_{model_type}_order_{order}.pth'
+    model_path_enc = f'{full_path}/models/mk01/enc_timestep_{timesteps}.pth'
+    model_path_adj = f'{full_path}/models/mk01/adj_timestep_{timesteps}.pth'
     
     return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
     

@@ -103,3 +103,23 @@ def get_models(model_type: str, n_base_features: int, n_embed_features, lr, devi
          optimizer = torch.optim.Adam(model_adj.parameters(), lr=lr)
 
     return model_adj, model_enc, optimizer
+
+
+def count_nan_indices(loader):
+    total_nans = 0
+
+    for batch in loader:
+        target_assignments, proc_times, job_ops_adj, ops_ma_adj = batch
+
+        B = target_assignments.shape[0]
+
+        for i in range(B):
+            if (
+                torch.isnan(target_assignments[i]).any() or
+                torch.isnan(proc_times[i]).any() or
+                torch.isnan(job_ops_adj[i]).any() or
+                torch.isnan(ops_ma_adj[i]).any()
+            ):
+                total_nans += 1
+    logging.info(f"Total instances with NaN values: {total_nans}")
+    return total_nans
