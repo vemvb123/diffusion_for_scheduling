@@ -40,7 +40,7 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
     # beta start var opprinnelig 1e-4
     beta_start = 1e-4
     beta_end = 0.02
-    timesteps = 1000
+    timesteps = 100
     betas, alphas, alphas_cumprod, = get_inference_schedule(beta_start, beta_end, timesteps, device = "cuda")
 
     model.eval()
