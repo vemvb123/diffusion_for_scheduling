@@ -231,20 +231,23 @@ def do_actions(actions, n_machines, td, env):
 
     for action in actions:
         # machine index that this action refers to
-        ma_to_use = (action - 0) % n_machines
+        ma_to_use = (action - 1) % n_machines
 
-        while td["busy_until"][-1, ma_to_use].item() > td["time"].item():
-            invalid_action = torch.tensor([-1])  
+        while td["busy_until"][0, ma_to_use].item() > td["time"].item():
+            invalid_action = torch.tensor([0])  
             td["action"] = invalid_action
 
             td = env.step(td)["next"]
-            env.render(td, -1)
+            env.render(td, 0)
 
-        if action != -1:
+        if action != 0:
             td["action"] = torch.tensor([action])
             td = env.step(td)["next"]
-            env.render(td, -1)
+            env.render(td, 0)
     return td
+
+
+
 
 
 def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, error_list, ops_sequence_order):
@@ -278,8 +281,13 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
         for td in tds
     ]
 
+    print("")
     print(f"makespans: {makespans}")
-    print(f"best makespan: {min(makespans)}")
+    print("")
+    print(f"lowest makespan: {min(makespans)}")
+    print(f"highestmakespan: {max(makespans)}")
+    print(f"Average makespan: {sum(makespans) / len(makespans)}")
+
     td_best = tds[ makespans.index( min(makespans) ) ]
     env.render(td_best, 0)
     if path_save_image:
