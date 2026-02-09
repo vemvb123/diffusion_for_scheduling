@@ -29,7 +29,8 @@ import time
 def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, timesteps=1000, cos=False):
     
     device = "cuda"
-    print(f"Using model {model_path}")
+    print(f"Using model {model_path}, with timesteps {timesteps}, and cos: {cos}")
+
     model = deepinv.models.DiffUNet(
         in_channels=4, out_channels=1, pretrained=Path(model_path)
     ).to(device)

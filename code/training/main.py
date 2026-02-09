@@ -31,11 +31,14 @@ else:
 
 timesteps = None
 if model_to_train == 1:
-    timesteps = 200
+    timesteps = 50
 elif model_to_train == 2:
-    timesteps = 500
+    timesteps = 100
 elif model_to_train == 3:
-    timesteps = 800
+    timesteps = 150
+elif model_to_train == 4:
+    timesteps = 25
+
 
 
 

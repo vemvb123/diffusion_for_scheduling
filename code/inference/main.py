@@ -69,7 +69,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         valid_h = 6
         valid_w = 60
         adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
+        # adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
 
 
     td = dataset_utils.get_td_from_path(dataset_folder, instance_idx)
@@ -112,14 +112,14 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         #inference_assignments = experimental.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, sampling_steps = 50, ddim_eta = 0.0)
         #elapsed = None 
         #assignments_over_time = None
-
         ## == CACHE
         # inference_assignments, elapsed, assignments_over_time, columns_done, done_at_t = cache_inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, order, mask_h, mask_w, after_ts_check, valid_h, valid_w, n_ops, threshold )
         # ==== ERSTATTER BATCHES
         t_replace = 995
         # inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
         # === VANLID
-        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, 200, True)
+        timesteps = 100
+        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, True)
         eta = 0.9
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
 

@@ -5,6 +5,15 @@ import torch
 
 from code.inference.denoise import get_inference_schedule
 
+
+
+
+def similair_MU(x):
+    pass
+
+
+
+
 def guiding_function(x): #  is batch of instances
     # x has shape [1, 1, 20, 20]
     # extract the 4×16 region
@@ -17,6 +26,10 @@ def guiding_function(x): #  is batch of instances
     error = torch.abs(bottom_row).mean()
 
     return error
+
+
+
+
 
 
 def guide_adj_inference(conditions, n_channels, model_path, n_to_make, batch_size):
