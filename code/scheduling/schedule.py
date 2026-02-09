@@ -225,26 +225,26 @@ def infer_n_jobs(ops_sequence_order: torch.Tensor):
 
 from functorch import vmap
 
-
+# busy ... will only schedule action if machine avalible, otherwise wait
+# notbusy .. will skip action if machine not avalible at the time
 def do_actions(actions, n_machines, td, env):
 
     for action in actions:
         # machine index that this action refers to
-        ma_to_use = (action - 1) % n_machines
+        ma_to_use = (action - 0) % n_machines
 
-        while td["busy_until"][0, ma_to_use].item() > td["time"].item():
-            invalid_action = torch.tensor([0])  
+        while td["busy_until"][-1, ma_to_use].item() > td["time"].item():
+            invalid_action = torch.tensor([-1])  
             td["action"] = invalid_action
 
             td = env.step(td)["next"]
-            env.render(td, 0)
+            env.render(td, -1)
 
-        if action != 0:
+        if action != -1:
             td["action"] = torch.tensor([action])
             td = env.step(td)["next"]
-            env.render(td, 0)
+            env.render(td, -1)
     return td
-
 
 
 def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, error_list, ops_sequence_order):

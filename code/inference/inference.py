@@ -3,6 +3,7 @@ inference.py contains code for running inference with trained models
 """
 
 
+from diffusers import CosineDPMSolverMultistepScheduler, DDPMScheduler
 
 from code.inference.denoise import denoise_ddpm, get_inference_schedule
 
@@ -25,10 +26,10 @@ import time
 
 
 
-def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked):
-
+def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, timesteps=1000, cos=False):
+    
     device = "cuda"
-
+    print(f"Using model {model_path}")
     model = deepinv.models.DiffUNet(
         in_channels=4, out_channels=1, pretrained=Path(model_path)
     ).to(device)
@@ -40,10 +41,21 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
     # beta start var opprinnelig 1e-4
     beta_start = 1e-4
     beta_end = 0.02
-    timesteps = 100
     betas, alphas, alphas_cumprod, = get_inference_schedule(beta_start, beta_end, timesteps, device = "cuda")
 
     model.eval()
+
+    scheduler = DDPMScheduler(
+        num_train_timesteps=timesteps,
+        beta_start=beta_start,
+        beta_end=beta_end,
+        beta_schedule="squaredcos_cap_v2",  # cosine schedule
+        clip_sample=True,
+        prediction_type="epsilon",
+    )
+
+
+
 
     given_assignments = []
     
@@ -76,7 +88,10 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
 
             predicted_noise = model(inputs, t_tensor, type_t="timestep")
 
-            x = denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
+            if cos:
+                x = scheduler.step(predicted_noise, t, x).prev_sample
+            else:
+                x = denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
 
             if t % 100==0:
                 given_assignments.append(x.clone())

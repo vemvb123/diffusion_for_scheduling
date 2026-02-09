@@ -148,6 +148,7 @@ def diffusion(
         prediction_type="epsilon",
     )
 
+
     if model_type != "adj" and model_type != "f":
         raise ValueError(f"model_type must be either adj or f .. but value was #{model_type}#")
 
