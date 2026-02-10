@@ -1,8 +1,10 @@
 
-
+import code.inference.guide as guide
 import deepinv
 from pathlib import Path
 import logging
+
+from code.inference.guide import guiding_function
 logging.basicConfig(
     level=logging.INFO,
     format="%(filename)s:%(lineno)d - %(message)s"
@@ -15,44 +17,10 @@ from pathlib import Path
 import torch
 
 from code.inference.denoise import get_inference_schedule
-import code.inference.utils as utils
 
 
 
-def similair_MU(x, h, w, n_ops, ops_ma_adj, proc_times, n_ma):
-
-
-    x = x[:, :, :h, :w]
-    proc_times = proc_times[:, :, :h, :w]
-
-    x_schedule_order = utils.show_order_clear(x, n_ops, ops_ma_adj, r_global=True)
-
-    sum_over_all = 0
-    for i in range(n_ops):
-        sum_ma = 0
-        first_op_in_ma_proc = 0
-        for i in range(n_ma):
-
-            if i == n_ops: 
-                break
-
-            idx = torch.nonzero(x_schedule_order == i, as_tuple=False)
-            row, col = idx[0]
-            proc_time = proc_times[row, col]
-            sum_ma += proc_time
-
-            if first_op_in_ma_proc == 0: 
-                first_op_in_ma_proc = proc_time
-
-        sum_ma / n_ma
-        difference = abs(sum_ma - first_op_in_ma_proc)
-        sum_over_all += difference
-
-
-
-
-
-def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, timesteps=1000, guidence_scale=0.5):
+def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, n_ops, ops_seq_order, timesteps=1000, guidence_scale=0.5):
     
     device = "cuda"
     print(f"Using model {model_path}, with timesteps {timesteps}, and cos: {cos}")
@@ -119,7 +87,8 @@ def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sa
 
             x0 = scheduler.step(predicted_noise, t, x).pred_original_sample
 
-            guide_loss = guidence_func(x0) * guidence_scale
+            guide_loss = guide.amt_errors(x0, n_ops, ops_ma_adj, ops_seq_order, 30) 
+            guide_loss = guide_loss * guidence_scale
             if t % 10 == 0:
                 print(t, "loss:", guide_loss.item())
             cond_grad = -torch.autograd.grad(guide_loss, x)[0]
@@ -138,24 +107,6 @@ def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sa
 
     given_assignments.append(x.clone())
     return x, elapsed, given_assignments
-
-
-
-
-
-def guiding_function(x): #  is batch of instances
-    # x has shape [1, 1, 20, 20]
-    # extract the 4×16 region
-    x_inside = x[:, :, :4, :16]   # shape [1, 1, 4, 16]
-
-    # select the bottom row of that 4×16 → index 3
-    bottom_row = x_inside[:, :, 3, :]  # shape [1, 1, 16]
-
-    # compute mean absolute value of bottom row
-    error = torch.abs(bottom_row).mean()
-
-    return error
-
 
 
 
