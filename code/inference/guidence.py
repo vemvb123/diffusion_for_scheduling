@@ -52,7 +52,7 @@ def similair_MU(x, h, w, n_ops, ops_ma_adj, proc_times, n_ma):
 
 
 
-def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, timesteps=1000, cos=False, guidence_scale=0.5):
+def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, timesteps=1000, guidence_scale=0.5):
     
     device = "cuda"
     print(f"Using model {model_path}, with timesteps {timesteps}, and cos: {cos}")
@@ -112,17 +112,20 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
                 x,
                 features,
             ], dim=1)
-
+ 
             predicted_noise = model(inputs, t_tensor, type_t="timestep")
 
-            # Guidence
-            estimated_x0 = scheduler.step(predicted_noise, t, x).prev_sample
-            guidance_loss = guiding_function(estimated_x0) * guidence_scale
-            grad_x = torch.autograd.grad(guidance_loss, x)[0]
-            x_guided = x.detach() - guidence_scale * grad_x
+            x = x.detach().requires_grad_()
 
-            x = scheduler.step(x_guided, t, predicted_noise).prev_sample
-            x = x.detach()
+            x0 = scheduler.step(predicted_noise, t, x).pred_original_sample
+
+            guide_loss = guidence_func(x0) * guidence_scale
+            if t % 10 == 0:
+                print(t, "loss:", guide_loss.item())
+            cond_grad = -torch.autograd.grad(guide_loss, x)[0]
+            x = x.detach() + cond_grad
+
+            x = scheduler.step(predicted_noise, t, x).prev_sample
 
             if t % 100==0:
                 given_assignments.append(x.clone())

@@ -227,23 +227,24 @@ from functorch import vmap
 
 # busy ... will only schedule action if machine avalible, otherwise wait
 # notbusy .. will skip action if machine not avalible at the time
+
 def do_actions(actions, n_machines, td, env):
 
     for action in actions:
         # machine index that this action refers to
         ma_to_use = (action - 1) % n_machines
 
+
         while td["busy_until"][0, ma_to_use].item() > td["time"].item():
             invalid_action = torch.tensor([0])  
             td["action"] = invalid_action
 
             td = env.step(td)["next"]
-            env.render(td, 0)
 
         if action != 0:
             td["action"] = torch.tensor([action])
             td = env.step(td)["next"]
-            env.render(td, 0)
+
     return td
 
 
@@ -270,12 +271,16 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
     td = td.unsqueeze(0)
 
 
-    feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0]
+    feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0] 
     tds = Parallel(n_jobs=os.cpu_count())(
         delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env )
         for f_i in feasible_indecies
     )
 
+    #===
+    #check = feasible_indecies[0]
+    #tds = [do_actions( all_actions[check], n_machines, td.copy(), env )]
+    #===
     makespans = [
         td["busy_until"].max(dim=1).values
         for td in tds
