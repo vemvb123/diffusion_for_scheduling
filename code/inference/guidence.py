@@ -1,15 +1,141 @@
+
+
 import deepinv
+from pathlib import Path
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(filename)s:%(lineno)d - %(message)s"
+)
+from diffusers import CosineDPMSolverMultistepScheduler, DDPMScheduler
+
+
 import time
 from pathlib import Path
 import torch
 
 from code.inference.denoise import get_inference_schedule
+import code.inference.utils as utils
+
+
+
+def similair_MU(x, h, w, n_ops, ops_ma_adj, proc_times, n_ma):
+
+
+    x = x[:, :, :h, :w]
+    proc_times = proc_times[:, :, :h, :w]
+
+    x_schedule_order = utils.show_order_clear(x, n_ops, ops_ma_adj, r_global=True)
+
+    sum_over_all = 0
+    for i in range(n_ops):
+        sum_ma = 0
+        first_op_in_ma_proc = 0
+        for i in range(n_ma):
+
+            if i == n_ops: 
+                break
+
+            idx = torch.nonzero(x_schedule_order == i, as_tuple=False)
+            row, col = idx[0]
+            proc_time = proc_times[row, col]
+            sum_ma += proc_time
+
+            if first_op_in_ma_proc == 0: 
+                first_op_in_ma_proc = proc_time
+
+        sum_ma / n_ma
+        difference = abs(sum_ma - first_op_in_ma_proc)
+        sum_over_all += difference
 
 
 
 
-def similair_MU(x):
-    pass
+
+def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, timesteps=1000, cos=False, guidence_scale=0.5):
+    
+    device = "cuda"
+    print(f"Using model {model_path}, with timesteps {timesteps}, and cos: {cos}")
+
+    model = deepinv.models.DiffUNet(
+        in_channels=4, out_channels=1, pretrained=Path(model_path)
+    ).to(device)
+
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logging.info(f"Amount of trainable parameters: {trainable_params}")
+
+
+    # beta start var opprinnelig 1e-4
+    beta_start = 1e-4
+    beta_end = 0.02
+    betas, alphas, alphas_cumprod, = get_inference_schedule(beta_start, beta_end, timesteps, device = "cuda")
+
+    model.eval()
+
+    scheduler = DDPMScheduler(
+        num_train_timesteps=timesteps,
+        beta_start=beta_start,
+        beta_end=beta_end,
+        beta_schedule="squaredcos_cap_v2",  # cosine schedule
+        clip_sample=True,
+        prediction_type="epsilon",
+    )
+
+
+
+
+    given_assignments = []
+    
+    x = None
+    with torch.no_grad():
+        
+        x = torch.randn(n_samples, 1, h_when_masked, w_when_masked).to(device)
+
+        # må fore inn maske...
+        features = torch.cat([            
+            proc_times,
+            job_ops_adj,
+            ops_ma_adj,
+        ], dim=1)
+
+        features = features.to(device, dtype=torch.float32)
+        features = features.repeat(n_samples, 1, 1, 1)
+        x = x.to(device, dtype=torch.float32)
+
+        # start timer
+        start_time = time.perf_counter()
+
+        for t in reversed(range(timesteps)):
+            t_tensor = torch.ones(n_samples, device=device).long() * t
+
+            inputs = torch.cat([
+                x,
+                features,
+            ], dim=1)
+
+            predicted_noise = model(inputs, t_tensor, type_t="timestep")
+
+            # Guidence
+            estimated_x0 = scheduler.step(predicted_noise, t, x).prev_sample
+            guidance_loss = guiding_function(estimated_x0) * guidence_scale
+            grad_x = torch.autograd.grad(guidance_loss, x)[0]
+            x_guided = x.detach() - guidence_scale * grad_x
+
+            x = scheduler.step(x_guided, t, predicted_noise).prev_sample
+            x = x.detach()
+
+            if t % 100==0:
+                given_assignments.append(x.clone())
+
+    # end timer
+    end_time = time.perf_counter()
+    elapsed = end_time - start_time
+
+    x = torch.clamp(x, 0, 1)
+
+    given_assignments.append(x.clone())
+    return x, elapsed, given_assignments
+
 
 
 
@@ -120,3 +246,6 @@ def guide_adj_inference(conditions, n_channels, model_path, n_to_make, batch_siz
     x_allocations = torch.clamp(x_allocations, 0, 1)
 
     return x_allocations, elapsed, allocations_over_time, errors
+
+
+

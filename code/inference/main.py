@@ -105,7 +105,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         print("beginning on cache")
         threshold = 0.02
         # SAMPLES
-        n_samples = 64
+        n_samples = 8
         n_ops = int(torch.count_nonzero(target_assignments))
 
         # === DDIM
