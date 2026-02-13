@@ -20,10 +20,10 @@ from code.inference.denoise import get_inference_schedule
 
 
 
-def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, n_ops, ops_seq_order, timesteps=1000, guidence_scale=0.5):
+def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, valid_h, valid_w, n_ops, ops_seq_order, timesteps=1000, guidence_scale=0.5):
     
     device = "cuda"
-    print(f"Using model {model_path}, with timesteps {timesteps}, and cos: {cos}")
+    print(f"Using model {model_path}, with timesteps {timesteps}")
 
     model = deepinv.models.DiffUNet(
         in_channels=4, out_channels=1, pretrained=Path(model_path)
@@ -87,10 +87,12 @@ def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sa
 
             x0 = scheduler.step(predicted_noise, t, x).pred_original_sample
 
-            guide_loss = guide.amt_errors(x0, n_ops, ops_ma_adj, ops_seq_order, 30) 
+            guide_loss = guide.amt_errors(x0, n_ops, ops_ma_adj, ops_seq_order, valid_h, valid_w, 30)
             guide_loss = guide_loss * guidence_scale
+
             if t % 10 == 0:
                 print(t, "loss:", guide_loss.item())
+
             cond_grad = -torch.autograd.grad(guide_loss, x)[0]
             x = x.detach() + cond_grad
 

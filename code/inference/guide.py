@@ -19,7 +19,12 @@ def guiding_function(x): #  is batch of instances
 
 
 
-def amt_errors(x, n_ops, ops_ma_adj, ops_seq_order, max_allowed_total_errors=30):
+def amt_errors(x, n_ops, ops_ma_adj, ops_seq_order, valid_h, valid_w, max_allowed_total_errors=30):
+    # remove padding
+    x = x[:, :, :valid_h, :valid_w]
+    print("hvata")
+    print(x.shape)
+    print("---")
     # make in schedule with order
     inference_assignments = utils.show_order_clear(x, n_ops, ops_ma_adj)
     # get amount of errors
@@ -30,7 +35,7 @@ def amt_errors(x, n_ops, ops_ma_adj, ops_seq_order, max_allowed_total_errors=30)
     if error <= total_errors:
         return float(1)
     # normaliserer totale feil mot max_allowed_total_errors
-    norm_error = (error- 0) / (max_allowed_total_errors - 0)
+    norm_error = (error) / (max_allowed_total_errors)
     # returnerer error
     return norm_error
 

@@ -124,7 +124,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         # === GUIDENCE
         n_ops = int(torch.count_nonzero(target_assignments))
         ops_seq_order = td["ops_sequence_order"]
-        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, n_ops, ops_seq_order, timesteps, True)
+        inference_assignments, elapsed, assignments_over_time = guidence.adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h, valid_w, n_ops, ops_seq_order, timesteps, True)
 
         # print(done_at_t)
         print(columns_done)
