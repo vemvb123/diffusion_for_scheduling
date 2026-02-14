@@ -1,3 +1,5 @@
+
+print("started running")
 """
 results.py contains code for gathering results.
 Such as gathering mean makespan of scheduled instances, graphs, training results, etc
@@ -19,8 +21,8 @@ matplotlib.use('Agg')
 
 import torch
 
-
 def get_inference_result(problem_type, instance_idx, model_type, order: bool):
+    print("starting inference")
     # instantiate all return values as None
     (td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, valid_h, valid_w) = (None,) * 10
 
@@ -67,8 +69,9 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         mask_w = 64
         valid_h = 6
         valid_w = 60
+
         adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
-        # adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
 
 
     td = dataset_utils.get_td_from_path(dataset_folder, instance_idx)
@@ -104,11 +107,18 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         print("beginning on cache")
         threshold = 0.02
         # SAMPLES
-        n_samples = 32
+        n_samples = 64
         n_ops = int(torch.count_nonzero(target_assignments))
 
+        timesteps = 100
+        sampling_steps = 60
+        ddim_eta = 1.0
+
+
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
+
         # === DDIM
-        #inference_assignments = experimental.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, sampling_steps = 50, ddim_eta = 0.0)
+        #inference_assignments, elapsed, assignments_over_time = experimental.adj_inference_ddi0m(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, sampling_steps = sampling_steps, ddim_eta = ddim_eta, timesteps = timesteps)
         #elapsed = None 
         #assignments_over_time = None
         ## == CACHE
@@ -117,14 +127,13 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         t_replace = 995
         # inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
         # === VANLID
-        timesteps = 200
-        # inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, True)
+        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, True)
         eta = 0.9
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
         # === GUIDENCE
-        n_ops = int(torch.count_nonzero(target_assignments))
-        ops_seq_order = td["ops_sequence_order"]
-        inference_assignments, elapsed, assignments_over_time = guidence.adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h, valid_w, n_ops, ops_seq_order, timesteps, True)
+        #n_ops = int(torch.count_nonzero(target_assignments))
+        #ops_seq_order = td["ops_sequence_order"]
+        #inference_assignments, elapsed, assignments_over_time = guidence.adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h, valid_w, n_ops, ops_seq_order, timesteps, True)
 
         # print(done_at_t)
         print(columns_done)

@@ -183,7 +183,8 @@ def adj_inference_ddim(
     model_path, n_samples,
     h_when_masked, w_when_masked,
     sampling_steps = 50,   # fewer steps than 1000
-    ddim_eta = 0.0         # eta=0 => deterministic DDIM
+    ddim_eta = 0.0,         # eta=0 => deterministic DDIM
+    timesteps=1000
 
 ):
 
@@ -202,9 +203,15 @@ def adj_inference_ddim(
     beta_end = 0.02
 
     scheduler = DDIMScheduler(
-        beta_start=1e-4, beta_end=0.02, beta_schedule="linear"
+        num_train_timesteps=timesteps,       # same as training
+        beta_start=beta_start,                # same as training
+        beta_end=beta_end,                    # same as training
+        beta_schedule="squaredcos_cap_v2",    # cosine schedule
+        clip_sample=True,
+        prediction_type="epsilon",            # normally matches training
     )
-    scheduler.set_timesteps(50)
+
+    scheduler.set_timesteps(sampling_steps)
 
     # 3) Start from pure noise
     x = torch.randn(n_samples, 1, h_when_masked, w_when_masked).to(device)
@@ -225,7 +232,8 @@ def adj_inference_ddim(
             inputs = torch.cat([x, features], dim=1)
 
             noise_pred = model(inputs, t_tensor, type_t="timestep")
-            x = scheduler.step(noise_pred, t, x).prev_sample
+            out = scheduler.step(noise_pred, t, x, eta=ddim_eta)
+            x = out.prev_sample
 
     x = torch.clamp(x, 0, 1)
-    return x
+    return x, None, None

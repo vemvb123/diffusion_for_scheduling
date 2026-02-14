@@ -37,6 +37,7 @@ def map_assignemnts_to_actions(assignments, order: bool, n_jobs: int):
     num_sections = W // cols_per_section
 
     actions = []
+    machine_assigned_to = []
 
     if order:
         # ---- ORDERED MODE ----
@@ -59,6 +60,7 @@ def map_assignemnts_to_actions(assignments, order: bool, n_jobs: int):
             actions.append(action)
 
 
+
     else:
         # ---- BINARY MODE ----
         for col in range(W):
@@ -74,7 +76,162 @@ def map_assignemnts_to_actions(assignments, order: bool, n_jobs: int):
 
 
 
+def map_operation_to_machines(ma_assignment):
+    # if there’s a leading batch dim, remove it
+    if ma_assignment.dim() == 3:
+        ma_assignment = ma_assignment.squeeze(0)
+
+    op_to_ma = []
+    num_rows, num_cols = ma_assignment.shape
+
+    for col in range(num_cols):
+        # find rows where value == 1
+        rows = (ma_assignment[:, col] == 1).nonzero(as_tuple=False)
+
+        if rows.shape[0] == 0:
+            # no 1 in this column → filler
+            op_to_ma.append(99)
+        else:
+            # take the first row index with a 1
+            op_to_ma.append(rows[0, 0].item())
+
+    return op_to_ma
+
+
+from collections import defaultdict
+import math
+import numpy as np
+
+
+
+import numpy as np
 import torch
+
+def compress_schedule(start_times, finish_times, machines, job_lengths, td, filler_machine=99):
+    """
+    Compress schedule by removing unnecessary gaps.
+    Works with TensorDict batch dimension (1, N) or plain arrays.
+    """
+
+    # -------------------------------------------------
+    # 0. Convert to flat numpy arrays
+    # -------------------------------------------------
+    start = np.asarray(start_times).reshape(-1).astype(float).copy()
+    finish = np.asarray(finish_times).reshape(-1).astype(float).copy()
+    machines = np.asarray(machines).reshape(-1)
+
+    n = len(start)
+    duration = finish - start
+
+    # -------------------------------------------------
+    # 1. Build predecessor array from job_lengths
+    # -------------------------------------------------
+    pred = np.full(n, -1, dtype=int)
+
+    idx = 0
+    for job_len in job_lengths:
+        for j in range(job_len):
+            if idx >= n:
+                break
+            if j > 0:
+                pred[idx] = idx - 1
+            idx += 1
+
+    # -------------------------------------------------
+    # 2. Machine → operation mapping
+    # -------------------------------------------------
+    machine_ops = {}
+    for i in range(n):
+        if machines[i] == filler_machine:
+            continue
+        machine_ops.setdefault(machines[i], []).append(i)
+
+    # Sort operations on each machine by start time
+    for m in machine_ops:
+        machine_ops[m].sort(key=lambda i: start[i])
+
+    # -------------------------------------------------
+    # 3. Left-shift compression
+    # -------------------------------------------------
+    changed = True
+    while changed:
+        changed = False
+
+        for m in machine_ops:
+            machine_time = 0
+
+            for op in machine_ops[m]:
+                pred_finish = finish[pred[op]] if pred[op] != -1 else 0
+                earliest_start = max(machine_time, pred_finish)
+
+                if start[op] > earliest_start:
+                    start[op] = earliest_start
+                    finish[op] = start[op] + duration[op]
+                    changed = True
+
+                machine_time = finish[op]
+
+    # -------------------------------------------------
+    # 4. Restore batch dimension (1, N) as Tensor
+    # -------------------------------------------------
+    start_tensor = torch.tensor(start, dtype=torch.float32).unsqueeze(0)
+    finish_tensor = torch.tensor(finish, dtype=torch.float32).unsqueeze(0)
+
+    td["start_times"] = start_tensor
+    td["finish_times"] = finish_tensor
+
+    return td
+
+
+
+
+
+
+
+
+import torch
+
+
+def map_assignments_to_actions_per_machine(assignments, order: bool, n_jobs):
+    if assignments.dim() > 2:
+        assignments = assignments.squeeze(0)
+
+    H, W = assignments.shape
+
+    # Determine widths for each machine group if n_jobs is list or int
+    if isinstance(n_jobs, int):
+        widths = [n_jobs] * (W // n_jobs)
+    else:
+        widths = n_jobs
+
+    stride = max(widths)
+    section_starts = torch.cumsum(
+        torch.tensor([0] + widths[:-1]), dim=0
+    )
+
+    # Prepare one list per machine
+    per_machine_actions = [[] for _ in range(H)]
+
+    if order:
+        nonzero = torch.nonzero(assignments, as_tuple=False)
+        values = assignments[nonzero[:, 0], nonzero[:, 1]]
+        sorted_idx = torch.argsort(values)
+
+        for i in sorted_idx:
+            row, col = nonzero[i].tolist()
+            section_idx = int((section_starts <= col).sum() - 1)
+            action = section_idx * stride + (row + 1)
+            per_machine_actions[row].append(action)
+
+    else:
+        for row in range(H):
+            for col in range(W):
+                if assignments[row, col] == 1:
+                    section_idx = int((section_starts <= col).sum() - 1)
+                    action = section_idx * stride + (row + 1)
+                    per_machine_actions[row].append(action)
+
+    return per_machine_actions
 
 
 def map_assignments_to_actions_text(assignments, order: bool, n_jobs):

@@ -131,6 +131,7 @@ def diffusion(
     lr: float = 1e-3,
     device: str = "cuda",
     batch_size: int = 32,
+    use_cos=True
 ):
     n_base_features = train_dataset.n_base_features
 
@@ -139,14 +140,16 @@ def diffusion(
     sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod = get_diffusion_schedule(beta_start, beta_end, timesteps)
 
 
-    scheduler = DDPMScheduler(
-        num_train_timesteps=timesteps,
-        beta_start=beta_start,
-        beta_end=beta_end,
-        beta_schedule="squaredcos_cap_v2",  # cosine schedule
-        clip_sample=True,
-        prediction_type="epsilon",
-    )
+    scheduler = None
+    if use_cos:
+        scheduler = DDPMScheduler(
+            num_train_timesteps=timesteps,
+            beta_start=beta_start,
+            beta_end=beta_end,
+            beta_schedule="squaredcos_cap_v2",  # cosine schedule
+            clip_sample=True,
+            prediction_type="epsilon",
+        )
 
 
     if model_type != "adj" and model_type != "f":
@@ -159,7 +162,7 @@ def diffusion(
     elif model_type == "f":
         run_epoch_func = run_epoch_feature 
 
-    train_loader, test_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size)
+    train_loader, test_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size) # subset=True ... for testing med subset
 
     logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
     logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")
@@ -232,7 +235,7 @@ def diffusion(
     torch.save(model_adj.state_dict(), model_path_adj)
     if model_type == "f":
         torch.save(model_enc.state_dict(), model_enc)
-
+    print(f"done training. Saved model {model_path_adj}")
     return None, model_path_adj, all_losses[-1]
 
 

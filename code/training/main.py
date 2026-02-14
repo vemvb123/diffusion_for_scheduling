@@ -31,13 +31,13 @@ else:
 
 timesteps = None
 if model_to_train == 1:
-    timesteps = 50
-elif model_to_train == 2:
     timesteps = 100
+elif model_to_train == 2:
+    timesteps = 200
 elif model_to_train == 3:
-    timesteps = 150
+    timesteps = 500
 elif model_to_train == 4:
-    timesteps = 25
+    timesteps = 1000
 
 
 
@@ -69,27 +69,29 @@ def train_models(
     best_loss = 1
     best_lr = None
 
-    logging.info(f"Began training timestep model {timesteps} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+    logging.info(f"Began training timestep model {model_path_adj} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 
     for lr in lrs:
         logging.info(f"Training with lr {lr}")
         path_enc, path_adj, last_epoch_loss = training.diffusion(
             model_type, train_dataset, test_dataset,
             embed_size, model_path_adj, model_path_enc,
-            graph_name, graph_save_folder, valid_h, valid_w, timesteps, testing_epochs, lr
+            graph_name, graph_save_folder, valid_h, valid_w, timesteps, testing_epochs, lr,
+            use_cos=False
         ) 
         if best_loss > last_epoch_loss: 
             best_lr = lr
             best_loss = last_epoch_loss
 
-    logging.info(f"Best lr found: {best_lr}, for model {model_type} order_{order} training full model now")
+    logging.info(f"Best lr found: {best_lr}, for model {path_adj}")
     path_enc, path_adj, last_epoch_loss = training.diffusion(
         model_type, train_dataset, test_dataset,
         embed_size, model_path_adj, model_path_enc,
-        graph_name, graph_save_folder, valid_h, valid_w, timesteps, run_epochs, best_lr
+        graph_name, graph_save_folder, valid_h, valid_w, timesteps, run_epochs, best_lr,
+        use_cos=False
     )
 
-    logging.info(f"Ended training model {model_type} order_{order} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+    logging.info(f"Ended training model {path_adj} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 
 
 
@@ -167,9 +169,8 @@ def mk01():
     train_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01'
     test_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01_TEST'
 
-    
-    model_path_enc = f'{full_path}/models/mk01/enc_timestep_{timesteps}.pth'
-    model_path_adj = f'{full_path}/models/mk01/adj_timestep_{timesteps}.pth'
+    model_path_enc = f'{full_path}/models/beta/enc_timestep_{timesteps}.pth'
+    model_path_adj = f'{full_path}/models/beta/adj_timestep_{timesteps}.pth'
     
     return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
     

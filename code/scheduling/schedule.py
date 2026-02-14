@@ -249,11 +249,35 @@ def do_actions(actions, n_machines, td, env):
 
 
 
+def do_actions_fix_gap(actions, n_machines, td, env):
+    
+    for action in actions:
+        # machine index that this action refers to
+        ma_to_use = (action - 1) % n_machines
+
+
+        while td["busy_until"][0, ma_to_use].item() > td["time"].item():
+            invalid_action = torch.tensor([0])  
+            td["action"] = invalid_action
+
+            td = env.step(td)["next"]
+
+        if action != 0:
+            td["action"] = torch.tensor([action])
+            td = env.step(td)["next"]
+
+    return td
+
+import torch
+
 
 
 def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, error_list, ops_sequence_order):
     print(f"assignments shape: {assignments.shape}")
     n_jobs = infer_n_jobs(ops_sequence_order) 
+
+
+
 
     print(f"making actions for assignments with {os.cpu_count()} processors")
     B = assignments.size(0)
@@ -270,21 +294,46 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
     td.del_("opt_actions")
     td = td.unsqueeze(0)
 
-
+ 
     feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0] 
     tds = Parallel(n_jobs=os.cpu_count())(
         delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env )
         for f_i in feasible_indecies
     )
 
-    #===
-    #check = feasible_indecies[0]
-    #tds = [do_actions( all_actions[check], n_machines, td.copy(), env )]
-    #===
+    # filling gaps
+    ## mapping operations to machines
+    machine_assignments_maps = Parallel(n_jobs=os.cpu_count())(
+        delayed(utils.map_operation_to_machines)(td["ma_assignment"])
+        for td in tds
+    )
+    #machine_assignments_maps = [list(m) for m in machine_assignments_maps]
+
+    ## filling gaps
+    tds = Parallel(n_jobs=os.cpu_count())(
+        delayed(utils.compress_schedule)(td["start_times"], td["finish_times"], ma_op_map, n_jobs, td, filler_machine=99)
+        for td, ma_op_map in zip(tds, machine_assignments_maps)
+    )
+    
+    makespans = [
+        td["finish_times"][td["finish_times"] != 9999.0].max().item()
+        for td in tds
+    ]
+    td_best = tds[ makespans.index( min(makespans) ) ]
+
+    """
+    start_times = td_best["start_times"]
+    finish_times = td_best["finish_times"]
+    machines = utils.map_operation_to_machines(td_best["ma_assignment"])
+    job_lengths = n_jobs
+    td_best["start_times"], td_best["finish_times"] = utils.compress_schedule(start_times, finish_times, machines, job_lengths, filler_machine=99)
+
+
     makespans = [
         td["busy_until"].max(dim=1).values
         for td in tds
     ]
+    """
 
     print("")
     print(f"makespans: {makespans}")
@@ -293,11 +342,15 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
     print(f"highestmakespan: {max(makespans)}")
     print(f"Average makespan: {sum(makespans) / len(makespans)}")
 
-    td_best = tds[ makespans.index( min(makespans) ) ]
+
+
     env.render(td_best, 0)
     if path_save_image:
         plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
         print(f"Saved scheduled image at path {path_save_image}")
+
+
+
     return td_best
 
 
