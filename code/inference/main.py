@@ -110,7 +110,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         n_samples = 32
         n_ops = int(torch.count_nonzero(target_assignments))
 
-        timesteps = 100
+        timesteps = 200
         sampling_steps = 60
         ddim_eta = 1.0
 
@@ -127,9 +127,10 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         t_replace = 995
         # inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
         # === VANLID
-        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/beta/adj_timestep_100.pth"
-        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, True)
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/beta/adj_timestep_200.pth"
+        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/beta/adj_timestep_200.pth"
+        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, False)
         eta = 0.9
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
         # === GUIDENCE
