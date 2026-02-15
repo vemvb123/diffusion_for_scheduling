@@ -1,4 +1,8 @@
 
+Test guiding for inference
+test guiding for trening
+
+...
 
 Noe a fikse..
 det er faktisk noe feil med skeduleringa, det kan ses at operasjoner venter unødvendig lenge med å bli skedulert.
