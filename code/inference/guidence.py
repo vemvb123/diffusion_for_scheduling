@@ -87,7 +87,7 @@ def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sa
 
             x0 = scheduler.step(predicted_noise, t, x).pred_original_sample
 
-            guide_loss = guide.amt_errors(x0, n_ops, ops_ma_adj, ops_seq_order, valid_h, valid_w, 30)
+            guide_loss = guide.amt_errors(x0, n_ops, ops_ma_adj, ops_seq_order, valid_h, valid_w, 30) # kan kanskje endre fra 30, ut ifra hvilekt tidssteg 
             guide_loss = guide_loss * guidence_scale
 
             if t % 10 == 0:

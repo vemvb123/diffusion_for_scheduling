@@ -43,33 +43,47 @@ def amt_errors(x, n_ops, ops_ma_adj, ops_seq_order, valid_h, valid_w, max_allowe
 
 
 
+# få til clear order, men kan også ta binær, binær er sikkert raskere
+# map assignments til proctid
+# summer proc tider for hver maskin
+# ta loss som forskjell i proc tider: 
+# beste tilfelle: (alle summer, som en sum) / mengde maskiner
+# faktisk tilfelle: SUM( abs(sumN - beste) )
+# normaliser: beste tilfelle, værste tilfelle (beste+beste/2)
 
 
 def similair_MU(x, h, w, n_ops, ops_ma_adj, proc_times, n_ma):
+    """
+    Machine-utilization similarity loss.
+    Lower is better (0 = perfectly balanced).
+    """
 
-
+    # crop to active region
     x = x[:, :, :h, :w]
     proc_times = proc_times[:, :, :h, :w]
+    # binary assignment matrix
+    x_used_assignments = utils.round_to_values(x, w, ops_ma_adj)
+    # map processing times via assignment
+    valid_proc_times = x_used_assignments * proc_times
 
-    x_schedule_order = utils.show_order_clear(x, n_ops, ops_ma_adj, r_global=True)
+    # sum processing times per machine
+    proc_time_per_machine = valid_proc_times.sum(dim=-1)  # (B, 1, n_ma)
+    # total processing time
+    total_proc_time = proc_time_per_machine.sum(dim=-1, keepdim=True)  # (B, 1, 1)
 
-    sum_over_all = 0
-    for i in range(n_ops):
-        sum_ma = 0
-        first_op_in_ma_proc = 0
-        for i in range(n_ma):
+    # best possible balanced load
+    best_case = total_proc_time / n_ma  # (B, 1, 1)
+    # actual deviation from balance
+    deviation = torch.abs(proc_time_per_machine - best_case)
+    loss_raw = deviation.sum(dim=-1)  # (B, 1)
+    # worst reasonable case
+    worst_case = best_case * 1.5  # (B, 1, 1)
 
-            if i == n_ops:
-                break
+    # normalized loss
+    loss_norm = loss_raw / (worst_case.squeeze(-1) + 1e-8)
 
-            idx = torch.nonzero(x_schedule_order == i, as_tuple=False)
-            row, col = idx[0]
-            proc_time = proc_times[row, col]
-            sum_ma += proc_time
+    return loss_norm.squeeze(-1)
 
-            if first_op_in_ma_proc == 0:
-                first_op_in_ma_proc = proc_time
 
-        sum_ma / n_ma
-        difference = abs(sum_ma - first_op_in_ma_proc)
-        sum_over_all += difference
+
+
