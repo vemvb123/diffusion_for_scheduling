@@ -35,6 +35,7 @@ def main(instance_type: str):
 
         ## Lag datasett for brandimarte instanse mk01
         dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
+        #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
         filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt'
         parameters = utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
         print(parameters)

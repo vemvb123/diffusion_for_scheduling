@@ -23,23 +23,25 @@ from code.dataset_code.dataset import Dataset_RL4CO
 
 # maps file execution parameter (1-4) to some model to train
 model_to_train = None
+use_cos = True
 if len(sys.argv) > 1:
     model_to_train = int(sys.argv[1])
+    if int(sys.argv[2]) == 1:
+        use_cos = True
+    elif int(sys.argv[2]) == 2:
+        use_cos = False
+
     logging.info(f"Training models nr {model_to_train}")
 else:
     logging.info("Please provide a training number!")
 
 timesteps = None
 if model_to_train == 1:
-    timesteps = 100
-elif model_to_train == 2:
-    timesteps = 200
-elif model_to_train == 3:
-    timesteps = 500
-elif model_to_train == 4:
     timesteps = 1000
+elif model_to_train == 2:
+    timesteps = 800
 
-
+print(f"training model on timestep {timesteps} with scheduler cos: {use_cos}")
 
 
 
@@ -77,7 +79,7 @@ def train_models(
             model_type, train_dataset, test_dataset,
             embed_size, model_path_adj, model_path_enc,
             graph_name, graph_save_folder, valid_h, valid_w, timesteps, testing_epochs, lr,
-            use_cos=False
+            use_cos=use_cos
         ) 
         if best_loss > last_epoch_loss: 
             best_lr = lr
@@ -88,7 +90,7 @@ def train_models(
         model_type, train_dataset, test_dataset,
         embed_size, model_path_adj, model_path_enc,
         graph_name, graph_save_folder, valid_h, valid_w, timesteps, run_epochs, best_lr,
-        use_cos=False
+        use_cos=use_cos
     )
 
     logging.info(f"Ended training model {path_adj} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
@@ -170,7 +172,11 @@ def mk01():
     test_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01_TEST'
 
     model_path_enc = f'{full_path}/models/beta/enc_timestep_{timesteps}.pth'
-    model_path_adj = f'{full_path}/models/beta/adj_timestep_{timesteps}.pth'
+
+    if use_cos:
+        model_path_adj = f'{full_path}/models/cos_beta/timestep_{timesteps}_cos.pth'
+    else:
+        model_path_adj = f'{full_path}/models/cos_beta/timestep_{timesteps}_beta.pth'
     
     return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
     
