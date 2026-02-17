@@ -49,68 +49,82 @@ def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sa
         prediction_type="epsilon",
     )
 
-
-
-
     given_assignments = []
-    
-    x = None
-    with torch.no_grad():
-        
-        x = torch.randn(n_samples, 1, h_when_masked, w_when_masked).to(device)
+    guidance_loss_scale = 40  # Adjust this value
 
-        # må fore inn maske...
-        features = torch.cat([            
-            proc_times,
-            job_ops_adj,
-            ops_ma_adj,
+    # Don't use torch.no_grad() for the entire loop - we need gradients!
+    x = torch.randn(n_samples, 1, h_when_masked, w_when_masked).to(device)
+
+    # Prepare features
+    features = torch.cat([            
+        proc_times,
+        job_ops_adj,
+        ops_ma_adj,
+    ], dim=1)
+
+    features = features.to(device, dtype=torch.float32)
+    features = features.repeat(n_samples, 1, 1, 1)
+    x = x.to(device, dtype=torch.float32)
+
+    # start timer
+    start_time = time.perf_counter()
+
+    for t in reversed(range(timesteps)):
+        t_tensor = torch.ones(n_samples, device=device).long() * t
+
+        inputs = torch.cat([
+            x,
+            features,
         ], dim=1)
 
-        features = features.to(device, dtype=torch.float32)
-        features = features.repeat(n_samples, 1, 1, 1)
-        x = x.to(device, dtype=torch.float32)
-
-        # start timer
-        start_time = time.perf_counter()
-
-        for t in reversed(range(timesteps)):
-            t_tensor = torch.ones(n_samples, device=device).long() * t
-
-            inputs = torch.cat([
-                x,
-                features,
-            ], dim=1)
- 
+        # Predict noise (no gradients needed for model forward pass)
+        with torch.no_grad():
             predicted_noise = model(inputs, t_tensor, type_t="timestep")
 
-            x = x.detach().requires_grad_()
+        # --- Guidance step (following tutorial pattern) ---
+        # 1. Detach and enable gradients for x
+        x = x.detach().requires_grad_()
+        
+        # 2. Get the predicted x0 from current x and noise prediction
+        x0 = scheduler.step(predicted_noise, t, x).pred_original_sample
 
-            x0 = scheduler.step(predicted_noise, t, x).pred_original_sample
-
-            guide_loss = guide.amt_errors(x0, n_ops, ops_ma_adj, ops_seq_order, valid_h, valid_w, 30) # kan kanskje endre fra 30, ut ifra hvilekt tidssteg 
-            guide_loss = guide_loss * guidence_scale
-
-            if t % 10 == 0:
-                print(t, "loss:", guide_loss.item())
-
-            cond_grad = -torch.autograd.grad(guide_loss, x)[0]
+        
+        # 3. Calculate guidance loss based on x0
+        print("into loss")
+        #loss = guide.amt_errors(x0, n_ops, ops_ma_adj, ops_seq_order, valid_h, valid_w, 80) * guidance_loss_scale
+        loss = guide.use_ma_less(x0, valid_h, valid_w) * guidance_loss_scale
+        
+        print(f"Step {t}, loss: {loss.item()}")
+        
+        # 4. Get gradient
+        cond_grad = -torch.autograd.grad(loss, x)[0]
+        
+        # 5. If gradient exists, apply it
+        if cond_grad is not None:
             x = x.detach() + cond_grad
-
+        else:
+            x = x.detach()
+        # --- End guidance step ---
+        
+        # Now step with scheduler (using the guided x)
+        x = scheduler.step(predicted_noise, t, x).prev_sample
+        """
+        if cos:
             x = scheduler.step(predicted_noise, t, x).prev_sample
+        else:
+            x = denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
+        """
+        if t % 100 == 0:
+            given_assignments.append(x.clone())
 
-            if t % 100==0:
-                given_assignments.append(x.clone())
 
     # end timer
     end_time = time.perf_counter()
     elapsed = end_time - start_time
 
     x = torch.clamp(x, 0, 1)
-
     given_assignments.append(x.clone())
     return x, elapsed, given_assignments
-
-
 
 
 

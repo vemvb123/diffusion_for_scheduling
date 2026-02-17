@@ -277,11 +277,11 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
     n_jobs = infer_n_jobs(ops_sequence_order) 
 
 
-
+    jobs_to_make = int(os.cpu_count() / 6)
 
     print(f"making actions for assignments with {os.cpu_count()} processors")
     B = assignments.size(0)
-    all_actions = Parallel(n_jobs=os.cpu_count())(
+    all_actions = Parallel(n_jobs=jobs_to_make)(
         delayed(utils.map_assignments_to_actions_text)( assignments[b], True, n_jobs )
         for b in range(B)
     )
@@ -294,23 +294,23 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
     td.del_("opt_actions")
     td = td.unsqueeze(0)
 
- 
+
     feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0] 
-    tds = Parallel(n_jobs=os.cpu_count())(
+    tds = Parallel(n_jobs=jobs_to_make)(
         delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env )
         for f_i in feasible_indecies
     )
 
     # filling gaps
     ## mapping operations to machines
-    machine_assignments_maps = Parallel(n_jobs=os.cpu_count())(
+    machine_assignments_maps = Parallel(n_jobs=jobs_to_make)(
         delayed(utils.map_operation_to_machines)(td["ma_assignment"])
         for td in tds
     )
     #machine_assignments_maps = [list(m) for m in machine_assignments_maps]
 
     ## filling gaps
-    tds = Parallel(n_jobs=os.cpu_count())(
+    tds = Parallel(n_jobs=jobs_to_make)(
         delayed(utils.compress_schedule)(td["start_times"], td["finish_times"], ma_op_map, n_jobs, td, filler_machine=99)
         for td, ma_op_map in zip(tds, machine_assignments_maps)
     )

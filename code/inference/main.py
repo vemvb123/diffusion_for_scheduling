@@ -109,7 +109,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         print("beginning on cache")
         threshold = 0.02
         # SAMPLES
-        n_samples = 64
+        n_samples = 32
         n_ops = int(torch.count_nonzero(target_assignments))
 
         timesteps = 100
@@ -133,13 +133,13 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/beta/adj_timestep_200.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
         cos = True
-        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, cos)
+        #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, cos)
         eta = 0.9
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
         # === GUIDENCE
         #n_ops = int(torch.count_nonzero(target_assignments))
-        #ops_seq_order = td["ops_sequence_order"]
-        #inference_assignments, elapsed, assignments_over_time = guidence.adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h, valid_w, n_ops, ops_seq_order, timesteps, True)
+        ops_seq_order = td["ops_sequence_order"]
+        inference_assignments, elapsed, assignments_over_time = guidence.adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h, valid_w, n_ops, ops_seq_order, timesteps, True)
 
         # print(done_at_t)
         print(columns_done)
@@ -180,8 +180,6 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
         inference_assignments = utils.show_order_clear(inference_assignments, n_ops, ops_ma_adj)
     else:
         inference_assignments = utils.round_to_values(inference_assignments, w, ops_ma_adj)
-    print("the assignments")
-    print(inference_assignments)
     # inference_assignments = utils.show_order_clear(inference_assignments, n_ops, ops_ma_adj)
     
     dups = utils.count_duplicate_instances(inference_assignments)
