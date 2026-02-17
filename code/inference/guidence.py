@@ -20,7 +20,7 @@ from code.inference.denoise import get_inference_schedule
 
 
 
-def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, valid_h, valid_w, n_ops, ops_seq_order, timesteps=1000, guidence_scale=0.5):
+def adj_inference_ddpm_cos(job_lengts, proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, valid_h, valid_w, n_ops, ops_seq_order, timesteps=1000, guidence_scale=0.5):
     
     device = "cuda"
     print(f"Using model {model_path}, with timesteps {timesteps}")
@@ -50,7 +50,7 @@ def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sa
     )
 
     given_assignments = []
-    guidance_loss_scale = 40  # Adjust this value
+    guidance_loss_scale = 5 # Adjust this value, between 5 and 100
 
     # Don't use torch.no_grad() for the entire loop - we need gradients!
     x = torch.randn(n_samples, 1, h_when_masked, w_when_masked).to(device)
@@ -92,8 +92,13 @@ def adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sa
         # 3. Calculate guidance loss based on x0
         print("into loss")
         #loss = guide.amt_errors(x0, n_ops, ops_ma_adj, ops_seq_order, valid_h, valid_w, 80) * guidance_loss_scale
-        loss = guide.use_ma_less(x0, valid_h, valid_w) * guidance_loss_scale
-        
+        #loss = guide.use_ma_less(x0, valid_h, valid_w) * guidance_loss_scale
+        #loss = guide.minimize_infeasibility(x0, valid_h, valid_w, job_lengts) * guidance_loss_scale 
+        # TODO mask vekk invalid allokasjoner
+        loss = guide.increasing_columns_loss(x0, job_lengts, valid_h, valid_w) * guidance_loss_scale
+        #loss = guide.loss_single_ma(x0, valid_h, valid_w)
+        #loss = (loss_pred + loss_single_ma) * guidence_scale
+
         print(f"Step {t}, loss: {loss.item()}")
         
         # 4. Get gradient

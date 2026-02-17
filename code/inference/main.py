@@ -21,6 +21,46 @@ matplotlib.use('Agg')
 
 import torch
 
+
+def compute_job_lengths(indices):
+    """
+    Compute lengths of jobs from a 1D tensor of indices, where each
+    job is defined as a contiguous sequence starting at 0 and increasing
+    by +1. Trailing filler zeros are ignored.
+    """
+    arr = indices.tolist()
+    job_lengths = []
+    current_length = 0
+    expected_next = 0
+
+    for i, val in enumerate(arr):
+        # If we see expected value in a sequence
+        if val == expected_next:
+            current_length += 1
+            expected_next += 1
+
+        # If we see a 0 where a new job could start
+        elif val == 0:
+            # If we already finished a valid job (current_length > 0),
+            # we record it and start a new one
+            if current_length > 0:
+                job_lengths.append(current_length)
+            current_length = 1
+            expected_next = 1
+
+        # Anything else breaks the job detection
+        else:
+            break
+
+    # After loop, if we were in a valid job, save it
+    if current_length > 0:
+        job_lengths.append(current_length)
+
+    return job_lengths
+
+
+
+
 def get_inference_result(problem_type, instance_idx, model_type, order: bool):
     print("starting inference")
     # instantiate all return values as None
@@ -130,7 +170,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         # inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
         # === VANLID
         adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/beta/adj_timestep_200.pth"
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_beta.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
         cos = True
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, cos)
@@ -139,7 +179,9 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         # === GUIDENCE
         #n_ops = int(torch.count_nonzero(target_assignments))
         ops_seq_order = td["ops_sequence_order"]
-        inference_assignments, elapsed, assignments_over_time = guidence.adj_inference_ddpm_cos(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h, valid_w, n_ops, ops_seq_order, timesteps, True)
+        job_lengts = compute_job_lengths(ops_seq_order)
+        #job_lengts = [5, 6, 5, 6, 6, 6, 5, 6, 6, 5, 0,0,0,0] 
+        inference_assignments, elapsed, assignments_over_time = guidence.adj_inference_ddpm_cos(job_lengts, proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h, valid_w, n_ops, ops_seq_order, timesteps, True)
 
         # print(done_at_t)
         print(columns_done)
@@ -328,7 +370,8 @@ order = True
 enc_model_path = None
 adj_model_path = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/444/adj_type_adj_order_{order}.pth'
 
-dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444_TEST'
+# dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444_TEST'
+# dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
 # dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01_TEST'
 instance_idx = 10
 

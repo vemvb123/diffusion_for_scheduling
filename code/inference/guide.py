@@ -18,6 +18,135 @@ def guiding_function(x): #  is batch of instances
     return error
 
 
+import torch.nn.functional as F
+
+
+def increasing_columns_loss(x, sections, valid_h, valid_w):
+    x = x[:, :, :valid_h, :valid_w]
+
+    col_sums = x.sum(dim=1).sum(dim=1)
+
+    losses = []
+    start = 0
+
+    for i, section_len in enumerate(sections):
+        end = start + section_len
+
+        # sanity check (optional but helpful)
+        if end > col_sums.shape[1]:
+            raise ValueError(f"Section {i} exceeds valid_w")
+
+        if section_len >= 2:
+            sec = col_sums[:, start:end]
+            diffs = sec[:, :-1] - sec[:, 1:]
+            penalty = torch.relu(diffs)
+            losses.append(penalty.mean())
+
+        start = end
+
+    if len(losses) == 0:
+        # all sections were fillers
+        return torch.zeros((), device=x.device, requires_grad=True)
+
+    return torch.stack(losses).mean()
+
+
+
+def loss_single_ma(x, valid_h, valid_w, top_k=55):
+    # Remove padding
+    x = x[:, :, :valid_h, :valid_w]   # (b, 1, h, w)
+    b, _, h, w = x.shape
+
+    # Flatten safely
+    flat = x.reshape(b, -1)
+
+    # Top-k values
+    top_vals, top_idx = torch.topk(flat, k=top_k, dim=1)
+
+    # Convert flat indices → column indices
+    col_idx = top_idx % w
+
+    # One-hot encode columns
+    col_onehot = F.one_hot(col_idx, num_classes=w).float()
+
+    # Count collisions per column
+    col_counts = col_onehot.sum(dim=1)
+
+    # Penalize collisions
+    collision_penalty = F.relu(col_counts - 1.0) ** 2
+
+    return collision_penalty.mean()
+
+
+
+# error is how much lower some value in front of predecessor us
+# job_lengths is a list like [3, 4, 3, 6] .. tells the length of each job
+def minimize_infeasibility(x, valid_h, valid_w, job_lengths):
+    """
+    Loss that penalizes “infeasible” column order where a column has a lower
+    max activation than its predecessor within each job group.
+
+    x: (B, C, H, W) raw model output
+    valid_h: height without padding
+    valid_w: width without padding
+    job_lengths: list of ints like [3,4,3,6] describing column group sizes
+    """
+
+    # Crop padding
+    x = x[:, :, :valid_h, :valid_w]
+
+    # We want to compute max activations per column (remove batch & channel)
+    # Shape: (batch, channels, height, cols)
+    # We reduce height & channels to a single representative value per column
+    # Use max over height and channels:
+    # shape → (batch, cols)
+    col_max = x.amax(dim=2).amax(dim=1)  # max over height then channel
+
+    # Now col_max[b, col_index] gives max activation for each column
+
+    start_col = 0
+    loss_terms = []
+
+    # Loop job groups
+    for length in job_lengths:
+        group_end = start_col + length
+
+        # Extract this group
+        group_vals = col_max[:, start_col:group_end]  # shape: (B, length)
+
+        # Make pairwise comparisons
+        # For every consecutive pair (prev, next) apply relu(prev - next)
+        if group_vals.shape[1] > 1:  # only if at least 2 columns
+            prev_vals = group_vals[:, :-1]  # all except last
+            next_vals = group_vals[:, 1:]   # all except first
+
+            # Penalty where next < prev
+            diff = torch.relu(prev_vals - next_vals)
+
+            # Average penalty in this group
+            loss_terms.append(diff.mean())
+
+        # Move to next group
+        start_col = group_end
+
+    # If no losses were generated (e.g., empty job_lengths), just zero
+    if not loss_terms:
+        return torch.tensor(0.0, device=x.device, dtype=x.dtype)
+
+    # Mean over all job groups
+    loss = torch.stack(loss_terms).mean()
+
+    return loss
+
+
+
+
+
+
+
+
+
+
 
 
 # ma to use more is a list of row indexes
