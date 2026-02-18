@@ -149,18 +149,24 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         print("beginning on cache")
         threshold = 0.02
         # SAMPLES
-        n_samples = 32
+        n_samples = 360
         n_ops = int(torch.count_nonzero(target_assignments))
 
         timesteps = 100
-        sampling_steps = 60
+        #sampling_steps = 60
         ddim_eta = 1.0
 
 
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
+        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth"
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_beta.pth"
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth"
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
+
 
         # === DDIM
-        #inference_assignments, elapsed, assignments_over_time = experimental.adj_inference_ddi0m(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, sampling_steps = sampling_steps, ddim_eta = ddim_eta, timesteps = timesteps)
+        #inference_assignments, elapsed, assignments_over_time = experimental.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, sampling_steps = sampling_steps, ddim_eta = ddim_eta, timesteps = timesteps)
         #elapsed = None 
         #assignments_over_time = None
         ## == CACHE
@@ -169,11 +175,8 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         t_replace = 995
         # inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
         # === VANLID
-        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_beta.pth"
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
         cos = True
-        #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, cos)
+        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, cos)
         eta = 0.9
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
         # === GUIDENCE
@@ -181,7 +184,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         ops_seq_order = td["ops_sequence_order"]
         job_lengts = compute_job_lengths(ops_seq_order)
         #job_lengts = [5, 6, 5, 6, 6, 6, 5, 6, 6, 5, 0,0,0,0] 
-        inference_assignments, elapsed, assignments_over_time = guidence.adj_inference_ddpm_cos(job_lengts, proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h, valid_w, n_ops, ops_seq_order, timesteps, True)
+        #inference_assignments, elapsed, assignments_over_time = guidence.adj_inference_ddpm_cos(job_lengts, proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h, valid_w, n_ops, ops_seq_order, timesteps, True)
 
         # print(done_at_t)
         print(columns_done)
@@ -228,12 +231,16 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     print(f"amount of same instances: {dups}")
 
     report, total_errors, error_list = utils.assert_sequence_respected(inference_assignments, td["ops_sequence_order"])
+    amt_feas = 0
     for key, value in report.items():
         if value["total"] == 0:
+            amt_feas += 1
             print(f"{key} .. {value} .. NO ERRORS")
         else:
             print(f"{key} .. {value}")
     print(f"Total errors: {total_errors}")
+    print(f"Total feasible schedules: {amt_feas}")
+    exit()
     # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESUeckT
     # utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj, valid_h, valid_w)
 

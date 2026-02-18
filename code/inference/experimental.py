@@ -182,7 +182,7 @@ def adj_inference_ddim(
     proc_times, job_ops_adj, ops_ma_adj,
     model_path, n_samples,
     h_when_masked, w_when_masked,
-    sampling_steps = 50,   # fewer steps than 1000
+    sampling_steps = 100,   # fewer steps than 1000
     ddim_eta = 0.0,         # eta=0 => deterministic DDIM
     timesteps=1000
 

@@ -238,6 +238,7 @@ def assert_sequence_respected(ma_seq_matrix, ops_sequence_order, do_print=True, 
                 }
             }
     """
+    total_feasible_schedules = 0
 
     # ---- normalize shape ----
     if ma_seq_matrix.dim() == 4:
