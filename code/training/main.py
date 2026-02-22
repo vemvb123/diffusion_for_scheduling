@@ -12,7 +12,7 @@ from typing import Callable, Dict, List, Tuple
 import sys
 from datetime import datetime
 
-
+import code.training.diffusion_improv as train_improv
 import code.training.diffusion as training
 from code.dataset_code.dataset import Dataset_RL4CO
 
@@ -88,7 +88,7 @@ def train_models(
 
     for lr in lrs:
         logging.info(f"Training with lr {lr}")
-        path_enc, path_adj, last_epoch_loss = training.diffusion(
+        path_enc, path_adj, last_epoch_loss = train_improv.diffusion(
             model_type, train_dataset, test_dataset,
             embed_size, model_path_adj, model_path_enc,
             graph_name, graph_save_folder, valid_h, valid_w, 
@@ -101,7 +101,7 @@ def train_models(
             best_loss = last_epoch_loss
 
     logging.info(f"Best lr found: {best_lr}, for model {path_adj}")
-    path_enc, path_adj, last_epoch_loss = training.diffusion(
+    path_enc, path_adj, last_epoch_loss = train_improv.diffusion(
         model_type, train_dataset, test_dataset,
         embed_size, model_path_adj, model_path_enc,
         graph_name, graph_save_folder, valid_h, valid_w, 
