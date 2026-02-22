@@ -219,7 +219,7 @@ def diffusion(
     if model_type == "f":
         torch.save(model_enc.state_dict(), model_enc)
     logging.info(f"done training. Saved model {model_path_adj}")
-    return None, model_path_adj, all_losses[-1]
+    return None, model_path_adj, all_losses_val[-1]
 
 
 
