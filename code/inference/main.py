@@ -149,7 +149,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         print("beginning on cache")
         threshold = 0.02
         # SAMPLES
-        n_samples = 360
+        n_samples = 32
         n_ops = int(torch.count_nonzero(target_assignments))
 
         timesteps = 100
@@ -157,8 +157,8 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         ddim_eta = 1.0
 
 
-        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
+        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_beta.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth"
@@ -240,7 +240,6 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
             print(f"{key} .. {value}")
     print(f"Total errors: {total_errors}")
     print(f"Total feasible schedules: {amt_feas}")
-    exit()
     # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESUeckT
     # utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj, valid_h, valid_w)
 

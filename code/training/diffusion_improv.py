@@ -2,7 +2,8 @@
 diffusion.py contains code for training diffusion models
 """
 from diffusers import CosineDPMSolverMultistepScheduler, DDPMScheduler
-
+from sklearn.model_selection import KFold
+from torch.utils.data import Subset
 import logging
 
 from code.training.experimental import run_epoch_feature
@@ -32,28 +33,6 @@ import torch.nn as nn
 from diffusers import UNet1DModel
 
 
-
-'''
-dataset has: image of machine relations (1 for each machinbe)
-model outputs: set of coordinates, to one of the coordinates for an operation, where each coordinate in sequence gives the assignment order
-target: ideal coordinates
-'''
-
-
-
-'''
-Hvordan feature vectors...
-
-Prosseseringstid:
-    sender inn adj med prosseseringstidene (b, 1, w, h)
-    bruker output channels til å få flere dimensjoner (b, 256, w, h)
-    Flater, ved wh, så hele h inneholder alle nodene, og flater ut langs 256 som blir w
-    så shape blir (b, 1, 256, w x h)
-
-    ID tror jeg ikke er verdt noe, siden en ma eller op kan endre seg for hver instanse, så vil ikke en op eller ma bety det samme.
-    Men generelt for features, eks mengde precessors osv, kan man ha en adj matrise, så prossesere det likt som med prosseseringstid.
-
-'''
 
 
 def run_epoch(loop, device, timesteps,
@@ -156,25 +135,16 @@ def diffusion(
     if model_type != "adj" and model_type != "f":
         raise ValueError(f"model_type must be either adj or f .kk. but value was #{model_type}#")
 
-    # running different diffusion algorithms depening on the model type
-    run_epoch_func = None
-    if model_type == "adj":
-        run_epoch_func = run_epoch
-    elif model_type == "f":
-        run_epoch_func = run_epoch_feature 
+    train_loader, test_loader, val_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size, val_ratio=0.2) # subset=True ... for testing med subset
 
-    train_loader, test_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size) # subset=True ... for testing med subset
-
-    logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
-    logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")
-    
     model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr)
 
     trainable_params = sum(p.numel() for p in model_adj.parameters() if p.requires_grad)
     logging.info(f"Amount of trainable parameters: {trainable_params}")
 
     all_losses = []
-    all_losses_test = []
+    all_losses_val = []
+
     for epoch in range(num_epochs):
 
         train_loop = tqdm(
@@ -182,22 +152,22 @@ def diffusion(
             desc=f"Train Epoch {epoch+1}/{num_epochs}",
             unit="batch"
         )
-        test_loop = tqdm(
-            test_loader,
-            desc=f"Test Epoch {epoch+1}/{num_epochs}",
+        val_loop = tqdm(
+            val_loader,
+            desc=f"Validation Epoch {epoch+1}/{num_epochs}",
             unit="batch"
         )
 
 
-        train_loop, model_adj, avg_loss = run_epoch_func(
+        train_loop, model_adj, avg_loss = run_epoch(
             train_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
             "train", valid_h, valid_w, scheduler
         )
 
-        test_loop, model_adj, avg_loss_test = run_epoch_func(
-            test_loop, device, timesteps,
+        val_loop, model_adj, avg_loss_val = run_epoch(
+            val_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
             "test", valid_h, valid_w, scheduler
@@ -213,30 +183,42 @@ def diffusion(
 
         logging.info(
             f"Epoch [{epoch+1}/{num_epochs}], "
-            f"Loss: {avg_loss:.4f}, Test Loss: {avg_loss_test:.4f}"
+            f"Loss: {avg_loss:.4f}, Val Loss: {avg_loss_val:.4f}"
         )
 
         all_losses.append(avg_loss)
-        all_losses_test.append(avg_loss_test)
+        all_losses_val.append(avg_loss_val)
 
         torch.save(model_adj.state_dict(), model_path_adj)
         if model_type == "f":
             torch.save(model_enc.state_dict(), model_enc)
 
-        if len(all_losses_test) >= 4:
-            if all_losses_test[-1] > all_losses_test[-4]:
-                logging.info("Test loss has not gone down for 4 epochs - stopping early")
+        if len(all_losses_val) >= 4:
+            if all_losses_val[-1] > all_losses_val[-4]:
+                logging.info("Validation loss has not gone down for 4 epochs - stopping early")
                 break
     
 
+    # Running on test set
+    test_loop = tqdm( test_loader, desc=f"Running on test set", unit="batch" )
+    test_loop, model_adj, avg_loss_test = run_epoch(
+        test_loop, device, timesteps,
+        model_adj, model_enc, optimizer,
+        batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
+        "test", valid_h, valid_w, scheduler
+    )
+    logging.info(f"Average test loss: {avg_loss_test}")
+
+
+    # Saving graphs from training
     logging.info("saved loss image")
     plot_losses(graph_save_folder, f"{graph_name} train", all_losses)
-    plot_losses(graph_save_folder, f"{graph_name} test", all_losses_test)
+    plot_losses(graph_save_folder, f"{graph_name} validation", all_losses_val)
 
     torch.save(model_adj.state_dict(), model_path_adj)
     if model_type == "f":
         torch.save(model_enc.state_dict(), model_enc)
-    print(f"done training. Saved model {model_path_adj}")
+    logging.info(f"done training. Saved model {model_path_adj}")
     return None, model_path_adj, all_losses[-1]
 
 

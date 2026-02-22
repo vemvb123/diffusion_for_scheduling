@@ -6,7 +6,7 @@ from deepinv.models.diffunet import DiffUNet
 import torch
 import os
 
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, Subset, random_split
 
 
 def save_losses(epoch, graph_name, losses):
@@ -56,7 +56,7 @@ def mask_invalid(valid_h, valid_w, pred, noise, ops_ma_adj):
 
 
 
-def get_dataset_loaders(train_dataset, test_dataset, batch_size: int = 32, subset: bool = False):
+def get_dataset_loaders(train_dataset, test_dataset, batch_size: int = 32, val_ratio: float = None, subset: bool = False):
     train_loader, test_loader = None, None
 
     if subset:
@@ -68,8 +68,24 @@ def get_dataset_loaders(train_dataset, test_dataset, batch_size: int = 32, subse
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
-    logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
     logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")
+
+    if val_ratio != None:
+        n_total = len(train_dataset)
+        n_val   = int(val_ratio * n_total)         # e.g., 20% validation
+        n_train = n_total - n_val
+
+        train_subset, val_subset = random_split(train_dataset, [n_train, n_val])
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_loader   = DataLoader(val_subset,   batch_size=batch_size, shuffle=False)
+
+        logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
+        logging.info(f"N instances in val dataset: { len(val_loader.dataset) }")
+
+        return train_loader, test_loader, val_loader
+
+
+    logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
     return train_loader, test_loader
 
 

@@ -1,4 +1,5 @@
-
+import os
+import torch
 import code.dataset_code.utils as dataset_utils
 import logging
 
@@ -22,27 +23,6 @@ from code.dataset_code.dataset import Dataset_RL4CO
 # 4 f
 
 # maps file execution parameter (1-4) to some model to train
-model_to_train = None
-use_cos = True
-if len(sys.argv) > 1:
-    model_to_train = int(sys.argv[1])
-    if int(sys.argv[2]) == 1:
-        use_cos = True
-    elif int(sys.argv[2]) == 2:
-        use_cos = False
-
-    logging.info(f"Training models nr {model_to_train}")
-else:
-    logging.info("Please provide a training number!")
-
-timesteps = None
-if model_to_train == 1:
-    timesteps = 1000
-elif model_to_train == 2:
-    timesteps = 800
-
-print(f"training model on timestep {timesteps} with scheduler cos: {use_cos}")
-
 
 
 
@@ -71,14 +51,49 @@ def train_models(
     best_loss = 1
     best_lr = None
 
-    logging.info(f"Began training timestep model {model_path_adj} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+
+    scheduler_timesteps = 1000
+    batch_size = 32
+    timesteps = 1000
+
+    full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
+    path_adj = None
+    use_cos = True
+    if len(sys.argv) > 1:
+        if int(sys.argv[1]) == 1:
+            print("Training model 1")
+            timesteps = 100
+            path_adj= f'{full_path}/models/further_improved/trained_on_100_timesteps.pth'
+        if int(sys.argv[1]) == 2:
+            print("Training model 2")
+            batch_size = 8
+            path_adj= f'{full_path}/models/further_improved/batch_size_8.pth'
+        if int(sys.argv[1]) == 3:
+            print("Training model 3")
+            batch_size = 64
+            path_adj= f'{full_path}/models/further_improved/batch_size_64.pth'
+        if int(sys.argv[1]) == 4:
+            print("Training model 4")
+            timesteps = 200
+            path_adj= f'{full_path}/models/further_improved/trained_on_200_timesteps.pth'
+
+
+
+
+
+    logging.info(f"Began training timestep model {path_adj} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+    print("CUDA available:", torch.cuda.is_available())
+    print("Number of GPUs:", torch.cuda.device_count())
+    print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 
     for lr in lrs:
         logging.info(f"Training with lr {lr}")
         path_enc, path_adj, last_epoch_loss = training.diffusion(
             model_type, train_dataset, test_dataset,
             embed_size, model_path_adj, model_path_enc,
-            graph_name, graph_save_folder, valid_h, valid_w, timesteps, testing_epochs, lr,
+            graph_name, graph_save_folder, valid_h, valid_w, 
+            timesteps, scheduler_timesteps,
+            testing_epochs, lr, batch_size,
             use_cos=use_cos
         ) 
         if best_loss > last_epoch_loss: 
@@ -89,7 +104,9 @@ def train_models(
     path_enc, path_adj, last_epoch_loss = training.diffusion(
         model_type, train_dataset, test_dataset,
         embed_size, model_path_adj, model_path_enc,
-        graph_name, graph_save_folder, valid_h, valid_w, timesteps, run_epochs, best_lr,
+        graph_name, graph_save_folder, valid_h, valid_w, 
+        timesteps, scheduler_timesteps,
+        run_epochs, best_lr, batch_size,
         use_cos=use_cos
     )
 
@@ -162,7 +179,7 @@ def mk01():
     run_epochs = 50
 
 
-    graph_name = f"model {timesteps}, with order: {order}"
+    graph_name = f"model, with order: {order}"
 
     full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
 
@@ -171,12 +188,9 @@ def mk01():
     train_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01'
     test_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01_TEST'
 
-    model_path_enc = f'{full_path}/models/beta/enc_timestep_{timesteps}.pth'
+    model_path_enc = f'{full_path}/models/beta/enc_timestep.pth'
 
-    if use_cos:
-        model_path_adj = f'{full_path}/models/cos_beta/timestep_{timesteps}_cos.pth'
-    else:
-        model_path_adj = f'{full_path}/models/cos_beta/timestep_{timesteps}_beta.pth'
+    model_path_adj = f'{full_path}/models/cos_beta/timestep_cos.pth'
     
     return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
     
