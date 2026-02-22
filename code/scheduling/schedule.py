@@ -355,4 +355,44 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
 
 
 
+def schedule_randomly(ops_ma_adj):
+
+    ops_ma_adj = ops_ma_adj.squeeze(0).squeeze(0)  # now shape [6,60]
+
+    # Find indices of ones: list of tensors for each column
+    # This yields a list length=60
+    one_positions = [torch.nonzero(ops_ma_adj[:,c]).view(-1) for c in range(ops_ma_adj.shape[1])]
+
+    # Prepare output
+    schedule = torch.zeros_like(ops_ma_adj)
+
+    for c, ones in enumerate(one_positions):
+        if ones.numel() > 0:
+            idx = ones[torch.randint(len(ones), (1,))]
+            schedule[idx, c] = 1
+
+    # reshape back
+    schedule = schedule.unsqueeze(0).unsqueeze(0)  # [1,1,6,60]
+    return schedule
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
