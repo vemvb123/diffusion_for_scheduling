@@ -66,18 +66,19 @@ def train_models(
             path_adj= f'{full_path}/models/further_improved/trained_on_100_timesteps.pth'
         if int(sys.argv[1]) == 2:
             print("Training model 2")
-            batch_size = 8
-            path_adj= f'{full_path}/models/further_improved/batch_size_8.pth'
-        if int(sys.argv[1]) == 3:
-            print("Training model 3")
-            batch_size = 64
-            path_adj= f'{full_path}/models/further_improved/batch_size_64.pth'
-        if int(sys.argv[1]) == 4:
-            print("Training model 4")
             timesteps = 200
             path_adj= f'{full_path}/models/further_improved/trained_on_200_timesteps.pth'
 
-
+        if int(sys.argv[1]) == 3:
+            print("Training model 3")
+            batch_size = 8
+            path_adj= f'{full_path}/models/further_improved/batch_size_8.pth'
+        if int(sys.argv[1]) == 4:
+            print("Training model 4")
+            batch_size = 64
+            path_adj= f'{full_path}/models/further_improved/batch_size_64.pth'
+        # TODO kan legge til penalty for infeasible, men vil helst først trene modeller med mindre tidssteg,
+        # egner ikke særlig å gi penalty på et tidssteg som jeg uansett ikke bruker
 
 
 
