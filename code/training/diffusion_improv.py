@@ -95,6 +95,8 @@ def run_epoch(loop, device, timesteps,
     return loop, model_adj, total_loss / len(loop)
 
 
+from code.training.experimental import run_epoch_penalty_feasibility
+
 def diffusion(
     model_type: str, # must be either "adj" for adjecency model or "f" for feature vector model
     train_dataset,
@@ -111,7 +113,8 @@ def diffusion(
     lr: float = 1e-3,
     device: str = "cuda",
     batch_size: int = 32,
-    use_cos=True
+    use_cos=True,
+    penalty=False
 ):
     n_base_features = train_dataset.n_base_features
 
@@ -132,6 +135,12 @@ def diffusion(
         )
 
 
+    epoch_func = None
+    if penalty:
+        epoch_func = run_epoch_penalty_feasibility
+    else:
+        epoch_func = run_epoch
+
     if model_type != "adj" and model_type != "f":
         raise ValueError(f"model_type must be either adj or f .kk. but value was #{model_type}#")
 
@@ -141,6 +150,7 @@ def diffusion(
 
     trainable_params = sum(p.numel() for p in model_adj.parameters() if p.requires_grad)
     logging.info(f"Amount of trainable parameters: {trainable_params}")
+
 
     all_losses = []
     all_losses_val = []
@@ -158,15 +168,14 @@ def diffusion(
             unit="batch"
         )
 
-
-        train_loop, model_adj, avg_loss = run_epoch(
+        train_loop, model_adj, avg_loss = epoch_func(
             train_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
             "train", valid_h, valid_w, scheduler
         )
 
-        val_loop, model_adj, avg_loss_val = run_epoch(
+        val_loop, model_adj, avg_loss_val = epoch_func(
             val_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,

@@ -85,6 +85,7 @@ class Dataset_RL4CO(Dataset):
             if torch.isnan(data).any():
                 raise ValueError(f"Assignment NaN values found in tensor, at {i}")
 
+
         return target_assignments, proc_times, job_ops_adj, ops_ma_adj
 
 

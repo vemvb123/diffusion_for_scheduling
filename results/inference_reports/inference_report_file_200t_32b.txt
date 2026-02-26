@@ -1,0 +1,37 @@
+0 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+1 .. {'multi': 1, 'seq': 0, 'total': 1}
+2 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+3 .. {'multi': 0, 'seq': 1, 'total': 1}
+4 .. {'multi': 2, 'seq': 1, 'total': 3}
+5 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+6 .. {'multi': 0, 'seq': 1, 'total': 1}
+7 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+8 .. {'multi': 1, 'seq': 0, 'total': 1}
+9 .. {'multi': 1, 'seq': 0, 'total': 1}
+10 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+11 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+12 .. {'multi': 1, 'seq': 1, 'total': 2}
+13 .. {'multi': 0, 'seq': 1, 'total': 1}
+14 .. {'multi': 1, 'seq': 0, 'total': 1}
+15 .. {'multi': 1, 'seq': 0, 'total': 1}
+16 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+17 .. {'multi': 0, 'seq': 2, 'total': 2}
+18 .. {'multi': 1, 'seq': 0, 'total': 1}
+19 .. {'multi': 0, 'seq': 1, 'total': 1}
+20 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+21 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+22 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+23 .. {'multi': 2, 'seq': 0, 'total': 2}
+24 .. {'multi': 0, 'seq': 1, 'total': 1}
+25 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+26 .. {'multi': 0, 'seq': 2, 'total': 2}
+27 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+28 .. {'multi': 1, 'seq': 0, 'total': 1}
+29 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+30 .. {'multi': 0, 'seq': 1, 'total': 1}
+31 .. {'multi': 1, 'seq': 0, 'total': 1}
+Total errors: 25 - scheduled multiple times: 13, break predecessor constraint: 12
+Avg errors per instance: 0.78, scheduled multiple times: 0.41, break predecessor constraint: 0.38
+Avg error rates: 0.013950892857142854 - avg rate scheduled multi: 0.007254464285714284, avg rate break predecessor constraint: 0.00669642857142857
+Total feasible schedules: 13 / 32: 40.62%
+Seconds to run inference: 9.692781855992507 smakespans - avg 44.69230769230769, min 39.0, max 50.0

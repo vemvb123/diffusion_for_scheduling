@@ -55,6 +55,11 @@ def main(instance_type: str):
         )
         print("Done making mk01 dataset")
 
+def check_benchmark_parameters():
+    #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
+    parameters = utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+    print(parameters)
 
 
 def check_dataset():
@@ -82,6 +87,8 @@ def check_dataset():
     dataset[0]
 
 
+check_benchmark_parameters()
+
 # check_dataset()
-instance_type = "mk01"
-main(instance_type)
+#instance_type = "mk01"
+#main(instance_type)

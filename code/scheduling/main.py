@@ -37,3 +37,85 @@ def main():
     print("scheduled:")
     print(td_scheduled["ma_assignment"])
     print(td_scheduled["ma_assignment"].shape)
+
+
+
+
+from rl4co.envs import FJSPEnv
+from rl4co.models.zoo.l2d import L2DModel
+
+
+import code.dataset_code.utils as dataset_utils
+
+def make_benchmark_instance_into_td(file_path: str):
+
+    parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(file_path)
+    print(parameters)
+
+    generator_params = {
+        "num_jobs": parameters['n_jobs'],
+        "num_machines": parameters['n_machines'],
+        "min_ops_per_job": parameters['fewest_operations'],
+        "max_ops_per_job": parameters['most_operations'],
+        "min_processing_time": parameters['min_processing_time'],
+        "max_processing_time": parameters['max_processing_time'],
+        "min_eligible_ma_per_op": parameters['min_machine_options'],
+        "max_eligible_ma_per_op": parameters['max_machine_options'],
+    }
+
+    env = FJSPEnv(
+        generator_params=generator_params,
+        _torchrl_mode=True,
+        stepwise_reward=True
+    )
+    td = env.reset(batch_size=[1])
+
+    for key, value in td.items():
+        print(f"{key}: {value.shape}")
+        print(value)
+        print("---")
+
+    # må mappe det til ops_ma_adj, derfra kan jeg legge inn en del info
+    """
+start_op_per_job .. trur kan lagde hvis veit job lengder
+end_op_per_job .. kan nok lage hvis veit job lengder
+proc_times .. lager funk for mappe ops_ma_adj, da kan jeg nok lett fylle inn her
+pad_mask .. bare sum av ops.. - hvor mange måtte trengt for å fylle
+ops_adj .. vettafaen, veit ikke en gang hva den sier
+job_ops_adj ... lager bare en liste med lengda av hver jobb, og bruker det til å lage
+ops_job_map .. samme som job_ops_adj
+ops_sequence_order .. lett å decode
+start_times .. fyllt med 0
+finish_times .. fyllt med 999
+ma_assignment .. fyllt med 0
+busy_until.. fyllt med 0
+num_eligible .. kan fylle ut lett hvis ved kan decode til ops_ma_adj
+next_op .. trur kan fylle ved å vita lengda til jobbene
+ops_ma_adj .. må dekode
+op_scheduled .. Bare False verdier
+job_in_process .. bare False
+reward ..0
+time .. 0
+job_done .. bare False
+done .. bare False
+action_mask .. trur jeg kan lage hvis vet lengda til hver jobb .men usikker
+lbs ... veit ikke hva betyr
+is_ready .. kan lage hvis veit lengda til hver jobb
+terminated .. False
+proc_times .. kan sikkert lett nok lage hvis klarer dekode til ops_ma_adj
+
+
+Sliter:
+lbs, action_mask, ops_adj
+
+ops_adj .. kan kanskje få gpt til å dekode hvis jeg viser jobblengder eller noe
+
+    """
+
+
+
+
+make_benchmark_instance_into_td("/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt")
+
+
+

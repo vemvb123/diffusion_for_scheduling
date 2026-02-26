@@ -1,0 +1,13 @@
+0 .. {'multi': 2, 'seq': 2, 'total': 4}
+1 .. {'multi': 1, 'seq': 1, 'total': 2}
+2 .. {'multi': 1, 'seq': 3, 'total': 4}
+3 .. {'multi': 1, 'seq': 0, 'total': 1}
+4 .. {'multi': 0, 'seq': 1, 'total': 1}
+5 .. {'multi': 0, 'seq': 2, 'total': 2}
+6 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+7 .. {'multi': 2, 'seq': 0, 'total': 2}
+Total errors: 16 - scheduled multiple times: 7, break predecessor constraint: 9
+Avg errors per instance: 2.00, scheduled multiple times: 0.88, break predecessor constraint: 1.12
+Avg error rates: 0.03571428571428571 - avg rate scheduled multi: 0.015624999999999998, avg rate break predecessor constraint: 0.020089285714285712
+Total feasible schedules: 1 / 8: 12.50%
+Seconds to run inference: 4.764472630005912 smakespans - avg 48.0, min 48.0, max 48.0

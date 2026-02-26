@@ -5,7 +5,7 @@ from diffusers import CosineDPMSolverMultistepScheduler, DDPMScheduler
 
 import logging
 
-from code.training.experimental import run_epoch_feature
+from code.training.experimental import run_epoch_feature, run_epoch_penalty_feasibility
 from code.training.noising import get_diffusion_schedule, get_noised_x
 from code.training.utils import get_dataset_loaders, get_models, mask_invalid, plot_losses
 
@@ -132,7 +132,8 @@ def diffusion(
     lr: float = 1e-3,
     device: str = "cuda",
     batch_size: int = 32,
-    use_cos=True
+    use_cos=True,
+    penalty=False
 ):
     n_base_features = train_dataset.n_base_features
 
@@ -162,6 +163,8 @@ def diffusion(
         run_epoch_func = run_epoch
     elif model_type == "f":
         run_epoch_func = run_epoch_feature 
+    if penalty:
+        run_epoch_func = run_epoch_penalty_feasibility
 
     train_loader, test_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size) # subset=True ... for testing med subset
 

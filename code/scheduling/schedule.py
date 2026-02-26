@@ -272,7 +272,7 @@ import torch
 
 
 
-def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, error_list, ops_sequence_order):
+def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, error_list, ops_sequence_order, report_file_path):
     print(f"assignments shape: {assignments.shape}")
     n_jobs = infer_n_jobs(ops_sequence_order) 
 
@@ -325,7 +325,7 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
     start_times = td_best["start_times"]
     finish_times = td_best["finish_times"]
     machines = utils.map_operation_to_machines(td_best["ma_assignment"])
-    job_lengths = n_jobs
+    job_lengths = n_jobsdd
     td_best["start_times"], td_best["finish_times"] = utils.compress_schedule(start_times, finish_times, machines, job_lengths, filler_machine=99)
 
 
@@ -336,11 +336,14 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
     """
 
     print("")
+    min_makespan = min(makespans)
+    max_makespan = max(makespans)
+    avg_makespan = sum(makespans) / len(makespans)
     print(f"makespans: {makespans}")
     print("")
-    print(f"lowest makespan: {min(makespans)}")
-    print(f"highestmakespan: {max(makespans)}")
-    print(f"Average makespan: {sum(makespans) / len(makespans)}")
+    print(f"lowest makespan: {min_makespan}")
+    print(f"highest makespan: {max_makespan}")
+    print(f"Average makespan: {avg_makespan}")
 
 
 
@@ -351,7 +354,7 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
 
 
 
-    return td_best
+    return td_best, min_makespan, max_makespan, avg_makespan
 
 
 
@@ -374,15 +377,6 @@ def schedule_randomly(ops_ma_adj):
     # reshape back
     schedule = schedule.unsqueeze(0).unsqueeze(0)  # [1,1,6,60]
     return schedule
-
-
-
-
-
-
-
-
-
 
 
 

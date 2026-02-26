@@ -252,7 +252,7 @@ def amt_errors(x, n_ops, ops_ma_adj, ops_seq_order, valid_h, valid_w, max_allowe
 
     inference_assignments = utils.show_order_clear(x, n_ops, ops_ma_adj)
     # get amount of errors
-    report, total_errors, error_list = utils.assert_sequence_respected(inference_assignments, ops_seq_order, do_print=False)
+    report, total_errors, error_list = utils.count_infeasibilities(inference_assignments, ops_seq_order, do_print=False)
     # sammenligner med max mengde tillate feil
     error = max_allowed_total_errors - total_errors
     # hvis flere enn max_allowed_total_errors, er error 1

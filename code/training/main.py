@@ -57,35 +57,41 @@ def train_models(
     timesteps = 1000
 
     full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
-    path_adj = None
     use_cos = True
+    penalty = False
     if len(sys.argv) > 1:
         if int(sys.argv[1]) == 1:
             print("Training model 1")
             timesteps = 100
-            path_adj= f'{full_path}/models/further_improved/trained_on_100_timesteps.pth'
+            model_path_adj= f'{full_path}/models/further_improved/trained_on_100_timesteps_sch_1000.pth'
         if int(sys.argv[1]) == 2:
             print("Training model 2")
             timesteps = 200
-            path_adj= f'{full_path}/models/further_improved/trained_on_200_timesteps.pth'
-
+            model_path_adj= f'{full_path}/models/further_improved/trained_on_200_timesteps_sch_1000.pth'
         if int(sys.argv[1]) == 3:
             print("Training model 3")
             batch_size = 8
-            path_adj= f'{full_path}/models/further_improved/batch_size_8.pth'
+            model_path_adj= f'{full_path}/models/further_improved/batch_size_8.pth'
         if int(sys.argv[1]) == 4:
             print("Training model 4")
             batch_size = 64
-            path_adj= f'{full_path}/models/further_improved/batch_size_64.pth'
+            model_path_adj= f'{full_path}/models/further_improved/batch_size_64.pth'
+        if int(sys.argv[1]) == 5:
+            print("Training model 5")
+            model_path_adj= f'{full_path}/models/further_improved/feas_penalty.pth'
+            penalty = True
+
+
+
         # TODO kan legge til penalty for infeasible, men vil helst først trene modeller med mindre tidssteg,
         # egner ikke særlig å gi penalty på et tidssteg som jeg uansett ikke bruker
 
 
 
-    logging.info(f"Began training timestep model {path_adj} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
-    print("CUDA available:", torch.cuda.is_available())
-    print("Number of GPUs:", torch.cuda.device_count())
-    print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
+    logging.info(f"Began training timestep model {model_path_adj} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+    logging.info("CUDA available:", torch.cuda.is_available())
+    logging.info("Number of GPUs:", torch.cuda.device_count())
+    logging.info("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 
     for lr in lrs:
         logging.info(f"Training with lr {lr}")
@@ -94,21 +100,21 @@ def train_models(
             embed_size, model_path_adj, model_path_enc,
             graph_name, graph_save_folder, valid_h, valid_w, 
             timesteps, scheduler_timesteps,
-            testing_epochs, lr, batch_size,
-            use_cos=use_cos
+            testing_epochs, lr, batch_size=batch_size,
+            use_cos=use_cos, penalty=penalty
         ) 
         if best_loss > last_epoch_loss: 
             best_lr = lr
             best_loss = last_epoch_loss
 
-    logging.info(f"Best lr found: {best_lr}, for model {path_adj}")
+    logging.info(f"Best lr found: {best_lr}, for model {model_path_adj}")
     path_enc, path_adj, last_epoch_loss = train_improv.diffusion(
         model_type, train_dataset, test_dataset,
         embed_size, model_path_adj, model_path_enc,
         graph_name, graph_save_folder, valid_h, valid_w, 
         timesteps, scheduler_timesteps,
-        run_epochs, best_lr, batch_size,
-        use_cos=use_cos
+        run_epochs, best_lr, batch_size=batch_size,
+        use_cos=use_cos, penalty=penalty
     )
 
     logging.info(f"Ended training model {path_adj} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")

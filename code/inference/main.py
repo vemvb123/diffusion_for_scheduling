@@ -156,12 +156,13 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         #sampling_steps = 60
         ddim_eta = 1.0
 
+        report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_100t_32b_92tr.txt"
 
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
-        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_beta.pth"
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth"
+        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
 
 
@@ -172,11 +173,12 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         ## == CACHE
         # inference_assignments, elapsed, assignments_over_time, columns_done, done_at_t = cache_inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, order, mask_h, mask_w, after_ts_check, valid_h, valid_w, n_ops, threshold )
         # ==== ERSTATTER BATCHES
-        t_replace = 995
-        # inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
-        # === VANLID
+        t_replace = 92
         cos = True
-        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, cos)
+        #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
+        inference_assignments, elapsed, assignments_over_time = experimental.adj_inference_ddpm_batch_improvement(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h=valid_h, valid_w=valid_w, timesteps=timesteps, cos=True, t_replace=t_replace, ops_sequence_order=ops_sequence_order, n_ops=n_ops)
+        # === VANLID
+        #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps, cos)
         eta = 0.9
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
         # === GUIDENCE
@@ -199,13 +201,13 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
     inference_assignments = inference_assignments[:, :, :valid_h, :valid_w]
     ops_ma_adj = ops_ma_adj[:, :, :valid_h, :valid_w]
 
-    return td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w
+    return td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path
 
 
 
 def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs):
     print("inside get inference cached")
-    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w = get_inference_result("mk01", instance_idx, model_type, order)
+    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path = get_inference_result("mk01", instance_idx, model_type, order)
     # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
     print("herkafaen")
     print(inference_assignments.shape)
@@ -230,27 +232,22 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     dups = utils.count_duplicate_instances(inference_assignments)
     print(f"amount of same instances: {dups}")
 
-    report, total_errors, error_list = utils.assert_sequence_respected(inference_assignments, td["ops_sequence_order"])
-    amt_feas = 0
-    for key, value in report.items():
-        if value["total"] == 0:
-            amt_feas += 1
-            print(f"{key} .. {value} .. NO ERRORS")
-        else:
-            print(f"{key} .. {value}")
-    print(f"Total errors: {total_errors}")
-    print(f"Total feasible schedules: {amt_feas}")
+    # TODO før inn elapsed og min,max,avg makespan
+    report, total_errors, error_list = utils.count_infeasibilities(inference_assignments, td["ops_sequence_order"], report_file_path=report_file_path, n_ops=n_ops)
+    utils.add_elapsed_time_report(elapsed, report_file_path)
+
     # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESUeckT
     # utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj, valid_h, valid_w)
 
     # SCHEDULING THE INFERENCED SCHEDULE
     graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/mk01"
-    graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
+    graph_name = f"{"result_schedule"}.png"
     graph_save_path = f"{graph_folder}/{graph_name}"
 
     n_machines = 6
-    td_scheduled = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"])
+    td_scheduled, min_makespan, max_makespan, avg_makespan = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path)
     
+    utils.add_makespans_report(min_makespan, max_makespan, avg_makespan, report_file_path)
 
 
 
