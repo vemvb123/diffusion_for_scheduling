@@ -271,7 +271,6 @@ def do_actions_fix_gap(actions, n_machines, td, env):
 import torch
 
 
-
 def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, error_list, ops_sequence_order, report_file_path):
     print(f"assignments shape: {assignments.shape}")
     n_jobs = infer_n_jobs(ops_sequence_order) 

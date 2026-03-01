@@ -5,6 +5,108 @@ import code.inference.utils as utils
 from torch import Tensor
 
 
+def fix_scheduled_multiple_times(x: torch.Tensor, valid_slots: torch.Tensor) -> torch.Tensor:
+
+    B, _, R, C = x.shape
+
+    # 1) Get all non-zero values per sample
+    mask_nonzero = x != 0
+    vals_per_batch = []
+    for i in range(B):
+        vals = x[i][mask_nonzero[i]]                   # select only non-zero
+        vals_per_batch.append(vals)
+        
+    # 2) Build empty output same shape
+    out = torch.zeros_like(x)
+
+    for i in range(B):
+        valid_pos = valid_slots[i].nonzero(as_tuple=True)    # all valid slot coordinates
+        vals = vals_per_batch[i]
+        n_vals = min(len(vals), valid_pos[0].shape[0])  # only fill what fits
+
+        if n_vals > 0:
+            # Take first n_vals valid coords
+            r_inds = valid_pos[2][:n_vals]
+            c_inds = valid_pos[3][:n_vals]
+            out[i, 0, r_inds, c_inds] = vals[:n_vals]
+
+    return out
+
+
+def make_job_lengths(ops_sequence_order: torch.Tensor) -> List[int]:
+    flat = ops_sequence_order.flatten()
+    vals = flat.tolist()
+
+    job_lengths = []
+    current_len = 0
+    expected_next = 0
+
+    for v in vals:
+        if v == expected_next:
+            current_len += 1
+            expected_next += 1
+        else:
+            # run ended → store and start new run
+            job_lengths.append(current_len)
+            current_len = 1
+            expected_next = v + 1
+
+    # append the final run
+    if current_len > 0:
+        job_lengths.append(current_len)
+
+
+def fix_breaks_predecessor(x: torch.Tensor, job_lengths: List) -> torch.Tensor:
+    B, _, R, C = x.shape
+    assert sum(job_lengths) == C, "job_lengths must sum to the number of columns"
+
+    out = torch.zeros_like(x)
+
+    # iterate over batch
+    for b in range(B):
+        col_start = 0
+        for group_size in job_lengths:
+            col_end = col_start + group_size
+
+            # 1) Extract group columns
+            group_vals = x[b, 0, :, col_start:col_end]           # shape (60, group_size)
+            
+            # 2) Get nonzero values -- should be exactly group_size ideally
+            nonzeros = group_vals[group_vals != 0]               # shape (n_nonzero,)
+            
+            # 3) Sort them
+            if len(nonzeros) > 0:
+                sorted_vals, _ = torch.sort(nonzeros)            # ascending order
+            else:
+                sorted_vals = torch.tensor([], device=x.device)
+
+            # 4) Place them back in increasing order
+            #    We assume exactly 1 nonzero per column, so we fill from left to right
+            #    leaving zeros if count < group_size
+            for i, v in enumerate(sorted_vals[:group_size]):
+                out[b, 0, :, col_start + i] = v
+
+            col_start = col_end
+
+    return out
+
+
+
+def fix_infeasibilities(x: torch.Tensor, valid_slots: torch.Tensor, ops_sequence_order: torch.Tensor) -> torch.Tensor:
+    x = fix_scheduled_multiple_times(x, valid_slots)
+    job_lengths = make_job_lengths(ops_sequence_order)  
+    x = fix_breaks_predecessor(x, valid_slots, job_lengths)
+    return x
+
+
+
+
+
+
+
+
+
+
 def round_to_values(
     x: torch.Tensor,
     n_values: int,
@@ -277,6 +379,9 @@ def write_report(report, total_errors, error_list, print_report=False, save_as_f
             f.write(avg_errors + "\n")
             f.write(avg_error_rates+ "\n")
             f.write(total_feas_str + "\n")
+
+
+
 
 
 

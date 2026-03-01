@@ -1,0 +1,37 @@
+0 .. {'multi': 2, 'seq': 2, 'total': 4}
+1 .. {'multi': 3, 'seq': 3, 'total': 6}
+2 .. {'multi': 0, 'seq': 1, 'total': 1}
+3 .. {'multi': 1, 'seq': 1, 'total': 2}
+4 .. {'multi': 1, 'seq': 3, 'total': 4}
+5 .. {'multi': 1, 'seq': 1, 'total': 2}
+6 .. {'multi': 1, 'seq': 0, 'total': 1}
+7 .. {'multi': 2, 'seq': 1, 'total': 3}
+8 .. {'multi': 1, 'seq': 2, 'total': 3}
+9 .. {'multi': 0, 'seq': 2, 'total': 2}
+10 .. {'multi': 1, 'seq': 1, 'total': 2}
+11 .. {'multi': 0, 'seq': 2, 'total': 2}
+12 .. {'multi': 3, 'seq': 2, 'total': 5}
+13 .. {'multi': 2, 'seq': 1, 'total': 3}
+14 .. {'multi': 3, 'seq': 0, 'total': 3}
+15 .. {'multi': 1, 'seq': 1, 'total': 2}
+16 .. {'multi': 1, 'seq': 2, 'total': 3}
+17 .. {'multi': 3, 'seq': 1, 'total': 4}
+18 .. {'multi': 0, 'seq': 1, 'total': 1}
+19 .. {'multi': 1, 'seq': 1, 'total': 2}
+20 .. {'multi': 1, 'seq': 0, 'total': 1}
+21 .. {'multi': 1, 'seq': 4, 'total': 5}
+22 .. {'multi': 1, 'seq': 0, 'total': 1}
+23 .. {'multi': 1, 'seq': 0, 'total': 1}
+24 .. {'multi': 2, 'seq': 0, 'total': 2}
+25 .. {'multi': 2, 'seq': 0, 'total': 2}
+26 .. {'multi': 1, 'seq': 1, 'total': 2}
+27 .. {'multi': 2, 'seq': 0, 'total': 2}
+28 .. {'multi': 1, 'seq': 1, 'total': 2}
+29 .. {'multi': 1, 'seq': 2, 'total': 3}
+30 .. {'multi': 0, 'seq': 2, 'total': 2}
+31 .. {'multi': 1, 'seq': 1, 'total': 2}
+Total errors: 80 - scheduled multiple times: 41, break predecessor constraint: 39
+Avg errors per instance: 2.50, scheduled multiple times: 1.28, break predecessor constraint: 1.22
+Avg error rates: 0.04545454545454546 - avg rate scheduled multi: 0.02329545454545455, avg rate break predecessor constraint: 0.022159090909090913
+Total feasible schedules: 0 / 32: 0.00%
+Seconds to run inference: 5.358164377976209 s

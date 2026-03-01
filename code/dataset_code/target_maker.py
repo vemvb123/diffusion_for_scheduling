@@ -6,6 +6,7 @@ The targets can later be used in a dataset
 """
 
 
+import sys
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,21 +22,39 @@ from rl4co.models.zoo.l2d.decoder import L2DDecoder
 from rl4co.models.nn.graph.hgnn import HetGNNEncoder
 from rl4co.utils.trainer import RL4COTrainer
 
+import code.dataset_code.utils as utils
 
 
 
 def train_model():
     print("Beginning training of target model")
 
-    name = "10j_6ma_6op_mk01"
-    jobs = 10
-    ma = 6
-    max_proc = 6
-    min_proc = 1
-    max_op_per_job = 6
-    min_op_per_job = 5
-    max_eligable_ma_per_op = 6
-    min_eligable_ma_per_op = 1
+
+    filepath_benchmark_instance = None
+    name = None
+    if int(sys.argv[1]) == 1:
+        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk15.txt'
+        name = "30j_15ma_11op_mk15"
+    elif int(sys.argv[1]) == 2:
+        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk10.txt'
+        name = "20j_15ma_14op_mk10"
+    elif int(sys.argv[1]) == 3:
+        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
+        name = "20j_10ma_25op_18a"
+
+
+    parameters = utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
+ 
+
+
+    jobs = parameters['n_jobs']
+    ma = parameters['n_machines']
+    max_proc = parameters['max_processing_time']
+    min_proc = parameters['min_processing_time']
+    max_op_per_job = parameters['most_operations']
+    min_op_per_job = parameters['fewest_operations']
+    max_eligable_ma_per_op = parameters['max_machine_options']
+    min_eligable_ma_per_op = parameters['min_machine_options']
 
 # Lets generate a more complex instance
 
@@ -59,7 +78,7 @@ def train_model():
 
     if torch.cuda.is_available():
         accelerator = "gpu"
-        batch_size = 256
+        batch_size = 24
         train_data_size = 2_000
         embed_dim = 128
         num_encoder_layers = 4
@@ -75,7 +94,7 @@ def train_model():
     policy = L2DPolicy(embed_dim=embed_dim, num_encoder_layers=num_encoder_layers, env_name="fjsp")
 
     # Model: default is AM with REINFORCE and greedy rollout baseline
-    lrs = [1e-4]
+    lrs = [1e-3]
     for lr in lrs:
         model = L2DModel(env,
                          policy=policy, 
@@ -86,7 +105,7 @@ def train_model():
                          optimizer_kwargs={"lr": lr})
         
         trainer = RL4COTrainer(
-            max_epochs=10,
+            max_epochs=100,
             accelerator=accelerator,
             devices=1,
             logger=None,
