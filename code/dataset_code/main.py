@@ -37,25 +37,32 @@ def main(instance_type = None):
 
     dataset_folder = None
     filepath_benchmark_instance = None
-
+    target_model = None
 
 
     if int(sys.argv[1]) == 1:
+        print("making mk15 dataset")
         dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk15_30j_15ma_11op'
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk15.txt'
 
     elif int(sys.argv[1]) == 2:
+        print("making mk10 dataset")
         dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk10_20j_15ma_14op'
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk10.txt'
+        target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.001_20j_15ma_14op_mk10.ckpt'
 
     elif int(sys.argv[1]) == 3:
+        print("making 18a dataset")
         dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_18a_20j_10ma_25op'
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
 
     parameters = utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
     print(parameters)
 
-    target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.001_30j_15ma_11op_mk15.ckpt'
+    print("stated making dataset")
+    print(f"dataset folder: {dataset_folder}")
+    print(f"benchmark instance: {filepath_benchmark_instance}")
+    print(f"target model: {target_model}")
 
     utils.make_dataset(
         n, dataset_folder,
@@ -70,7 +77,7 @@ def main(instance_type = None):
         target_model=target_model,
         order=True,
     )
-    print("Done making mk15 dataset")
+    print("Done making mk00 dataset")
 
 
 
@@ -120,8 +127,8 @@ def check_dataset():
     dataset[0]
     """
 
-check_benchmark_parameters()
+#check_benchmark_parameters()
 
 #check_dataset()
 #instance_type = "mk01"
-# main()
+main()

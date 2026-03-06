@@ -128,7 +128,7 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
             else:
                 x = denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
 
-            if t < 20:
+            if t % 10 == 0:
                 given_assignments.append(x.clone())
 
             """

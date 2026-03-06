@@ -313,11 +313,12 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
         delayed(utils.compress_schedule)(td["start_times"], td["finish_times"], ma_op_map, n_jobs, td, filler_machine=99)
         for td, ma_op_map in zip(tds, machine_assignments_maps)
     )
-    
     makespans = [
-        td["finish_times"][td["finish_times"] != 9999.0].max().item()
-        for td in tds
+    td["finish_times"][td["finish_times"] != 9999.0].max().item()
+    for td in tds
+    if td["finish_times"][td["finish_times"] != 9999.0].max().item() >= 30.0
     ]
+
     td_best = tds[ makespans.index( min(makespans) ) ]
 
     """
@@ -335,6 +336,7 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
     """
 
     print("")
+
     min_makespan = min(makespans)
     max_makespan = max(makespans)
     avg_makespan = sum(makespans) / len(makespans)
@@ -357,35 +359,49 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
 
 
 
-def schedule_randomly(ops_ma_adj):
-
-    ops_ma_adj = ops_ma_adj.squeeze(0).squeeze(0)  # now shape [6,60]
-
-    # Find indices of ones: list of tensors for each column
-    # This yields a list length=60
-    one_positions = [torch.nonzero(ops_ma_adj[:,c]).view(-1) for c in range(ops_ma_adj.shape[1])]
-
-    # Prepare output
-    schedule = torch.zeros_like(ops_ma_adj)
-
-    for c, ones in enumerate(one_positions):
-        if ones.numel() > 0:
-            idx = ones[torch.randint(len(ones), (1,))]
-            schedule[idx, c] = 1
-
-    # reshape back
-    schedule = schedule.unsqueeze(0).unsqueeze(0)  # [1,1,6,60]
-    return schedule
 
 
+def schedule_randomly(ops_ma_adj, valid_h, valid_w, job_lengths):
+    N = 55
 
+    ops_ma_adj = ops_ma_adj[:, :, :valid_h, :valid_w]
+    out = torch.zeros_like(ops_ma_adj, dtype=torch.float32)
 
+    # Global pool of values
+    available_values = list(range(1, N+1))
 
+    col = 0
+    for length in job_lengths:
 
+        if length <= 1:
+            col += length
+            continue
 
+        if len(available_values) < length:
+            break  # not enough values left
 
+        group_cols = list(range(col, col + length))
 
+        # 🔥 RANDOM UNIQUE VALUES
+        group_values = random.sample(available_values, length)
 
+        # ensure increasing inside group
+        group_values.sort()
 
+        # remove from global pool
+        for v in group_values:
+            available_values.remove(v)
 
+        # assign them
+        for c, v in zip(group_cols, group_values):
 
+            valid_rows = (ops_ma_adj[0,0,:,c] == 1).nonzero(as_tuple=True)[0].tolist()
+            if not valid_rows:
+                continue
+
+            row = valid_rows[0]  # or random.choice(valid_rows)
+            out[0,0,row,c] = v
+
+        col += length
+
+    return out / 100.0

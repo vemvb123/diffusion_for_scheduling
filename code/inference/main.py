@@ -152,18 +152,24 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         n_samples = 32
         n_ops = int(torch.count_nonzero(target_assignments))
 
-        timesteps = 100
+        timesteps = 200
         #sampling_steps = 60
         ddim_eta = 1.0
+        
+        graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/mk01"
+        graph_name = f"{"result_schedule"}.png"
+        graph_save_path = f"{graph_folder}/{graph_name}"
 
         report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b_lookahead.txt"
+        # report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b.txt"
+        # report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_random_mk01.txt"
 
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_beta.pth"
         adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth"
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
+        ##adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
         #adj_model_path = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/further_improved/trained_on_100_timesteps_sch_1000.pth"
 
 
@@ -185,21 +191,77 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
             cos=cos,
             smart_init=False)
         eta = 0.9
+
+        print(inference_assignments.shape)
+
+
+        index_to_check = 2
+        ops_ma_adj = ops_ma_adj[:, :, :6, :60]
+        given_assignments = utils.topk_binary_matrix(inference_assignments[2][:, :6, :60], 55, ops_ma_adj)
+        result = torch.stack([t[index_to_check][:, :6, :60] for t in assignments_over_time])
+        #result = utils.show_order_clear(result, n_ops, ops_ma_adj)
+        ops_ma_adj = ops_ma_adj.to("cuda")
+        result = torch.cat([result, ops_ma_adj], dim=0)
+        save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/evolution/"
+        #utils.show_schedule_over_time(result, ops_ma_adj, save_path, show_values=True)
+        print("ops se order")
+
+        column_groups = [5,6,5,6,5,6,5,6,5,6]
+
+        utils.show_schedule_over_time(
+            result,
+            ops_ma_adj,
+            save_path,
+            given_assignments,
+            show_values = True,
+            cell_size = 1
+        )
+        exit()
+
+
+        """
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
         # === LOOK AHEAD
+        """
         """
         inference_assignments, elapsed, assignments_over_time, variation_over_time = experimental.inference_lookahead(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
             jump=None, 
             cos=cos,
-            smart_init=False)
+            smart_init=False
+            )
         """
+        # ==== RANDOM
+        """
+        assignments_to_make = 28
+        ops_seq_order = td["ops_sequence_order"]
+        job_lengts = compute_job_lengths(ops_seq_order)
+        print(f"job lengths: {job_lengts}")
+        valid_w = 60
+        inference_assignments = schedule.schedule_randomly(ops_ma_adj, valid_h, valid_w, job_lengts)
+        for i in range(assignments_to_make-1):
+            instance_batch= schedule.schedule_randomly(ops_ma_adj, valid_h, valid_w, job_lengts)
+            inference_assignments = torch.cat([inference_assignments, instance_batch], dim=0)
 
+
+        print(f"random assignments shape: {inference_assignments.shape}")
+        print(inference_assignments)
+        elapsed = 0
+        assignments_over_time = None
+        """
+        """
+        inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
+            jump=None, 
+            cos=cos,
+            smart_init=False)
+        eta = 0.9
+        """
 
 
         # === GUIDENCE
         #n_ops = int(torch.count_nonzero(target_assignments))
         ops_seq_order = td["ops_sequence_order"]
         job_lengts = compute_job_lengths(ops_seq_order)
+
         #job_lengts = [5, 6, 5, 6, 6, 6, 5, 6, 6, 5, 0,0,0,0] 
         #inference_assignments, elapsed, assignments_over_time = guidence.adj_inference_ddpm_cos(job_lengts, proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h, valid_w, n_ops, ops_seq_order, timesteps, True)
 
@@ -275,7 +337,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
     inference_assignments = inference_assignments[:, :, :valid_h, :valid_w]
     ops_ma_adj = ops_ma_adj[:, :, :valid_h, :valid_w]
 
-    return td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path
+    return td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path
 
 
 
@@ -285,7 +347,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
 
 def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs):
     print("inside get inference cached")
-    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path = get_inference_result("mk01", instance_idx, model_type, order)
+    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path = get_inference_result("mk01", instance_idx, model_type, order)
     # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
     print("herkafaen")
     print(inference_assignments.shape)
@@ -322,10 +384,6 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj, valid_h, valid_w)
 
     # SCHEDULING THE INFERENCED SCHEDULE
-    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/mk01"
-    graph_name = f"{"result_schedule"}.png"
-    graph_save_path = f"{graph_folder}/{graph_name}"
-
     n_machines = 6
     td_scheduled, min_makespan, max_makespan, avg_makespan = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path)
     

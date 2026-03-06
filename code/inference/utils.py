@@ -6,7 +6,8 @@ from torch import Tensor
 
 
 def fix_scheduled_multiple_times(x: torch.Tensor, valid_slots: torch.Tensor) -> torch.Tensor:
-
+    print(x.shape)
+    print(valid_slots.shape)
     B, _, R, C = x.shape
 
     # 1) Get all non-zero values per sample
@@ -18,19 +19,124 @@ def fix_scheduled_multiple_times(x: torch.Tensor, valid_slots: torch.Tensor) -> 
         
     # 2) Build empty output same shape
     out = torch.zeros_like(x)
-
     for i in range(B):
-        valid_pos = valid_slots[i].nonzero(as_tuple=True)    # all valid slot coordinates
+        valid_pos = valid_slots[0].nonzero(as_tuple=True)
+
         vals = vals_per_batch[i]
-        n_vals = min(len(vals), valid_pos[0].shape[0])  # only fill what fits
+        n_vals = min(len(vals), valid_pos[0].shape[0])
 
         if n_vals > 0:
-            # Take first n_vals valid coords
-            r_inds = valid_pos[2][:n_vals]
-            c_inds = valid_pos[3][:n_vals]
+            r_inds = valid_pos[1][:n_vals]
+            c_inds = valid_pos[2][:n_vals]
             out[i, 0, r_inds, c_inds] = vals[:n_vals]
 
+
     return out
+
+# takes a batch of solutions over time, specifically from a specific generated solution
+# shape: B, C, H, W
+# B is the amount of timesteps that has been recorded for the solution 
+# take a specific solution of a batch of generated solutions, pair it with generated solutions for that specific solution over time
+import matplotlib.pyplot as plt
+import os
+import numpy as np
+
+import os
+import torch
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+import torch
+
+
+def topk_binary_matrix(tensor: torch.Tensor, k: int, valid_slots: torch.Tensor):
+    """
+    tensor: shape (1, H, W)
+    valid_slots: shape (1, 1, H, W) with 1s where allowed
+    k: number of top values to select
+    """
+    # Make valid_slots the same shape as tensor
+    mask = valid_slots[0, 0].bool()  # shape (H, W)
+    
+    # Flatten tensor and mask
+    flat = tensor.reshape(-1)
+    mask_flat = mask.reshape(-1)
+    
+    # Only consider valid positions
+    valid_values = flat.clone()
+    valid_values[~mask_flat] = float('-inf')  # ignore invalid slots
+    
+    # Take top-k among valid positions
+    topk_indices = torch.topk(valid_values, k).indices
+    
+    # Create binary result
+    result = torch.zeros_like(flat)
+    result[topk_indices] = 1
+    
+    return result.reshape_as(tensor)
+
+
+
+def show_schedule_over_time(
+    schedule_over_time: torch.Tensor,  # shape (batch, 1, H, W)
+    overlay: torch.Tensor,             # shape (1, 1, H, W), binary 0/1
+    save_path: str,
+    filled_assignments: torch.Tensor,
+    show_values: bool = False,
+    cell_size: float = 0.5,   # NEW: controls how large each cell is
+):  
+
+    os.makedirs(save_path, exist_ok=True)
+
+    overlay_matrix = overlay[0, 0].cpu().numpy()
+    filled_mask = filled_assignments[0].cpu().numpy()  # (H, W)
+
+    for i in range(schedule_over_time.shape[0]):
+        schedule = schedule_over_time[i, 0].cpu().numpy()
+        H, W = schedule.shape
+
+        fig, ax = plt.subplots(figsize=(W * cell_size, H * cell_size))
+
+        # base matrix
+        ax.matshow(schedule, cmap="gray_r")
+
+        # red overlay
+        ax.matshow(overlay_matrix, cmap="Reds", alpha=0.6)
+
+        # --- yellow overlay ---
+        # intensity based on how close schedule value is to 1
+        yellow_mask = filled_mask == 1
+        yellow_overlay = np.ma.masked_where(~yellow_mask, filled_mask)
+
+        ax.matshow(yellow_overlay, cmap="Wistia", alpha=0.9)
+
+
+        # grid lines
+        ax.set_xticks(np.arange(-0.5, W, 1), minor=True)
+        ax.set_yticks(np.arange(-0.5, H, 1), minor=True)
+        ax.grid(which="minor", color="black", linewidth=0.5)
+
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        if show_values:
+            for y in range(H):
+                for x in range(W):
+                    value = schedule[y, x]
+                    ax.text(
+                        x, y,
+                        f"{value:.2f}",
+                        va="center",
+                        ha="center",
+                        fontsize=10
+                    )
+
+        plt.savefig(f"{save_path}/{i+1}.png", bbox_inches="tight", pad_inches=0)
+        plt.close()
+
+
+
 
 
 def make_job_lengths(ops_sequence_order: torch.Tensor) -> List[int]:
@@ -54,6 +160,8 @@ def make_job_lengths(ops_sequence_order: torch.Tensor) -> List[int]:
     # append the final run
     if current_len > 0:
         job_lengths.append(current_len)
+    
+    return job_lengths
 
 
 def fix_breaks_predecessor(x: torch.Tensor, job_lengths: List) -> torch.Tensor:
@@ -87,15 +195,15 @@ def fix_breaks_predecessor(x: torch.Tensor, job_lengths: List) -> torch.Tensor:
                 out[b, 0, :, col_start + i] = v
 
             col_start = col_end
-
     return out
 
 
 
 def fix_infeasibilities(x: torch.Tensor, valid_slots: torch.Tensor, ops_sequence_order: torch.Tensor) -> torch.Tensor:
+    print("in fix")
     x = fix_scheduled_multiple_times(x, valid_slots)
-    job_lengths = make_job_lengths(ops_sequence_order)  
-    x = fix_breaks_predecessor(x, valid_slots, job_lengths)
+    #job_lengths = make_job_lengths(ops_sequence_order)  
+    #x = fix_breaks_predecessor(x, valid_slots, job_lengths)
     return x
 
 
@@ -110,12 +218,15 @@ def fix_infeasibilities(x: torch.Tensor, valid_slots: torch.Tensor, ops_sequence
 def round_to_values(
     x: torch.Tensor,
     n_values: int,
+
     valid_slots: torch.Tensor,
 ) -> torch.Tensor:
     """
+
     For each column:
     - If valid_slots has at least one valid entry, pick max among valid slots
-    - If valid_slots is all zeros, ignore it and pick max among all values
+    - If valid_slots is all zeros, ignore it and pick max am
+ong all values
     """
 
     x = x.to("cuda")
