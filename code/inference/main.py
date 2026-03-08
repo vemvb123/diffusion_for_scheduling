@@ -20,7 +20,7 @@ import matplotlib
 matplotlib.use('Agg')
 
 import torch
-
+import numpy as np
 
 def compute_job_lengths(indices):
     """
@@ -206,13 +206,16 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         #utils.show_schedule_over_time(result, ops_ma_adj, save_path, show_values=True)
         print("ops se order")
 
-        column_groups = [5,6,5,6,5,6,5,6,5,6]
-
+        # ops_sequence_order = td["ops_sequence_order"][:,:,:6,:60]
+        values = np.linspace(0, 1, 56)[1:]  # remove the 0
+        print(values)
+        job_lenghts = utils.make_job_lengths(ops_sequence_order)
         utils.show_schedule_over_time(
             result,
             ops_ma_adj,
             save_path,
             given_assignments,
+            job_lenghts,
             show_values = True,
             cell_size = 1
         )

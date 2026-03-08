@@ -1,4 +1,42 @@
 
+
+Skeduleringsfeil kommer av fogjande:
+Nar det er mange oppgaver, blir det stort spenn av aktuelle verdier.
+
+Med 55 verdier mellom 0 og 1, sa er den forte verdien nesten a 0.02
+Nar det ikke er feil, sa ser det ut som den minste verdien er hoyere enn det ville trodd, eks 0.04
+
+Jeg tror hvis man har storre spenn, sa kan det kanskje lose problemet. Na er det mellom 0 og 1.
+Men kan hende diff modellen eks tillater mellom -2 og 2
+
+
+Vrdn best fikse skeduleringsfeil, nar dem faktisk hender
+
+
+Sett:
+Gjerne den fyste, altsa minste oppgaven fra en jobb, der det ikke er assignment
+Der det er to verdier assignet, kan begge verdiene vere hoye, men de er gjerne begge lavere enn neste verdi
+
+Jeg tror nar en er skedulert fur en pred, sa er de begge veldig like i verdi
+
+Det kan hende sked feil fordi noen fa verdier er hoye, men utenfor gyldige steder
+....
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Test guiding for inference
 test guiding for trening
 

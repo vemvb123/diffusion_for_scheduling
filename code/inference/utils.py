@@ -78,11 +78,38 @@ def topk_binary_matrix(tensor: torch.Tensor, k: int, valid_slots: torch.Tensor):
 
 
 
+
+
+
+
+def insert_column_gaps(matrix, job_lengths, gap_size=1):
+    """
+    Inserts NaN columns between job groups.
+    """
+    H, W = matrix.shape
+    new_cols = []
+    col_start = 0
+
+    for i, length in enumerate(job_lengths):
+        cols = matrix[:, col_start:col_start + length]
+        new_cols.append(cols)
+
+        col_start += length
+
+        # insert gap except after last job
+        if i < len(job_lengths) - 1:
+            gap = np.full((H, gap_size), np.nan)
+            new_cols.append(gap)
+
+    return np.concatenate(new_cols, axis=1)
+
+
 def show_schedule_over_time(
     schedule_over_time: torch.Tensor,  # shape (batch, 1, H, W)
     overlay: torch.Tensor,             # shape (1, 1, H, W), binary 0/1
     save_path: str,
     filled_assignments: torch.Tensor,
+    job_lenghts: list[int],
     show_values: bool = False,
     cell_size: float = 0.5,   # NEW: controls how large each cell is
 ):  
@@ -96,24 +123,23 @@ def show_schedule_over_time(
         schedule = schedule_over_time[i, 0].cpu().numpy()
         H, W = schedule.shape
 
-        fig, ax = plt.subplots(figsize=(W * cell_size, H * cell_size))
+        schedule = insert_column_gaps(schedule, job_lenghts, gap_size=1)
+        overlay_matrix_gapped = insert_column_gaps(overlay_matrix, job_lenghts, gap_size=1)
+        filled_mask_gapped = insert_column_gaps(filled_mask, job_lenghts, gap_size=1)
 
-        # base matrix
+        H2, W2 = schedule.shape
+
+        fig, ax = plt.subplots(figsize=(W2 * cell_size, H * cell_size))
+
         ax.matshow(schedule, cmap="gray_r")
+        ax.matshow(overlay_matrix_gapped, cmap="Reds", alpha=0.6)
 
-        # red overlay
-        ax.matshow(overlay_matrix, cmap="Reds", alpha=0.6)
-
-        # --- yellow overlay ---
-        # intensity based on how close schedule value is to 1
-        yellow_mask = filled_mask == 1
-        yellow_overlay = np.ma.masked_where(~yellow_mask, filled_mask)
-
+        yellow_mask = filled_mask_gapped == 1
+        yellow_overlay = np.ma.masked_where(~yellow_mask, filled_mask_gapped)
         ax.matshow(yellow_overlay, cmap="Wistia", alpha=0.9)
 
-
-        # grid lines
-        ax.set_xticks(np.arange(-0.5, W, 1), minor=True)
+        # grid
+        ax.set_xticks(np.arange(-0.5, W2, 1), minor=True)
         ax.set_yticks(np.arange(-0.5, H, 1), minor=True)
         ax.grid(which="minor", color="black", linewidth=0.5)
 
@@ -122,20 +148,13 @@ def show_schedule_over_time(
 
         if show_values:
             for y in range(H):
-                for x in range(W):
+                for x in range(W2):
                     value = schedule[y, x]
-                    ax.text(
-                        x, y,
-                        f"{value:.2f}",
-                        va="center",
-                        ha="center",
-                        fontsize=10
-                    )
+                    if not np.isnan(value):
+                        ax.text(x, y, f"{value:.2f}", va="center", ha="center", fontsize=10)
 
         plt.savefig(f"{save_path}/{i+1}.png", bbox_inches="tight", pad_inches=0)
         plt.close()
-
-
 
 
 
