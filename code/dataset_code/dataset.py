@@ -28,7 +28,7 @@ class Dataset_RL4CO(Dataset):
 
         # TODO endre verdi hvis endrer datasett
         self.n_base_features = 3
-
+        # test kommentar ignorer denne
 
         self.files = sorted(
             os.path.join(folder, f)
