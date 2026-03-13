@@ -22,7 +22,11 @@ Jeg tror nar en er skedulert fur en pred, sa er de begge veldig like i verdi
 Det kan hende sked feil fordi noen fa verdier er hoye, men utenfor gyldige steder
 ....
 
+nar mangler verdi:
+flytt storste verdi til gyldig pos .. ser ut til a alltid vere en fyrste rad som mangler verdi
 
+nar pred feil:
+swap fyr og etter verdiene, de er ganske like i verdi uansett, som betyr at de ikke skeduleres langt unna hverandre, kanskje rett etter hverandre
 
 
 

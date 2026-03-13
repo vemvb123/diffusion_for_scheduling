@@ -10,6 +10,8 @@ import os
 import logging
 import bisect
 
+from code.inference.data_inform import infer_n_jobs
+import code.scheduling.fix_scheduling_gaps
 import code.scheduling.utils as utils
 
 logging.basicConfig(
@@ -22,7 +24,7 @@ from tensordict import TensorDict, from_dict
 from torch import Tensor
 
 from torchtyping import TensorType
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, List
 
 from rl4co.envs import FJSPEnv
 from rl4co.models.zoo.l2d import L2DModel
@@ -40,67 +42,6 @@ params:
   3: minimum proc time
   4: maximum proc time
 """
-
-def make_instance(
-    n_ma, n_jobs, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, max_eligable_ma_per_op, min_eligable_ma_per_op, batch_size
-) -> Tuple[FJSPEnv, TensorDict, Dict]:
-
-    
-
-    generator_params = {
-        "num_jobs": n_jobs,
-        "num_machines": n_ma,
-        "min_ops_per_job": min_op_per_job,
-        "max_ops_per_job": max_op_per_job,
-        "min_processing_time": min_proc_time,
-        "max_processing_time": max_proc_time,
-        "min_eligible_ma_per_op": min_eligable_ma_per_op,
-        "max_eligible_ma_per_op": max_eligable_ma_per_op,
-    }
-
-    env = FJSPEnv(
-        generator_params=generator_params,
-        _torchrl_mode=True,
-        stepwise_reward=True
-    )
-    td = env.reset(batch_size=[batch_size])
-    return env, td, generator_params
-
-
-# kan brukes hvis td ikke inneholder order fra før av
-def make_adj_with_order(
-        actions: List, td_unscheduled: TensorDict, env: FJSPEnv, order: bool
-    )-> TensorDict:
-
-    n_actions = len(actions)
-
-    td_to_actions = td_unscheduled.copy()
-    td_to_actions = td_to_actions.unsqueeze(0)
-    prev_adj = td_to_actions["ma_assignment"].clone()
-
-    # this stores the sequence / order matrix
-    assignment_adj = torch.zeros_like(prev_adj, dtype=torch.float)
-
-    per_row_counts = torch.zeros(prev_adj.size(0), dtype=torch.int)
-    for i, action in enumerate(actions):
-        td_to_actions["action"] = torch.tensor([action])
-        td_to_actions = env.step(td_to_actions)["next"]
-
-        new_adj = td_to_actions["ma_assignment"]
-
-        diff = (new_adj == 1) & (prev_adj == 0)
-
-        if diff.any():
-            normalized_order = i / float(n_actions)
-            assignment_adj[diff] = normalized_order
-        prev_adj = new_adj.clone()
-
-
-    td_to_actions["ma_assignment"] = assignment_adj
-    return td_to_actions
-
-
-
 
 # actions: [batch_size, seq_len]
 def schedule_actions_batch(env: FJSPEnv, actions: List, td: TensorDict, order: bool) -> TensorDict:
@@ -130,30 +71,6 @@ def schedule_actions_batch(env: FJSPEnv, actions: List, td: TensorDict, order: b
         return td, None
 
 
-
-def make_target(env: FJSPEnv, td: TensorDict, checkpoint_path: str, order: bool = False) -> Tuple[TensorDict, List]:
-
-    model = L2DModel.load_from_checkpoint(checkpoint_path)
-    model = model.to("cpu")
-
-    with torch.inference_mode():
-        out = model(td,
-                    decode_type="multistart_sampling",
-                    num_starts=5,
-                    select_best=True,
-                    return_actions=True)
-    actions = out["actions"]
-    td_scheduled, ordered_assignments = schedule_actions_batch(env, actions, td.copy(), order)
-    return td_scheduled, actions, ordered_assignments
-
-
-
-
-
-
-
-
- 
 
 # bruk hvis ordered, for å se klart sekvens
 # første operasjon er laveste tallet i return matrisen, det er annerledes enn hvordan det ellers er, der største verdi rett fra modell er første operasjon
@@ -205,24 +122,6 @@ def get_td_from_path(path: str, instance_idx: int) -> Tensor:
 
 
 
-def infer_n_jobs(ops_sequence_order: torch.Tensor):
-    n_jobs = []
-    count = 1
-
-    for i in range(1, len(ops_sequence_order)):
-        # if sequence continues (0→1→2→...)
-        if ops_sequence_order[i] == ops_sequence_order[i - 1] + 1:
-            count += 1
-        else:
-            n_jobs.append(count)
-            count = 1
-
-    # append last job
-    n_jobs.append(count)
-
-    return n_jobs
-
-
 from functorch import vmap
 
 # busy ... will only schedule action if machine avalible, otherwise wait
@@ -271,7 +170,133 @@ def do_actions_fix_gap(actions, n_machines, td, env):
 import torch
 
 
-def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, error_list, ops_sequence_order, report_file_path):
+import code.dataset_code.benchmark_utils as data_utils
+
+
+# TODO fortsatt under testing. Forsøk på å lage dataset der man stiller på machine utilization
+def schdule_by_utilization():
+    """
+    print(1)
+    checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_10j_6ma_6op_mk01.ckpt'
+    model = L2DModel.load_from_checkpoint(checkpoint_path)
+    model = model.to("cpu")
+
+    print(2)
+    instance_idx = 10
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
+    td = data_utils.get_td_from_path(dataset_folder, instance_idx)
+
+    td.del_("opt_assignment")
+    td.del_("opt_assignment_order")
+    td.del_("opt_actions")
+    td = td.unsqueeze(0)
+
+    print(3)
+    print(td['ops_ma_adj'].shape)
+
+    # reset env with instance
+    env = FJSPEnv()
+    td = env.reset(td)
+
+    with torch.inference_mode():
+        out = model(td,
+                    decode_type="multistart_sampling",
+                    num_starts=5,
+                    select_best=True,
+                    return_actions=True)
+    actions = out["actions"]
+
+    td_scheduled, ordered_assignments = schedule_actions_batch(env, actions, td.copy(), True)
+
+
+    path_save_image = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/testing_util.png'
+    env.render(td_scheduled, 0)
+    if path_save_image:
+        plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
+        print(f"Saved scheduled image at path {path_save_image}")
+
+    """
+       # 1) Load model
+    checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_10j_6ma_6op_mk01.ckpt'
+    model = L2DModel.load_from_checkpoint(checkpoint_path).to("cpu")
+    model.eval()
+
+    benchmark_instance_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
+    parameters = data_utils.get_rl4co_parameters_from_brandimarte_instance(benchmark_instance_path)
+    print(parameters)
+
+    generator_params = {
+        "num_jobs": parameters['n_jobs'],
+        "num_machines": parameters['n_machines'],
+        "min_ops_per_job": parameters['fewest_operations'],
+        "max_ops_per_job": parameters['most_operations'],
+        "min_processing_time": parameters['min_processing_time'],
+        "max_processing_time": parameters['max_processing_time'],
+        "min_eligible_ma_per_op": parameters['min_machine_options'],
+        "max_eligible_ma_per_op": parameters['max_machine_options'],
+    }
+
+    env = FJSPEnv(generator_params=generator_params)
+    td = env.reset(batch_size=[1])
+
+
+
+    with torch.no_grad():
+
+        done = False
+        while not done:
+
+            # Get action logits from policy
+            out = model.policy(td)
+            logits = out["logits"]
+            mask = out["mask"]
+
+            # Greedy action (respect mask)
+            logits[~mask] = -torch.inf
+            action = logits.argmax(dim=-1)
+
+            # Add action to tensordict
+            td["action"] = action
+
+            # Step environment
+            td = env.step(td)["next"]
+
+            # Check termination
+            done = td["done"].item()
+
+            print("Action chosen:", action.item())
+
+
+
+
+
+
+
+
+
+
+
+
+    """
+    path_save_image = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/testing_util.png'
+    env.render(td_current, 0)
+    if path_save_image:
+        plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
+        print(f"Saved scheduled image at path {path_save_image}")
+
+    """
+
+
+
+
+
+
+
+
+
+
+# Takes schedule made from the model, than schedules it
+def schedule_from_inference( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, error_list, ops_sequence_order, report_file_path):
     print(f"assignments shape: {assignments.shape}")
     n_jobs = infer_n_jobs(ops_sequence_order) 
 
@@ -310,7 +335,7 @@ def inferenced_schedule( assignments, order: bool, env, td, path_save_image: str
 
     ## filling gaps
     tds = Parallel(n_jobs=jobs_to_make)(
-        delayed(utils.compress_schedule)(td["start_times"], td["finish_times"], ma_op_map, n_jobs, td, filler_machine=99)
+        delayed(code.scheduling.fix_scheduling_gaps.compress_schedule)(td["start_times"], td["finish_times"], ma_op_map, n_jobs, td, filler_machine=99)
         for td, ma_op_map in zip(tds, machine_assignments_maps)
     )
     makespans = [

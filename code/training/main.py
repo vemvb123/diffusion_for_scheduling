@@ -1,6 +1,6 @@
 import os
 import torch
-import code.dataset_code.utils as dataset_utils
+import code.dataset_code.benchmark_utils as dataset_utils
 import logging
 
 logging.basicConfig(
@@ -59,32 +59,14 @@ def train_models(
     full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
     use_cos = True
     penalty = False
-    if len(sys.argv) > 1:
-        if int(sys.argv[1]) == 1:
-            print("Training model 1")
-            timesteps = 100
-            model_path_adj= f'{full_path}/models/further_improved/trained_on_100_timesteps_sch_1000.pth'
-        if int(sys.argv[1]) == 2:
-            print("Training model 2")
-            timesteps = 200
-            model_path_adj= f'{full_path}/models/further_improved/trained_on_200_timesteps_sch_1000.pth'
-        if int(sys.argv[1]) == 3:
-            print("Training model 3")
-            batch_size = 8
-            model_path_adj= f'{full_path}/models/further_improved/batch_size_8.pth'
-        if int(sys.argv[1]) == 4:
-            print("Training model 4")
-            batch_size = 64
-            model_path_adj= f'{full_path}/models/further_improved/batch_size_64.pth'
-        if int(sys.argv[1]) == 5:
-            print("Training model 5")
-            model_path_adj= f'{full_path}/models/further_improved/feas_penalty.pth'
-            penalty = True
+
+    timesteps = 1000
+    model_path_adj= f'{full_path}/models/mk10/mk10.pth'
 
 
 
-        # TODO kan legge til penalty for infeasible, men vil helst først trene modeller med mindre tidssteg,
-        # egner ikke særlig å gi penalty på et tidssteg som jeg uansett ikke bruker
+    # TODO kan legge til penalty for infeasible, men vil helst først trene modeller med mindre tidssteg,
+    # egner ikke særlig å gi penalty på et tidssteg som jeg uansett ikke bruker
 
 
 
@@ -160,8 +142,8 @@ def four():
     
 
 
-def mk01():
-    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt'
+def mk10():
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk10.txt'
     parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     logging.info(parameters)
 
@@ -179,32 +161,32 @@ def mk01():
     embed_size = 80
 
     h = 24
-    w = 64
-    valid_h = 6
-    valid_w = 60
+    w = 280
+    valid_h = 15
+    valid_w = 280
     testing_epochs = 1
     run_epochs = 50
 
 
-    graph_name = f"model, with order: {order}"
+    graph_name = f"mk10"
 
     full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
 
-    graph_save_folder = f"{full_path}/results/timestep_mk01" 
+    graph_save_folder = f"{full_path}/results/mk10" 
 
-    train_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01'
-    test_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01_TEST'
+    train_dataset_path = f'{full_path}/data/batched_mk10_20j_15ma_14op'
+    test_dataset_path = f'{full_path}/data/batched_mk10_20j_15ma_14op_TEST'
 
-    model_path_enc = f'{full_path}/models/beta/enc_timestep.pth'
+    model_path_enc = f'{full_path}/models/mk10/mk10.pth'
 
-    model_path_adj = f'{full_path}/models/cos_beta/timestep_cos.pth'
+    model_path_adj = f'{full_path}/models/mk10/mk10.pth'
     
     return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
     
 
 
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = four()
-generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk01()
+generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk10()
 
 train_models(model_type, order,
     generator_params,

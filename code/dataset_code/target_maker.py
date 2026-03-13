@@ -22,10 +22,10 @@ from rl4co.models.zoo.l2d.decoder import L2DDecoder
 from rl4co.models.nn.graph.hgnn import HetGNNEncoder
 from rl4co.utils.trainer import RL4COTrainer
 
-import code.dataset_code.utils as utils
+import code.dataset_code.benchmark_utils as utils
 
 
-
+# Trains RL model to make scheduling targets
 def train_model():
     print("Beginning training of target model")
 

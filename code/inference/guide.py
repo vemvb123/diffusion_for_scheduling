@@ -1,6 +1,7 @@
 import torch
 
-import code.inference.utils as utils
+import code.inference.inferenced_to_schedule
+import code.inference.report_infeasibilities as utils
 
 # example ... Error for how much lastlast  Machine is used
 # assumes no order given in schedule
@@ -250,7 +251,7 @@ def amt_errors(x, n_ops, ops_ma_adj, ops_seq_order, valid_h, valid_w, max_allowe
 
     #inference_assignments = utils.show_order_clear(inference_assignments, n_ops, ops_ma_adj)
 
-    inference_assignments = utils.show_order_clear(x, n_ops, ops_ma_adj)
+    inference_assignments = code.inference.inferenced_to_schedule.show_order_clear(x, n_ops, ops_ma_adj)
     # get amount of errors
     report, total_errors, error_list = utils.count_infeasibilities(inference_assignments, ops_seq_order, do_print=False)
     # sammenligner med max mengde tillate feil
@@ -292,7 +293,7 @@ def similair_MU(x, h, w, n_ops, ops_ma_adj, proc_times, n_ma):
     x = x[:, :, :h, :w]
     proc_times = proc_times[:, :, :h, :w]
     # binary assignment matrix
-    x_used_assignments = utils.round_to_values(x, w, ops_ma_adj)
+    x_used_assignments = code.inference.inferenced_to_schedule.round_to_values(x, w, ops_ma_adj)
     # map processing times via assignment
     valid_proc_times = x_used_assignments * proc_times
 

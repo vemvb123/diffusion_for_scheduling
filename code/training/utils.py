@@ -9,6 +9,8 @@ import os
 from torch.utils.data import DataLoader, Subset, random_split
 
 
+
+
 def save_losses(epoch, graph_name, losses):
     os.makedirs("./losses", exist_ok=True)
     os.makedirs("./weights", exist_ok=True)

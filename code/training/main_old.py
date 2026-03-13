@@ -1,6 +1,6 @@
 
 
-import code.dataset_code.utils as dataset_utils
+import code.dataset_code.benchmark_utils as dataset_utils
 import logging
 
 logging.basicConfig(

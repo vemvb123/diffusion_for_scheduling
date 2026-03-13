@@ -7,6 +7,9 @@ from denoising_diffusion_pytorch import GaussianDiffusion
 
 
 import logging
+
+import code.inference.inferenced_to_schedule
+import code.inference.report_infeasibilities
 logging.basicConfig(
     level=logging.INFO,
     format="%(filename)s:%(lineno)d - %(message)s"
@@ -164,8 +167,8 @@ def adj_inference_ddpm_batch_improvement(proc_times, job_ops_adj, ops_ma_adj, mo
 
             if t_replace != None and ( t_replace == timesteps - t ):
                 print("in t replace")
-                x_with_order = utils.show_order_clear(x, n_ops, ops_ma_adj, r_global=True)
-                report, total_errors, error_list = utils.count_infeasibilities(x_with_order, ops_sequence_order, False, valid_h, valid_w)
+                x_with_order = code.inference.inferenced_to_schedule.show_order_clear(x, n_ops, ops_ma_adj, r_global=True)
+                report, total_errors, error_list = code.inference.report_infeasibilities.count_infeasibilities(x_with_order, ops_sequence_order, False, valid_h, valid_w)
                 #print(f"replacing at timestep {t}, which forward in time is {timesteps - t}")
                 #print(f"error list was: {error_list}")
                 x = utils.replace_batches_with_fittest(x, error_list)

@@ -1,4 +1,5 @@
-import code.dataset_code.utils as utils
+import code.dataset_code.benchmark_utils
+import code.dataset_code.dataset_utils as dataset_utils
 import code.scheduling.schedule as schedule
 from code.dataset_code.dataset import Dataset_RL4CO
 
@@ -19,7 +20,7 @@ def main(instance_type = None):
     if instance_type == "444":
 
         dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444'
-        utils.make_dataset(
+        dataset_utils.make_dataset(
             n, dataset_folder,
             n_jobs=4,
             n_ma=4,
@@ -44,6 +45,7 @@ def main(instance_type = None):
         print("making mk15 dataset")
         dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk15_30j_15ma_11op'
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk15.txt'
+        # TODO har ikke target model fyllt inn her...
 
     elif int(sys.argv[1]) == 2:
         print("making mk10 dataset")
@@ -55,8 +57,9 @@ def main(instance_type = None):
         print("making 18a dataset")
         dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_18a_20j_10ma_25op'
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
+        target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.001_20j_10ma_25op_18a.ckpt'
 
-    parameters = utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
+    parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
     print(parameters)
 
     print("stated making dataset")
@@ -64,7 +67,7 @@ def main(instance_type = None):
     print(f"benchmark instance: {filepath_benchmark_instance}")
     print(f"target model: {target_model}")
 
-    utils.make_dataset(
+    dataset_utils.make_dataset(
         n, dataset_folder,
         n_jobs=parameters['n_jobs'],
         n_ma=parameters['n_machines'],
@@ -75,7 +78,7 @@ def main(instance_type = None):
         max_eligable_ma_per_op=parameters['max_machine_options'],
         min_eligable_ma_per_op=parameters['min_machine_options'],
         target_model=target_model,
-        order=True,
+        order=True
     )
     print("Done making mk00 dataset")
 
@@ -86,14 +89,14 @@ def check_benchmark_parameters():
     #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
     filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk10.txt'
     #filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
-    parameters = utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+    parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
 
 
 def check_dataset():
     instance_idx = 10
-    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk15_30j_15ma_11op_mk01'
-    td = utils.get_td_from_path(dataset_folder, instance_idx)
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk10_20j_15ma_14op'
+    td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
 
     print(td.keys())
     print(td['opt_assignment'])
@@ -129,6 +132,6 @@ def check_dataset():
 
 #check_benchmark_parameters()
 
-#check_dataset()
+# check_dataset()
 #instance_type = "mk01"
 main()

@@ -4,14 +4,19 @@ print("started running")
 results.py contains code for gathering results.
 Such as gathering mean makespan of scheduled instances, graphs, training results, etc
 """
+import code.dataset_code.benchmark_utils
+import code.dataset_code.dataset_maker
 import code.inference.experimental
+import code.inference.infeasibilities
+import code.inference.inferenced_to_schedule
+import code.inference.report_infeasibilities
 import code.inference.utils as utils
 import code.scheduling.utils as schedule_utils
 import code.inference.guidence as guidence
 import code.inference.inference as inference
 import code.inference.cache_inference as cache_inference
 import code.scheduling.schedule as schedule
-import code.dataset_code.utils as dataset_utils
+import code.dataset_code.dataset_utils as dataset_utils
 
 import torch
 import code.inference.experimental as experimental
@@ -69,7 +74,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
     if problem_type == "444":
 
         dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444_TEST'
-        env, td_ignore, generator_params = schedule.make_instance(
+        env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
             n_ma=4, 
             n_jobs=4, 
             max_op_per_job=4, 
@@ -92,9 +97,9 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         # TODO
         dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
         #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
-        parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+        parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
 
-        env, td_ignore, generator_params = schedule.make_instance(
+        env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
             n_ma=parameters['n_machines'], 
             n_jobs=parameters['n_jobs'], 
             max_op_per_job=parameters['most_operations'], 
@@ -116,8 +121,8 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
 
     print(f"dataset_folder: {dataset_folder}")
-    td = dataset_utils.get_td_from_path(dataset_folder, instance_idx)
-    target_assignments, proc_times, job_ops_adj, ops_ma_adj, ops_sequence_order, opt_actions = dataset_utils.get_feature_adj_from_instance(td, env, order, mask_h, mask_w, True)
+    td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
+    target_assignments, proc_times, job_ops_adj, ops_ma_adj, ops_sequence_order, opt_actions = dataset_utils.get_dataset_features(td, env, order, mask_h, mask_w, True)
 
     # TODO skjekk i morra for mk01
     """
@@ -192,35 +197,6 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
             smart_init=False)
         eta = 0.9
 
-        print(inference_assignments.shape)
-
-
-        index_to_check = 2
-        ops_ma_adj = ops_ma_adj[:, :, :6, :60]
-        given_assignments = utils.topk_binary_matrix(inference_assignments[2][:, :6, :60], 55, ops_ma_adj)
-        result = torch.stack([t[index_to_check][:, :6, :60] for t in assignments_over_time])
-        #result = utils.show_order_clear(result, n_ops, ops_ma_adj)
-        ops_ma_adj = ops_ma_adj.to("cuda")
-        result = torch.cat([result, ops_ma_adj], dim=0)
-        save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/evolution/"
-        #utils.show_schedule_over_time(result, ops_ma_adj, save_path, show_values=True)
-        print("ops se order")
-
-        # ops_sequence_order = td["ops_sequence_order"][:,:,:6,:60]
-        values = np.linspace(0, 1, 56)[1:]  # remove the 0
-        print(values)
-        job_lenghts = utils.make_job_lengths(ops_sequence_order)
-        utils.show_schedule_over_time(
-            result,
-            ops_ma_adj,
-            save_path,
-            given_assignments,
-            job_lenghts,
-            show_values = True,
-            cell_size = 1
-        )
-        exit()
-
 
         """
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
@@ -267,6 +243,9 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool):
 
         #job_lengts = [5, 6, 5, 6, 6, 6, 5, 6, 6, 5, 0,0,0,0] 
         #inference_assignments, elapsed, assignments_over_time = guidence.adj_inference_ddpm_cos(job_lengts, proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h, valid_w, n_ops, ops_seq_order, timesteps, True)
+
+        # === CHECK EVOLUTION
+        #utils.show_sched(2, ops_ma_adj, inference_assignments, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, graph_save_path)
 
 
 
@@ -366,31 +345,52 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     print("show")
     print(n_ops)
     print(inference_assignments.shape)
-    if order:
-        inference_assignments = utils.show_order_clear(inference_assignments, n_ops, ops_ma_adj)
-    else:
-        inference_assignments = utils.round_to_values(inference_assignments, w, ops_ma_adj)
-    # inference_assignments = utils.show_order_clear(inference_assignments, n_ops, ops_ma_adj)
-    
-    dups = utils.count_duplicate_instances(inference_assignments)
-    print(f"amount of same instances: {dups}")
 
-    # TODO før inn elapsed og min,max,avg makespan
-    report, total_errors, error_list = utils.count_infeasibilities(inference_assignments, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
-    utils.add_elapsed_time_report(elapsed, report_file_path)
 
+
+
+    #utils.show_sched(2, ops_ma_adj, inference_assignments, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
     print("fixed infeasibilities")
-    inference_assignments = utils.fix_infeasibilities(inference_assignments, ops_ma_adj, td["ops_sequence_order"])
-    report, total_errors, error_list = utils.count_infeasibilities(inference_assignments, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
-    exit()
+    inference_assignments_order = code.inference.inferenced_to_schedule.show_order_clear(inference_assignments, n_ops, ops_ma_adj)
+    report, total_errors, error_list = code.inference.report_infeasibilities.count_infeasibilities(inference_assignments_order, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
+    code.inference.report_infeasibilities.add_elapsed_time_report(elapsed, report_file_path)
+
+    print("2")
+
+    inference_assignments_fixed = code.inference.infeasibilities.fix_infeasibilities(inference_assignments, ops_ma_adj, td["ops_sequence_order"], inference_assignments_order, n_ops)
+    inference_assignments_order = code.inference.inferenced_to_schedule.show_order_clear(inference_assignments_fixed, n_ops, ops_ma_adj)
+    report, total_errors, error_list = code.inference.report_infeasibilities.count_infeasibilities(inference_assignments_order, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
+ 
+    """
+    index = 0
+    for key, value in report.items():
+        if report[key]["seq"] != 0:
+            break
+        index += 1
+
+    print(f"using index {index}")
+    save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/evolution"
+    utils.show_single_sched(inference_assignments, index, td["ops_sequence_order"], 
+                            ops_ma_adj, valid_h, valid_w, 
+                            save_path, n_ops, cell_size=1, show_values=True)
+
+    save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/evolution2"
+    utils.show_single_sched(inference_assignments_fixed, index, td["ops_sequence_order"], 
+                            ops_ma_adj, valid_h, valid_w, 
+                            save_path, n_ops, cell_size=1, show_values=True)
+
+   
+    print("3")
+    """
+
     # CHECKING WHEN IN INFERENCE THE RESULT BECAME SIMILAIR TO THE END RESUeckT
     # utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order, ops_ma_adj, valid_h, valid_w)
 
     # SCHEDULING THE INFERENCED SCHEDULE
     n_machines = 6
-    td_scheduled, min_makespan, max_makespan, avg_makespan = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path)
+    td_scheduled, min_makespan, max_makespan, avg_makespan = schedule.schedule_from_inference(inference_assignments_order, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path)
     
-    utils.add_makespans_report(min_makespan, max_makespan, avg_makespan, report_file_path)
+    code.inference.report_infeasibilities.add_makespans_report(min_makespan, max_makespan, avg_makespan, report_file_path)
 
 
 
@@ -407,9 +407,9 @@ def compare_inference(model_type: str, order: bool, adj_model_path, enc_model_pa
     n_jobs = 10
 
     # GETTING DATA OF TEST INSTANCE TO CHECK
-    td = dataset_utils.get_td_from_path(dataset_folder, instance_idx)
+    td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
 
-    env, td_ignore, generator_params = schedule.make_instance(
+    env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
         n_ma=4, 
         n_jobs=4, 
         max_op_per_job=4, 
@@ -422,7 +422,7 @@ def compare_inference(model_type: str, order: bool, adj_model_path, enc_model_pa
     )
 
 
-    target_assignments, proc_times, job_ops_adj, ops_ma_adj = dataset_utils.get_feature_adj_from_instance(td, env, order)
+    target_assignments, proc_times, job_ops_adj, ops_ma_adj = dataset_utils.get_dataset_features(td, env, order)
 
     target_assignments = target_assignments.unsqueeze(0)
     proc_times = proc_times.unsqueeze(0)
@@ -475,8 +475,8 @@ def compare_inference(model_type: str, order: bool, adj_model_path, enc_model_pa
  
     # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
     #if order:
-    inference_assignments = utils.round_to_values(inference_assignments, 16, ops_ma_adj)
-    comparison_inference_assignments = utils.round_to_values(comparison_inference_assignments, 16, ops_ma_adj)
+    inference_assignments = code.inference.inferenced_to_schedule.round_to_values(inference_assignments, 16, ops_ma_adj)
+    comparison_inference_assignments = code.inference.inferenced_to_schedule.round_to_values(comparison_inference_assignments, 16, ops_ma_adj)
     #else:
     #    inference_assignments = show_order_clear(inference_assignments, 16)
     #    guided_inference_assignments = show_order_clear(guided_inference_assignments, 16)
@@ -495,8 +495,8 @@ def compare_inference(model_type: str, order: bool, adj_model_path, enc_model_pa
     # TODO fjern
     # td_scheduled = inferenced_schedule(target_assignments, order, env, td.copy(), graph_save_path)
     # TODO gjør seinere så ikke kommenter ut
-    td_scheduled = schedule.inferenced_schedule(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs)
-    td_scheduled_comp = schedule.inferenced_schedule(comparison_inference_assignments, order, env, td.copy(), graph_save_path_comp, n_jobs)
+    td_scheduled = schedule.schedule_from_inference(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs)
+    td_scheduled_comp = schedule.schedule_from_inference(comparison_inference_assignments, order, env, td.copy(), graph_save_path_comp, n_jobs)
 
     # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
     makespan = td_scheduled['time']

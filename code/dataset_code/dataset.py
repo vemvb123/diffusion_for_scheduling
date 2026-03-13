@@ -1,4 +1,4 @@
-import code.dataset_code.utils as utils
+import code.dataset_code.dataset_utils as dataset_utils
 
 import logging
 logging.basicConfig(
@@ -77,7 +77,7 @@ class Dataset_RL4CO(Dataset):
         if self.transform:
             td_instance = self.transform(td_instance)
 
-        target_assignments, proc_times, job_ops_adj, ops_ma_adj = utils.get_feature_adj_from_instance(
+        target_assignments, proc_times, job_ops_adj, ops_ma_adj = dataset_utils.get_dataset_features(
                 td_instance, self.env, self.order, self.h, self.w
             )
 

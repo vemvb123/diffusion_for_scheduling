@@ -1,4 +1,7 @@
-from code.scheduling.schedule import make_instance, make_target
+from code.dataset_code.dataset_maker import make_instance, make_target
+from code.scheduling.schedule import schdule_by_utilization
+
+print(1)
 
 
 def main():
@@ -40,12 +43,17 @@ def main():
 
 
 
+print(2)
 
 from rl4co.envs import FJSPEnv
 from rl4co.models.zoo.l2d import L2DModel
 
 
-import code.dataset_code.utils as dataset_utils
+import code.dataset_code.benchmark_utils as dataset_utils
+
+print(3)
+
+
 
 def make_benchmark_instance_into_td(file_path: str):
 
@@ -112,10 +120,11 @@ ops_adj .. kan kanskje få gpt til å dekode hvis jeg viser jobblengder eller no
 
     """
 
+def testing():
+    print("Testing schdule_by_utilization")
+    schdule_by_utilization()
 
+# make_benchmark_instance_into_td("/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt")
 
-
-make_benchmark_instance_into_td("/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt")
-
-
+testing()
 

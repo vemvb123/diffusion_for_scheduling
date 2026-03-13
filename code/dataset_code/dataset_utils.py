@@ -7,20 +7,21 @@ import os
 import torch
 from torch import Tensor
 
+import code.dataset_code.dataset_maker
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(filename)s:%(lineno)d - %(message)s"
 )
 
 
-import code.scheduling.schedule as schedule
+from code.dataset_code.data_manipulation import expand_matrix
 
 import bisect
 
-from tensordict import TensorDict, from_dict
-from typing import Dict, Tuple
+from tensordict import TensorDict
+from typing import Tuple
 
-import torch.nn.functional as F
 
 import time
 
@@ -29,39 +30,8 @@ import time
 
 
 
-
-def expand_matrix(x: torch.Tensor, shape_to_make: Tuple[int, int]) -> torch.Tensor:
-    min_val = x.min()
-    max_val = x.max()
-
-    # Avoid divide by zero
-    if max_val == min_val:
-        x_norm = torch.zeros_like(x)   # or ones_like(x), depending on intent
-    else:
-        x_norm = (x - min_val) / (max_val - min_val)
-
-    x_norm = x_norm.clamp(0, 1)
-
-    # get height/width
-    if x_norm.ndim == 2:
-        h, w = x_norm.shape
-    else:
-        _, h, w = x_norm.shape
-
-    # compute padding
-    pad_bottom = shape_to_make[0] - h
-    pad_right  = shape_to_make[1] - w
-
-    # pad
-    x_padded = F.pad(x_norm, (0, pad_right, 0, pad_bottom), value=0.0)
-
-    return x_padded
-
-
-
-
-
-def get_feature_adj_from_instance(td: TensorDict, env, order: bool, h: int, w: int, include_ops_sequence: bool = False) -> Tuple[
+# gets values from schedule dataset used to train models
+def get_dataset_features(td: TensorDict, env, order: bool, h: int, w: int, include_ops_sequence: bool = False) -> Tuple[
         torch.Tensor, # target assignments
         torch.Tensor, # proc times matrix
         torch.Tensor, # jobid matrix
@@ -115,14 +85,14 @@ def print_info_about_dataset(td: TensorDict):
 
 def make_dataset(n: int, dataset_folder: str, 
                  n_jobs, n_ma, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, max_eligable_ma_per_op, min_eligable_ma_per_op,
-                 target_model: str, order: bool, batch_size: int = 1280):
+                 target_model: str, order: bool, batch_size: int = 1280, startpoint: int = 0):
 
     logging.info("Making dataset...")
 
     os.makedirs(dataset_folder, exist_ok=True)
-    for i in range(0, n, batch_size):
+    for i in range(startpoint, n, batch_size):
         # lag instanse
-        env, td, generator_params = schedule.make_instance(
+        env, td, generator_params = code.dataset_code.dataset_maker.make_instance(
             n_ma=n_ma, n_jobs=n_jobs, 
             max_op_per_job=max_op_per_job, 
             min_op_per_job=min_op_per_job, 
@@ -133,7 +103,7 @@ def make_dataset(n: int, dataset_folder: str,
             batch_size=batch_size)
         # fa target fra instance
 
-        td_target, actions, ordered_assignments = schedule.make_target(env, td.copy(), target_model, order)
+        td_target, actions, ordered_assignments = code.dataset_code.dataset_maker.make_target(env, td.copy(), target_model, order)
 
         # lagre json med: td, og optimale td koords
         td.set('opt_assignment', td_target['ma_assignment'])
@@ -169,77 +139,8 @@ def make_dataset(n: int, dataset_folder: str,
 
 
 
-
-def get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance: str) -> Dict:
-
-    with open(filepath_brandimarte_instance, "r") as f:
-        lines = [line.strip() for line in f if line.strip()]
-
-
-    # First line: number of jobs, number of machines
-    first = lines[0].split()
-    n_jobs = int(first[0])
-    n_machines = int(first[1])
-
-    # Stats
-    global_min_pt = float("inf")
-    global_max_pt = float("-inf")
-    min_ops = float("inf")
-    max_ops = float("-inf")
-
-    # New stats for machine options per operation
-    min_machine_options = float("inf")
-    max_machine_options = float("-inf")
-
-    # Loop through job lines
-    for i in range(1, 1 + n_jobs):
-        parts = list(map(int, lines[i].split()))
-        idx = 0
-
-        # Number of operations in this job
-        n_ops = parts[idx]
-        idx += 1
-
-        # Update min/max number of operations
-        min_ops = min(min_ops, n_ops)
-        max_ops = max(max_ops, n_ops)
-
-        # Loop through each operation
-        for _ in range(n_ops):
-            m_count = parts[idx]
-            idx += 1
-
-            # Track machine options stats
-            min_machine_options = min(min_machine_options, m_count)
-            max_machine_options = max(max_machine_options, m_count)
-
-            # m_count pairs of (machine, processing time)
-            for _ in range(m_count):
-                machine_id = parts[idx]        # machine index (not needed for stats)
-                proc_time = parts[idx + 1]     # processing time
-                idx += 2
-
-                # Track processing time
-                global_min_pt = min(global_min_pt, proc_time)
-                global_max_pt = max(global_max_pt, proc_time)
-
-
-    return {
-        "n_jobs": n_jobs,
-        "n_machines": n_machines,
-        "min_processing_time": global_min_pt,
-        "max_processing_time": global_max_pt,
-        "fewest_operations": min_ops,
-        "most_operations": max_ops,
-        "min_machine_options": min_machine_options,
-        "max_machine_options": max_machine_options
-    }
-
-
-
-
-
-def get_td_from_path(path: str, instance_idx: int) -> Tensor:
+# gets a dataset instance
+def get_dataset_instance(path: str, instance_idx: int) -> Tensor:
     # Get sorted list of data files
     files = sorted([f for f in os.listdir(path) if f.endswith(".pt")])
     # Build file ranges
