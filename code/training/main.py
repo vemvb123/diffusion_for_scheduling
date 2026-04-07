@@ -75,20 +75,28 @@ def train_models(
     logging.info("Number of GPUs:", torch.cuda.device_count())
     logging.info("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 
-    for lr in lrs:
-        logging.info(f"Training with lr {lr}")
+
+    # best_lr = 0.001
+    # lr =  0.001
+    lrs = [1e-3]
+    for i in range(30):
+        # TODO Idee... bare bruk flere epoker her... ... husk a fjerne at bare bruker subset i treninga
+        logging.info(f"Training with lr {lrs[0]}")
         path_enc, path_adj, last_epoch_loss = train_improv.diffusion(
             model_type, train_dataset, test_dataset,
             embed_size, model_path_adj, model_path_enc,
             graph_name, graph_save_folder, valid_h, valid_w, 
             timesteps, scheduler_timesteps,
-            testing_epochs, lr, batch_size=batch_size,
+            testing_epochs, lrs[0], batch_size=batch_size, # testing epochs ble brukt opprinnelig
             use_cos=use_cos, penalty=penalty
         ) 
         if best_loss > last_epoch_loss: 
-            best_lr = lr
-            best_loss = last_epoch_loss
-
+            # best_lr = lr
+            # best_loss = last_epoch_loss
+            pass
+    print('exiting')
+    exit()
+    # TODO ukommenter det over for a finne beste lr, og ikke sett manuelt beste lr
     logging.info(f"Best lr found: {best_lr}, for model {model_path_adj}")
     path_enc, path_adj, last_epoch_loss = train_improv.diffusion(
         model_type, train_dataset, test_dataset,

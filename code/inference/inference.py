@@ -24,6 +24,17 @@ from torchvision import datasets, transforms
 from tqdm import tqdm
 import time
 
+def zero_unused_slots(x, ops_ma_adj, valid_h, valid_w, device):
+
+    x = x.to(device, dtype=torch.float32)
+    ops_ma_adj = ops_ma_adj.to(device, dtype=torch.float32)
+    mask = ops_ma_adj.any(dim=2, keepdim=True)  # collapse 24
+    x = x * mask
+
+
+    return x
+
+
 
 
 def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, timesteps=1000, jump=None, cos=False, smart_init=False):
@@ -57,6 +68,11 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
 
 
 
+    valid_h = 6   # valid rows
+    valid_w = 55  # valid columns
+    device = 'cuda'  # or 'cpu'
+
+
 
     given_assignments = []
     variation_over_time = []
@@ -67,11 +83,6 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
             x = torch.randn(n_samples, 1, h_when_masked, w_when_masked).to(device)
         # ===
         elif smart_init == True:
-
-            valid_h = 6   # valid rows
-            valid_w = 55  # valid columns
-            device = 'cuda'  # or 'cpu'
-
             # initialize tensor with zeros (full shape including padding)
             x = torch.zeros(n_samples, 1, h_when_masked, w_when_masked, device=device)
 
@@ -128,7 +139,8 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
             else:
                 x = denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
 
-            if t % 10 == 0:
+            # if t % 10 == 0:
+            if t == 0:
                 given_assignments.append(x.clone())
 
             """
@@ -136,6 +148,7 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
                 given_assignments.append(x.clone())
             """
 
+            x = zero_unused_slots(x, ops_ma_adj, valid_h, valid_w, device)
 
     # end timer
     end_time = time.perf_counter()

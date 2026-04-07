@@ -91,7 +91,7 @@ def get_dataset_loaders(train_dataset, test_dataset, batch_size: int = 32, val_r
     return train_loader, test_loader
 
 
-def get_models(model_type: str, n_base_features: int, n_embed_features, lr, device: str = "cuda"):
+def get_models(model_type: str, n_base_features: int, n_embed_features, lr, device: str = "cuda", path = None):
     model_adj, model_enc, optimizer = None, None, None
 
     if model_type == "f":
@@ -119,6 +119,14 @@ def get_models(model_type: str, n_base_features: int, n_embed_features, lr, devi
             pretrained=None
         ).to(device)
          optimizer = torch.optim.Adam(model_adj.parameters(), lr=lr)
+
+    if path != None:
+        if os.path.exists(path):
+            checkpoint = torch.load(path, map_location=device)
+    
+            model_adj.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
 
     return model_adj, model_enc, optimizer
 

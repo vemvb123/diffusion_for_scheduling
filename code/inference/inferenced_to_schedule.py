@@ -7,33 +7,6 @@
 import torch
 
 
-def topk_binary_matrix(tensor: torch.Tensor, k: int, valid_slots: torch.Tensor):
-    """
-    tensor: shape (1, H, W)
-    valid_slots: shape (1, 1, H, W) with 1s where allowed
-    k: number of top values to select
-    """
-    # Make valid_slots the same shape as tensor
-    mask = valid_slots[0, 0].bool()  # shape (H, W)
-
-    # Flatten tensor and mask
-    flat = tensor.reshape(-1)
-    mask_flat = mask.reshape(-1)
-
-    # Only consider valid positions
-    valid_values = flat.clone()
-    valid_values[~mask_flat] = float('-inf')  # ignore invalid slots
-
-    # Take top-k among valid positions
-    topk_indices = torch.topk(valid_values, k).indices
-
-    # Create binary result
-    result = torch.zeros_like(flat)
-    result[topk_indices] = 1
-
-    return result.reshape_as(tensor)
-
-
 def round_to_values(
     x: torch.Tensor,
     n_values: int,
@@ -110,7 +83,9 @@ def show_order_clear(x, n_values, valid_slots, r_global=True):
         # Check if each batch item has any valid slots
         has_any_valid = flat_vs.any(dim=1, keepdim=True)  # (B, 1)
 
+        flat_x = flat_x.float()
         neg_inf = torch.finfo(flat_x.dtype).min
+        #neg_inf = torch.finfo(flat_x.dtype).min
 
         # Mask invalid slots ONLY if that batch item has any valid slots
         masked_x = torch.where(
@@ -142,54 +117,81 @@ def show_order_clear(x, n_values, valid_slots, r_global=True):
 
         return out.reshape_as(x)
 
-
     else:
-
         device = x.device
-        x = x.to(device)
 
-        if valid_slots is not None:
-            valid_slots = valid_slots.to(device)
-        else:
-            valid_slots = torch.ones_like(x)
+        x = x.float()  # convert to float for -inf masking
 
         B, C, H, W = x.shape
-        out = torch.zeros_like(x)
 
-        # Step 1: column-wise max (keeping only one value per column)
+        # Setup valid_slots
+        if valid_slots is None:
+            valid_slots = torch.ones_like(x, dtype=torch.bool, device=device)
+        else:
+            valid_slots = valid_slots.to(device).bool()
+            if valid_slots.shape[0] != B:
+                valid_slots = valid_slots.repeat(B, 1, 1, 1)
+
+        # Step 1: column-wise max
+        neg_inf = torch.finfo(x.dtype).min
+        # If any valid in column, mask invalid with -inf; else keep original
+        has_valid = valid_slots.any(dim=2, keepdim=True)  # (B,C,1,W)
+        masked_x = torch.where(has_valid, torch.where(valid_slots, x, neg_inf), x)
+
+        # Argmax along height (H) per column
+        max_idx = torch.argmax(masked_x, dim=2, keepdim=True)  # (B,C,1,W)
+
+        # Create mask of column maxima
         col_max_mask = torch.zeros_like(x, dtype=torch.bool)
-        for b in range(B):
-            for c in range(C):
-                for w in range(W):
-                    col_vals = x[b, c, :, w]
-                    col_vs = valid_slots[b, c, :, w]
+        col_max_mask.scatter_(2, max_idx, True)
 
-                    # Mask if needed
-                    if col_vs.any():
-                        masked = torch.where(col_vs.bool(), col_vals, torch.finfo(x.dtype).min)
-                    else:
-                        masked = col_vals
-
-                    # Index of maximum in this column
-                    max_idx = torch.argmax(masked)
-                    col_max_mask[b, c, max_idx, w] = True
-
-        # Keep only column maxima
+        # Keep only maxima
         filtered_x = torch.where(col_max_mask, x, torch.zeros_like(x))
 
-        # Step 2: global ranking of surviving values
+        # Step 2: global ranking
         flat_vals = filtered_x.flatten()
-        nonzero_mask = flat_vals != 0
+        mask = col_max_mask.flatten()  # only surviving values
 
-        out_flat = torch.zeros_like(flat_vals)
-        if nonzero_mask.any():
-            vals_to_rank = flat_vals[nonzero_mask]
-            sorted_vals, order = torch.sort(vals_to_rank, descending=False)  # smallest -> 1
-            rank_indices = nonzero_mask.nonzero(as_tuple=True)[0]
+        out_flat = torch.zeros_like(flat_vals, dtype=torch.int64)
 
-            # Assign ranks 1..n_ops (or less if fewer maxima)
+        if mask.any():
+            vals = flat_vals[mask]
+            _, order = torch.sort(vals, descending=False)  # smallest = rank 1
+            indices = mask.nonzero(as_tuple=True)[0]
+
             for rank, idx in enumerate(order, start=1):
-                # Cap rank at n_ops
-                out_flat[rank_indices[idx]] = min(rank, n_values)
+                out_flat[indices[idx]] = rank
 
-        return out_flat.view_as(x)
+    return out_flat.view_as(x)
+
+
+
+import torch
+
+def fix_x(x, valid_slots):
+    """
+    x: tensor of shape (B, 1, H, W), float, on any device (CPU/GPU)
+    valid_slots: tensor of shape (1, 1, H, W), binary (0/1), possibly on CPU
+
+    Returns:
+        fixed_x: same shape as x, only max valid per column kept
+    """
+    B, C, H, W = x.shape
+
+    # Move valid_slots to the same device as x
+    valid = valid_slots.to(x.device).expand(B, C, H, W)
+
+    # Mask invalid positions
+    masked = x.clone()
+    masked[valid == 0] = float('-inf')
+
+    # Get max per column (over height)
+    col_max, _ = masked.max(dim=2, keepdim=True)  # shape (B,1,1,W)
+
+    # Keep only max values, zero others
+    fixed_x = torch.where(x == col_max, x, torch.zeros_like(x))
+
+    # Ensure invalid positions are zero
+    fixed_x = torch.where(valid == 1, fixed_x, torch.zeros_like(fixed_x))
+
+    return fixed_x

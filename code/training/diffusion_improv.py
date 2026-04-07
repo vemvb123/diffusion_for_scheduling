@@ -31,17 +31,28 @@ import torch.nn as nn
 
 
 from diffusers import UNet1DModel
+import matplotlib.pyplot as plt
+
+
+
+
 
 
 
 
 def run_epoch(loop, device, timesteps,
             model_adj, model_enc, optimizer,
-            batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod, mode, valid_h, valid_w, 
-            scheduler=None):
-
+            batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
+            mode, valid_h, valid_w, scheduler=None):
 
     total_loss = 0.0
+    batch_losses = []
+
+    # Create figure once outside loop
+    fig, ax = plt.subplots()
+    ax.set_xlabel("Batch")
+    ax.set_ylabel("Loss")
+    ax.set_title(f"Loss {mode}")
 
     for batch_idx, (target_assignments, proc_times, job_ops_adj, ops_ma_adj) in enumerate(loop):
 
@@ -49,9 +60,7 @@ def run_epoch(loop, device, timesteps,
             proc_times,
             job_ops_adj,
             ops_ma_adj,
-        ], dim=1)
-
-        features = features.to(device, dtype=torch.float32)
+        ], dim=1).to(device, dtype=torch.float32)
         target_assignments = target_assignments.to(device, dtype=torch.float32)
 
         B = target_assignments.shape[0]
@@ -59,27 +68,20 @@ def run_epoch(loop, device, timesteps,
             logging.warning(f"Skipping batch {batch_idx} with size {B}")
             continue
 
-        # Sample random timesteps
         t = torch.randint(0, timesteps, (batch_size,), device=device)
 
-        noise, noised = None, None
-        if scheduler == None:
+        if scheduler is None:
             noise, noised = get_noised_x(t, target_assignments, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod)
         else:
             noise = torch.randn_like(target_assignments)
             noised = scheduler.add_noise(target_assignments, noise, t)
 
-
-        model_input = torch.cat([
-            noised,
-            features,
-        ], dim=1)
+        model_input = torch.cat([noised, features], dim=1)
 
         if mode == "train":
             optimizer.zero_grad()
 
         pred = model_adj(model_input, t, type_t="timestep")
-
         pred_valid, noise_valid = mask_invalid(valid_h, valid_w, pred, noise, ops_ma_adj)
         loss = nn.MSELoss()(pred_valid, noise_valid)
 
@@ -87,12 +89,41 @@ def run_epoch(loop, device, timesteps,
             loss.backward()
             optimizer.step()
 
-        loss_value = loss.item()
-        total_loss += loss_value
+        loss_val = loss.item()
+        total_loss += loss_val
+        batch_losses.append(loss_val)
+        loop.set_postfix(loss=loss_val)
 
-        loop.set_postfix(loss=loss_value)
+        # --- SAVE PLOT AS PNG ---
+        ax.clear()
+        ax.set_xlabel("Batch")
+        ax.set_ylabel("Loss")
+        ax.set_title(f"Loss {mode} (updated)")
+        ax.plot(batch_losses, color="blue")
 
-    return loop, model_adj, total_loss / len(loop)
+        # Save figure to disk as PNG (overwrite each batch)
+        fig.savefig(f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/mk10/in_epoch_{mode}.png")
+
+    avg_loss = total_loss / len(loop)
+    return loop, model_adj, avg_loss
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 from code.training.experimental import run_epoch_penalty_feasibility
@@ -116,6 +147,9 @@ def diffusion(
     use_cos=True,
     penalty=False
 ):
+
+    logging.info(f"For model training... using lr {lr}")
+
     n_base_features = train_dataset.n_base_features
 
     beta_start = 1e-4
@@ -146,7 +180,7 @@ def diffusion(
 
     train_loader, test_loader, val_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size, val_ratio=0.2) # subset=True ... for testing med subset
 
-    model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr)
+    model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr, path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk10/mk10.pth')
 
     trainable_params = sum(p.numel() for p in model_adj.parameters() if p.requires_grad)
     logging.info(f"Amount of trainable parameters: {trainable_params}")
@@ -198,7 +232,11 @@ def diffusion(
         all_losses.append(avg_loss)
         all_losses_val.append(avg_loss_val)
 
-        torch.save(model_adj.state_dict(), model_path_adj)
+        # torch.save(model_adj.state_dict(), model_path_adj)
+        torch.save({ 
+                'model_state_dict': model_adj.state_dict(), 
+                'optimizer_state_dict': optimizer.state_dict(), }, 
+            model_path_adj)
         if model_type == "f":
             torch.save(model_enc.state_dict(), model_enc)
 

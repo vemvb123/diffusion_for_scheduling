@@ -31,7 +31,7 @@ import time
 
 
 # gets values from schedule dataset used to train models
-def get_dataset_features(td: TensorDict, env, order: bool, h: int, w: int, include_ops_sequence: bool = False) -> Tuple[
+def get_dataset_features(td: TensorDict, env, order: bool, h: int, w: int, include_ops_sequence: bool = False, from_benchmark_instance: bool = False, include_ops_actions: bool = True) -> Tuple[
         torch.Tensor, # target assignments
         torch.Tensor, # proc times matrix
         torch.Tensor, # jobid matrix
@@ -40,11 +40,15 @@ def get_dataset_features(td: TensorDict, env, order: bool, h: int, w: int, inclu
 
     # ASSIGNMENT
     assignments = None
-    if order:
-        assignments = td["opt_assignment_order"]
-        assignments = assignments.unsqueeze(0)
+    if from_benchmark_instance is False:
+        if order:
+            assignments = td["opt_assignment_order"]
+            assignments = assignments.unsqueeze(0)
+        else:
+            assignments = td['opt_assignment']
+            assignments = assignments.unsqueeze(0)
     else:
-        assignments = td['opt_assignment']
+        assignments = td['ma_assignment']
         assignments = assignments.unsqueeze(0)
 
     assignments = expand_matrix(assignments, (h, w))
@@ -69,7 +73,10 @@ def get_dataset_features(td: TensorDict, env, order: bool, h: int, w: int, inclu
     ops_ma_adj = expand_matrix(ops_ma_adj, (h, w))
 
     if include_ops_sequence:
-        return assignments, proc_times, job_ops_adj, ops_ma_adj, td["ops_sequence_order"], td["opt_actions"]
+        if include_ops_actions:
+            return assignments, proc_times, job_ops_adj, ops_ma_adj, td["ops_sequence_order"], td["opt_actions"]
+        else:
+            return assignments, proc_times, job_ops_adj, ops_ma_adj, td["ops_sequence_order"], None
 
     return assignments, proc_times, job_ops_adj, ops_ma_adj
 

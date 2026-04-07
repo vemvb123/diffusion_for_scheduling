@@ -1,9 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
+import os
 
 import code.inference.inferenced_to_schedule
 import code.inference.data_inform as utils
 from code.inference.utils import insert_column_gaps
+from code.inference.top_values import topk_binary_matrix
 
 
 def show_a_sched(schedule, job_lenghts, overlay_matrix, filled_mask, save_path, cell_size=0.5, show_values=False, i=None):
@@ -43,6 +46,7 @@ def show_a_sched(schedule, job_lenghts, overlay_matrix, filled_mask, save_path, 
         path = f"{save_path}/{i+1}.png"
         plt.savefig(path, bbox_inches="tight", pad_inches=0)
         plt.close()
+        print(path)
     else:
         path = f"{save_path}/showcase.png"
         plt.savefig(path, bbox_inches="tight", pad_inches=0)
@@ -52,7 +56,7 @@ def show_a_sched(schedule, job_lenghts, overlay_matrix, filled_mask, save_path, 
 
 def show_single_sched(x, index, ops_sequence_order, ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.5, show_values=False):
     job_lenghts = utils.get_job_lengths(ops_sequence_order)
-    assignments_top_k_binary = code.inference.inferenced_to_schedule.topk_binary_matrix(x[index][:, :valid_h, :valid_w], n_ops, ops_ma_adj)
+    assignments_top_k_binary = topk_binary_matrix(x[index][:, :valid_h, :valid_w], n_ops, ops_ma_adj)
     overlay_matrix = ops_ma_adj[0, 0].cpu().numpy()
     filled_mask = assignments_top_k_binary[0].cpu().numpy()  # (H, W)
     x = x[index, 0].cpu().numpy()
@@ -76,12 +80,13 @@ def show_schedule_over_time(
 
     for i in range(schedule_over_time.shape[0]):
         schedule = schedule_over_time[i, 0].cpu().numpy()
-        show_a_sched(schedule, job_lenghts, overlay_matrix, filled_mask, save_path, cell_size, show_values)
+        show_a_sched(schedule, job_lenghts, overlay_matrix, filled_mask, save_path, cell_size, show_values, i)
 
 
-def show_sched(index_to_check, ops_ma_adj, inference_assignments, assignments_over_time, ops_sequence_order, n_ops, valid_h, valid_w, save_path):
+def show_sched(index_to_check, ops_ma_adj, inference_assignments, assignments_over_time, ops_sequence_order, n_ops, valid_h, valid_w, save_path, over_time=False):
     ops_ma_adj = ops_ma_adj[:, :, :valid_h, :valid_w]
-    given_assignments = code.inference.inferenced_to_schedule.topk_binary_matrix(inference_assignments[index_to_check][:, :valid_h, :valid_w], n_ops, ops_ma_adj)
+    given_assignments = code.inference.top_values.topk_binary_matrix(inference_assignments[index_to_check][:, :valid_h, :valid_w], n_ops, ops_ma_adj)
+    # given_assignments = code.inference.top_values.max_per_column_binary_matrix(inference_assignments[index_to_check][:, :valid_h, :valid_w], ops_ma_adj)
     result = torch.stack([t[index_to_check][:, :valid_h, :valid_w] for t in assignments_over_time])
 
     ops_ma_adj = ops_ma_adj.to("cuda")

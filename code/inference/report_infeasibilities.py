@@ -56,7 +56,18 @@ def write_report(report, total_errors, error_list, print_report=False, save_as_f
             f.write(avg_errors + "\n")
             f.write(avg_error_rates+ "\n")
             f.write(total_feas_str + "\n")
-
+    # total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p
+    return (
+        total_errors, 
+        total_errors / len(report), 
+        multi / len(report), 
+        seq / len(report),       
+        avg_multi_rate + avg_seq_rate, 
+        avg_multi_rate, 
+        avg_seq_rate, 
+        amt_feas, 
+        amt_feas / len(report) * 100
+    )
 
 def add_makespans_report(min_makespan, max_makespan, avg_makespan, report_path):
     with open(report_path, "a") as file:
@@ -184,8 +195,11 @@ def count_infeasibilities(ma_seq_matrix, ops_sequence_order, do_print=True, vali
         report[b] = errors
 
     if only_results:
-        return write_report(report, total_errors, error_list, print_report=True, save_as_file=report_file_path, n_ops=n_ops, only_results=True)
+        print('use only res')
+        total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = write_report(report, total_errors, error_list, print_report=True, save_as_file=report_file_path, n_ops=n_ops)
+        return report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p
+    total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = write_report(report, total_errors, error_list, print_report=True, save_as_file=report_file_path, n_ops=n_ops)
+    return report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p
 
-    write_report(report, total_errors, error_list, print_report=True, save_as_file=report_file_path, n_ops=n_ops)
 
-    return report, total_errors, error_list
+

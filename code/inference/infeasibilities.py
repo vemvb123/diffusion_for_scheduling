@@ -204,6 +204,248 @@ def when_pred_same_value_make_not_same(x, largest_values, job_lengths, epsilon=0
 
     return out
 
+def fix_order_mk10(x_order, valid_slots, job_lengths):
+    B, C, H, W = x_order.shape
+    x_fixed = x_order.clone()
+    valid = valid_slots.to(x_order.device)
+
+    col_start = 0
+    for job_len in job_lengths:
+        col_end = col_start + job_len
+        for b in range(B):
+            max_values = []
+            max_rows = []
+
+            # Step 1: collect maxima and their row indices
+            for w in range(col_start, col_end):
+                try:
+                    col_vals = x_fixed[b,0,:,w]
+                except IndexError as e:
+                    continue
+                mask = valid[0,0,:,w] == 1
+                if mask.any():
+                    row_idx = torch.argmax(col_vals * mask.float())
+                    max_values.append(col_vals[row_idx].item())
+                    max_rows.append(row_idx)
+                else:
+                    max_values.append(0.0)
+                    max_rows.append(None)
+
+            # Step 2: sort maxima in increasing order
+            sorted_values = sorted(max_values)
+
+            # Step 3: assign sorted values back to their original rows
+            for idx, w in enumerate(range(col_start, col_end)):
+                try:
+                    row = max_rows[idx]
+                except IndexError as e:
+                    continue
+
+                if row is not None:
+                    x_fixed[b,0,:,w] = 0.0  # clear column first
+                    x_fixed[b,0,row,w] = sorted_values[idx]
+
+        col_start = col_end
+
+    return x_fixed
+
+
+def fix_0s_mk10(x_order, valid_slots, job_lengths, eps=0.01):
+    B, C, H, W = x_order.shape
+    x_fixed = x_order.clone()
+    valid = valid_slots.to(x_order.device)
+
+    col_start = 0
+
+    for job_len in job_lengths:
+        col_end = col_start + job_len
+
+        for b in range(B):
+            for w in reversed(range(col_start, min(col_end, W))):
+                
+                try:
+                    col_vals = x_fixed[b, 0, :, w]
+                    valid_mask = valid[0, 0, :, w] == 1
+                    col_max = col_vals[valid_mask].max() if valid_mask.any() else 0.0
+
+                except IndexError as e:
+                    continue
+
+                if col_max == 0.0:
+                    step = 1
+                    found = False
+
+                    while (w + step) < W and (w + step) < col_end:
+                        next_col_vals = x_fixed[b, 0, :, w + step]
+                        next_valid_mask = valid[0, 0, :, w + step] == 1
+                        next_max = (
+                            next_col_vals[next_valid_mask].max()
+                            if next_valid_mask.any()
+                            else 0.0
+                        )
+
+                        if next_max > 0.0:
+                            found = True
+                            break
+                        step += 1
+
+                    new_val = max(next_max - eps * step, 0.0) if found else eps
+
+                    idx = torch.nonzero(valid_mask, as_tuple=False)
+                    if idx.numel() > 0:
+                        row = idx[0, 0]
+                        x_fixed[b, 0, row, w] = new_val
+
+        col_start = col_end
+        if col_start >= W:
+            break  # 🚨 STOP if we exceed tensor width
+
+    return x_fixed
+
+"""
+def fix_0s_mk10(x_order, valid_slots, job_lengths, eps=0.01):
+    B, C, H, W = x_order.shape
+    x_fixed = x_order.clone()
+    valid = valid_slots.to(x_order.device)
+
+    col_start = 0
+    for job_len in job_lengths:
+        #col_end = col_start + job_len
+        col_end = min(col_start + job_len, W)
+
+        for b in range(B):
+            # Iterate backwards so we can propagate values from the right
+            for w in reversed(range(col_start, col_end)):
+                print(f"batch {b}, col {w}")
+                col_vals = x_fixed[b, 0, :, w]
+                valid_mask = valid[0, 0, :, w] == 1
+                col_max = col_vals[valid_mask].max() if valid_mask.any() else 0.0
+
+                if col_max == 0.0:
+                    # Look forward until a non-zero column is found
+                    step = 1
+                    found = False
+                    while w + step < col_end and not found:
+                        next_col_vals = x_fixed[b, 0, :, w + step]
+                        next_valid_mask = valid[0, 0, :, w + step] == 1
+                        next_max = next_col_vals[next_valid_mask].max() if next_valid_mask.any() else 0.0
+                        if next_max > 0.0:
+                            found = True
+                        else:
+                            step += 1
+
+                    if found:
+                        new_val = max(next_max - eps * step, 0.0)
+                    else:
+                        # If no non-zero value exists in the future columns, just set a small default
+                        new_val = eps
+
+                    # Set the new value in the first valid row
+                    idx = torch.nonzero(valid_mask, as_tuple=False)
+                    if idx.numel() > 0:
+                        row = idx[0,0]
+                        x_fixed[b, 0, row, w] = new_val
+
+        col_start = col_end
+
+    return x_fixed
+"""
+def fix_same_value_in_job_mk10(x_order, valid_slots, job_lengths, eps=1e-3):
+    B, C, H, W = x_order.shape
+    x_fixed = x_order.clone()
+    valid = valid_slots.to(x_order.device)
+
+    col_start = 0
+    for job_len in job_lengths:
+        col_end = col_start + job_len
+
+        for b in range(B):
+
+            max_values = []
+            max_rows = []
+
+            # 🔥 FIX 1: clamp range
+            for w in range(col_start, min(col_end, W)):
+                col_vals = x_fixed[b, 0, :, w]
+                mask = valid[0, 0, :, w] == 1
+
+                if mask.any():
+                    row_idx = torch.argmax(col_vals * mask.float())
+                    max_values.append(col_vals[row_idx].item())
+                    max_rows.append(row_idx)
+                else:
+                    max_values.append(0.0)
+                    max_rows.append(None)
+
+            # Step 2: make values unique
+            unique_values = []
+            seen = {}
+            for val in max_values:
+                if val not in seen:
+                    seen[val] = 0
+                    unique_values.append(val)
+                else:
+                    seen[val] += 1
+                    unique_values.append(val + seen[val] * eps)
+
+            # 🔥 FIX 2: same clamp again
+            for idx, w in enumerate(range(col_start, min(col_end, W))):
+                row = max_rows[idx]
+                if row is not None:
+                    x_fixed[b, 0, :, w] = 0.0
+                    x_fixed[b, 0, row, w] = unique_values[idx]
+
+        col_start = col_end
+
+        # 🔥 FIX 3: hard stop
+        if col_start >= W:
+            break
+
+    return x_fixed
+
+def fix_same_value_global_mk10(x_order, valid_slots, eps=0.01):
+    x_fixed = x_order.clone()
+    B, C, H, W = x_fixed.shape
+
+    for b in range(B):
+        flat = x_fixed[b].view(-1)
+
+        # Indices of all non-zero values
+        nonzero_idx = torch.nonzero(flat > 0, as_tuple=False).squeeze()
+        if nonzero_idx.numel() == 0:
+            continue
+
+        # Extract values at these positions
+        vals = flat[nonzero_idx]
+
+        # Sort values (to handle duplicates)
+        sorted_vals, sort_idx = torch.sort(vals)
+
+        # Make strictly increasing
+        for i in range(1, len(sorted_vals)):
+            if sorted_vals[i] <= sorted_vals[i-1]:
+                sorted_vals[i] = sorted_vals[i-1] + eps
+
+        # Assign back to original positions
+        flat[nonzero_idx[sort_idx]] = sorted_vals
+
+        x_fixed[b] = flat.view(1, H, W)
+
+    return x_fixed
+
+
+
+def fix_infeas_mk10(x_order, valid_slots, ops_sequence_order):
+    job_lengths = get_job_lengths(ops_sequence_order)
+    x = fix_0s_mk10(x_order, valid_slots, job_lengths, eps=0.01)
+    x = fix_same_value_in_job_mk10(x, valid_slots, job_lengths, eps=0.01)
+    x = fix_same_value_global_mk10(x, valid_slots, eps=0.01)
+    x = fix_order_mk10(x, valid_slots, job_lengths)
+    return x
+
+
+
+
 
 def fix_infeasibilities(x: torch.Tensor, valid_slots: torch.Tensor, ops_sequence_order: torch.Tensor, largest_values: torch.Tensor, n_ops: int,
                         huh=False) -> torch.Tensor:
@@ -223,3 +465,5 @@ def fix_infeasibilities(x: torch.Tensor, valid_slots: torch.Tensor, ops_sequence
     x = when_break_pred_switch_order(x, valid_slots, largest_values, job_lengths)
 
     return x
+
+

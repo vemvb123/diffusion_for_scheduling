@@ -1,4 +1,18 @@
 
+for a kjore, ma nok...
+
+X endre sa blir sammenpressa i den ene funksjonen.
+X legge a masker
+endre filnavn pa grafer og slikt
+passe a overskriver forgje confidence fila, ikke bare legger til mer
+se at fikser sched feil
+
+tips... på stor benchmark kan du kanskje bruke batch erstattninga
+
+
+
+
+
 
 Skeduleringsfeil kommer av fogjande:
 Nar det er mange oppgaver, blir det stort spenn av aktuelle verdier.
