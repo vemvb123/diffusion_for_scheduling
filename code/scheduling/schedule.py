@@ -328,14 +328,14 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         print(td['ops_ma_adj'].shape)  # torch.Size([1, 6, 60])
 
     # Scheduling
-    print('Scheduling')
     feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0] 
     tds = Parallel(n_jobs=jobs_to_make)(
         delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env )
         for f_i in feasible_indecies
     )
 
-    ## mapping operations to machines ... result currently not used, idk what it is for...
+    # filling gaps
+    ## mapping operations to machines
     machine_assignments_maps = Parallel(n_jobs=jobs_to_make)(
         delayed(utils.map_operation_to_machines)(td["ma_assignment"])
         for td in tds
@@ -343,37 +343,31 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     #machine_assignments_maps = [list(m) for m in machine_assignments_maps]
 
     ## filling gaps
-    """
-    print('Filling gaps')
-    if fill_gaps:
-         print('her')
-         tds = Parallel(n_jobs=jobs_to_make)(
-            delayed(do_actions_fix_gap)( all_actions[f_i], n_machines, td.copy(), env )
-            for f_i in feasible_indecies
-        )
-    """
-    # Gathering numbers for makespans
+    tds = Parallel(n_jobs=jobs_to_make)(
+        delayed(code.scheduling.fix_scheduling_gaps.compress_schedule)(td["start_times"], td["finish_times"], ma_op_map, n_jobs, td, filler_machine=99)
+        for td, ma_op_map in zip(tds, machine_assignments_maps)
+    )
     makespans = [
     td["finish_times"][td["finish_times"] != 9999.0].max().item()
     for td in tds
     if td["finish_times"][td["finish_times"] != 9999.0].max().item() >= 30.0
     ]
 
-    # Getting the schedule of the best makespan
     td_best = tds[ makespans.index( min(makespans) ) ]
 
+    """
     start_times = td_best["start_times"]
     finish_times = td_best["finish_times"]
     machines = utils.map_operation_to_machines(td_best["ma_assignment"])
-    job_lengths = n_jobs
-    #td_best["start_times"], td_best["finish_times"] = fix_scheduling_gaps.compress_schedule(start_times, finish_times, machines, job_lengths, td_best, filler_machine=99)
-    td_best = fix_scheduling_gaps.compress_schedule(start_times, finish_times, machines, job_lengths, td_best, filler_machine=99)
+    job_lengths = n_jobsdd
+    td_best["start_times"], td_best["finish_times"] = utils.compress_schedule(start_times, finish_times, machines, job_lengths, filler_machine=99)
 
 
     makespans = [
         td["busy_until"].max(dim=1).values
         for td in tds
     ]
+    """
 
     print("")
 
