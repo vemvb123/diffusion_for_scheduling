@@ -2,7 +2,7 @@
 inference.py contains code for running inference with trained models
 """
 
-
+from code.training.utils import get_models
 from diffusers import CosineDPMSolverMultistepScheduler, DDPMScheduler
 
 from code.inference.denoise import denoise_ddpm, get_inference_schedule
@@ -42,9 +42,16 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
     device = "cuda"
     print(f"Using model {model_path}, with timesteps {timesteps}, and cos: {cos}")
 
+    '''
     model = deepinv.models.DiffUNet(
         in_channels=4, out_channels=1, pretrained=Path(model_path)
     ).to(device)
+    '''
+
+    model, model_enc, optimizer = get_models('adj',3, 1, 0.001, path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk02/mk02.pth')
+
+
+
 
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logging.info(f"Amount of trainable parameters: {trainable_params}")

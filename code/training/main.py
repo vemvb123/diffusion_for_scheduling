@@ -61,7 +61,7 @@ def train_models(
     penalty = False
 
     timesteps = 1000
-    model_path_adj= f'{full_path}/models/mk10/mk10.pth'
+    model_path_adj= f'{full_path}/models/mk01/mk01.pth'
 
 
 
@@ -75,11 +75,26 @@ def train_models(
     logging.info("Number of GPUs:", torch.cuda.device_count())
     logging.info("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 
+    model_path_adj = model_path_adj[:-4] + '_check_old_method' + '.pth'
+    logging.info(f"Saving model to {model_path_adj}")
 
     # best_lr = 0.001
     # lr =  0.001
+    lrs = [1e-4]
+    for i in range(3):
+        logging.info('training')
+        some, model_path, loss = training.diffusion(
+            model_type, train_dataset, test_dataset,
+            embed_size, model_path_adj, model_path_enc,
+            graph_name, graph_save_folder, valid_h, valid_w,
+            timesteps, scheduler_timesteps,
+            testing_epochs, lrs[0], batch_size=batch_size,
+            use_cos=use_cos, penalty=penalty,
+            idth=i
+        )
+    '''
     lrs = [1e-3]
-    for i in range(30):
+    for i in range(3):
         # TODO Idee... bare bruk flere epoker her... ... husk a fjerne at bare bruker subset i treninga
         logging.info(f"Training with lr {lrs[0]}")
         path_enc, path_adj, last_epoch_loss = train_improv.diffusion(
@@ -88,7 +103,9 @@ def train_models(
             graph_name, graph_save_folder, valid_h, valid_w, 
             timesteps, scheduler_timesteps,
             testing_epochs, lrs[0], batch_size=batch_size, # testing epochs ble brukt opprinnelig
-            use_cos=use_cos, penalty=penalty
+            use_cos=use_cos, penalty=penalty,
+            subset=False,
+            idth=i
         ) 
         if best_loss > last_epoch_loss: 
             # best_lr = lr
@@ -96,6 +113,7 @@ def train_models(
             pass
     print('exiting')
     exit()
+    '''
     # TODO ukommenter det over for a finne beste lr, og ikke sett manuelt beste lr
     logging.info(f"Best lr found: {best_lr}, for model {model_path_adj}")
     path_enc, path_adj, last_epoch_loss = train_improv.diffusion(
@@ -147,7 +165,94 @@ def four():
     model_path_adj = f'{full_path}/models/444/adj_type_{model_type}_order_{order}.pth'
     
     return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
+     
+def mk01():
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
+    parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+    logging.info(parameters)
+
+    generator_params = {
+        "num_jobs": parameters['n_jobs'],
+        "num_machines": parameters['n_machines'],
+        "min_ops_per_job": parameters['fewest_operations'],
+        "max_ops_per_job": parameters['most_operations'],
+        "min_processing_time": parameters['min_processing_time'],
+        "max_processing_time": parameters['max_processing_time'],
+        "min_eligible_ma_per_op": parameters['min_machine_options'],
+        "max_eligible_ma_per_op": parameters['max_machine_options'],
+    }
+
+    embed_size = 80
+
+    h = 24
+    w = 64
+    valid_h = 6
+    valid_w = 55
+    testing_epochs = 1
+    run_epochs = 50
+
+
+    graph_name = f"mk01"
+
+    full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
+
+    graph_save_folder = f"{full_path}/results/mk01" 
+
+    train_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01'
+    test_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01_TEST'
+
+    model_path_enc = f'{full_path}/models/mk01/mk01.pth'
+
+    model_path_adj = f'{full_path}/models/mk01/mk01.pth'
     
+    return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
+    
+
+
+
+def mk02():
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
+    parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+    logging.info(parameters)
+
+    generator_params = {
+        "num_jobs": parameters['n_jobs'],
+        "num_machines": parameters['n_machines'],
+        "min_ops_per_job": parameters['fewest_operations'],
+        "max_ops_per_job": parameters['most_operations'],
+        "min_processing_time": parameters['min_processing_time'],
+        "max_processing_time": parameters['max_processing_time'],
+        "min_eligible_ma_per_op": parameters['min_machine_options'],
+        "max_eligible_ma_per_op": parameters['max_machine_options'],
+    }
+
+    embed_size = 80
+
+    h = 24
+    w = 64
+    valid_h = 6
+    valid_w = 55
+    testing_epochs = 1
+    run_epochs = 50
+
+
+    graph_name = f"mk02"
+
+    full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
+
+    graph_save_folder = f"{full_path}/results/mk02" 
+
+    train_dataset_path = f'{full_path}/data/batched_10j_6ma_6op_mk02'
+    test_dataset_path = f'{full_path}/data/batched_10j_6ma_6op_mk02_TEST'
+
+    model_path_enc = f'{full_path}/models/mk02/mk02.pth'
+
+    model_path_adj = f'{full_path}/models/mk02/mk02.pth'
+    
+    return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
+    
+
+
 
 
 def mk10():
@@ -194,7 +299,8 @@ def mk10():
 
 
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = four()
-generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk10()
+# generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk10()
+generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk01()
 
 train_models(model_type, order,
     generator_params,

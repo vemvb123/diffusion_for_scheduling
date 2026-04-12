@@ -57,6 +57,7 @@ def mask_invalid(valid_h, valid_w, pred, noise, ops_ma_adj):
     return pred_valid, noise_valid
 
 
+"""
 
 def get_dataset_loaders(train_dataset, test_dataset, batch_size: int = 32, val_ratio: float = None, subset: bool = False):
     train_loader, test_loader = None, None
@@ -90,6 +91,64 @@ def get_dataset_loaders(train_dataset, test_dataset, batch_size: int = 32, val_r
     logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
     return train_loader, test_loader
 
+"""
+
+
+import logging
+import random
+from torch.utils.data import DataLoader, Subset, random_split
+
+
+def get_dataset_loaders(
+    train_dataset,
+    test_dataset,
+    batch_size: int = 32,
+    val_ratio: float = None,
+    subset: bool = False
+):
+    train_loader, test_loader = None, None
+
+    # Only reduce dataset IF subset=True
+    if subset:
+        subset_ratio = 0.05  # 20%
+
+        train_size = int(len(train_dataset) * subset_ratio)
+        test_size = int(len(test_dataset) * subset_ratio)
+
+        train_indices = random.sample(range(len(train_dataset)), train_size)
+        test_indices = random.sample(range(len(test_dataset)), test_size)
+
+        train_dataset = Subset(train_dataset, train_indices)
+        test_dataset = Subset(test_dataset, test_indices)
+
+    # Normal loaders
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
+    logging.info(f"N instances in test dataset: {len(test_loader.dataset)}")
+
+    # Validation split
+    if val_ratio is not None:
+        n_total = len(train_dataset)
+        n_val = int(val_ratio * n_total)
+        n_train = n_total - n_val
+
+        train_subset, val_subset = random_split(train_dataset, [n_train, n_val])
+
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+
+        logging.info(f"N instances in train dataset: {len(train_loader.dataset)}")
+        logging.info(f"N instances in val dataset: {len(val_loader.dataset)}")
+
+        return train_loader, test_loader, val_loader
+
+    logging.info(f"N instances in train dataset: {len(train_loader.dataset)}")
+
+    return train_loader, test_loader
+
+
+
 
 def get_models(model_type: str, n_base_features: int, n_embed_features, lr, device: str = "cuda", path = None):
     model_adj, model_enc, optimizer = None, None, None
@@ -113,6 +172,7 @@ def get_models(model_type: str, n_base_features: int, n_embed_features, lr, devi
         )
 
     elif model_type == "adj":
+         # im loading this
          model_adj = DiffUNet(
             in_channels=n_base_features + 1,
             out_channels=1,
@@ -120,7 +180,10 @@ def get_models(model_type: str, n_base_features: int, n_embed_features, lr, devi
         ).to(device)
          optimizer = torch.optim.Adam(model_adj.parameters(), lr=lr)
 
+
+
     if path != None:
+        # im loading this
         if os.path.exists(path):
             checkpoint = torch.load(path, map_location=device)
     

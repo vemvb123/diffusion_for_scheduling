@@ -55,14 +55,27 @@ Prosseseringstid:
 
 '''
 
+import matplotlib.pyplot as plt
 
 def run_epoch(loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod, mode, valid_h, valid_w, 
-            scheduler=None):
+            scheduler=None, idth=0, model_path=None):
 
 
     total_loss = 0.0
+    batch_losses = []
+
+    fig, ax = plt.subplots()
+    ax.set_xlabel("Batch")
+    ax.set_ylabel("Loss")
+    ax.set_title(f"Loss {mode}")
+
+    if mode == "train":
+        model_adj.train()
+    else:
+        model_adj.eval()
+
 
     for batch_idx, (target_assignments, proc_times, job_ops_adj, ops_ma_adj) in enumerate(loop):
 
@@ -97,21 +110,54 @@ def run_epoch(loop, device, timesteps,
         ], dim=1)
 
         if mode == "train":
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
-        pred = model_adj(model_input, t, type_t="timestep")
+            pred = model_adj(model_input, t, type_t="timestep")
 
-        pred_valid, noise_valid = mask_invalid(valid_h, valid_w, pred, noise, ops_ma_adj)
-        loss = nn.MSELoss()(pred_valid, noise_valid)
+            pred_valid, noise_valid = mask_invalid(valid_h, valid_w, pred, noise, ops_ma_adj)
+            loss = nn.MSELoss()(pred_valid, noise_valid)
 
-        if mode == "train":
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model_adj.parameters(), 1.0)
             optimizer.step()
+
+        else:
+            with torch.no_grad():
+                pred = model_adj(model_input, t, type_t="timestep")
+
+                pred_valid, noise_valid = mask_invalid(valid_h, valid_w, pred, noise, ops_ma_adj)
+                loss = nn.MSELoss()(pred_valid, noise_valid)
+
+
+        if loss.item() < 0.8 and idth > 0:
+            print('reached it')
+            logging.info('reached it')
+            exit()
+
+
+
 
         loss_value = loss.item()
         total_loss += loss_value
 
+
+        batch_losses.append(loss_value)
+
         loop.set_postfix(loss=loss_value)
+
+
+
+        ax.clear()
+        ax.set_xlabel("Batch")
+        ax.set_ylabel("Loss")
+        ax.set_title(f"Loss {mode} (updated)")
+        ax.plot(batch_losses, color="blue")
+        # Save figure to disk as PNG (overwrite each batch)
+        if model_path is not None:
+            fig.savefig(f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/in_epoch_{mode}_{model_path}.png")
+
+ 
+    plt.close(fig)
 
     return loop, model_adj, total_loss / len(loop)
 
@@ -133,7 +179,7 @@ def diffusion(
     device: str = "cuda",
     batch_size: int = 32,
     use_cos=True,
-    penalty=False
+    penalty=False, idth=None
 ):
     n_base_features = train_dataset.n_base_features
 
@@ -196,14 +242,14 @@ def diffusion(
             train_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-            "train", valid_h, valid_w, scheduler
+            "train", valid_h, valid_w, scheduler, idth, model_path_adj.split('/')[-1].split('.')[0]
         )
 
         test_loop, model_adj, avg_loss_test = run_epoch_func(
             test_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-            "test", valid_h, valid_w, scheduler
+            "test", valid_h, valid_w, scheduler, idth, model_path_adj.split('/')[-1].split('.')[0]
         )
 
 

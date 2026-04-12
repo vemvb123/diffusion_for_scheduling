@@ -10,7 +10,7 @@ def main(instance_type = None):
     ### Lag dataset
 
 
-    train_size = 300000
+    train_size = 100000
     test_size = int(train_size * 0.2)
     n = train_size + test_size
 
@@ -59,6 +59,13 @@ def main(instance_type = None):
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
         target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.001_20j_10ma_25op_18a.ckpt'
 
+    elif int(sys.argv[1]) == 4:
+        print("making mk02 dataset")
+        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_10j_6ma_6op_mk02'
+        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
+        target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.001_10j_6ma_6op_mk02.ckpt'
+
+
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
     print(parameters)
 
@@ -88,7 +95,7 @@ def main(instance_type = None):
 def check_benchmark_parameters():
     print("checking benchmark parameters...")
     #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
-    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
     #filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
@@ -97,9 +104,11 @@ def check_benchmark_parameters():
 def check_dataset():
     # --- process test image
     instance_idx = 10
-    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk10_20j_15ma_14op'
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444'
     td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
 
+
+    print(td['job_ops_adj'])
     print(td.keys())
     print(td['opt_assignment'])
     print(td['opt_actions'])
@@ -128,21 +137,21 @@ def check_dataset():
         order=True,
         w=24,
         h=24
-    )
+    ):w
     dataset[0]
     """
 
-check_benchmark_parameters()
+# check_benchmark_parameters()
 
-# check_dataset()
+check_dataset()
 #instance_type = "mk01"
 # main()
 
-ins = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
-td = benchmark_utils.make_the_stuff(ins)
+# ins = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
+# td = benchmark_utils.make_the_stuff(ins)
 
 
-
+"""
 print(td['proc_times'])
 print(td['ops_ma_adj'])
 print(td['job_ops_adj'])
@@ -151,6 +160,7 @@ print(td['ops_sequence_order'])
 
 print('------------------')
 
+"""
 """
 instance_idx = 10
 dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'

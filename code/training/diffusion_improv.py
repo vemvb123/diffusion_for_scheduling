@@ -43,7 +43,7 @@ import matplotlib.pyplot as plt
 def run_epoch(loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-            mode, valid_h, valid_w, scheduler=None):
+            mode, valid_h, valid_w, scheduler=None, idth=0, model_path=None):
 
     total_loss = 0.0
     batch_losses = []
@@ -85,6 +85,11 @@ def run_epoch(loop, device, timesteps,
         pred_valid, noise_valid = mask_invalid(valid_h, valid_w, pred, noise, ops_ma_adj)
         loss = nn.MSELoss()(pred_valid, noise_valid)
 
+        if loss.item() < 0.8 and idth > 0:
+            print('reached it')
+            logging.info('reached it')
+            exit()
+
         if mode == "train":
             loss.backward()
             optimizer.step()
@@ -102,7 +107,8 @@ def run_epoch(loop, device, timesteps,
         ax.plot(batch_losses, color="blue")
 
         # Save figure to disk as PNG (overwrite each batch)
-        fig.savefig(f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/mk10/in_epoch_{mode}.png")
+        if model_path is not None:
+            fig.savefig(f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/in_epoch_{mode}_{model_path}.png")
 
     avg_loss = total_loss / len(loop)
     return loop, model_adj, avg_loss
@@ -145,7 +151,9 @@ def diffusion(
     device: str = "cuda",
     batch_size: int = 32,
     use_cos=True,
-    penalty=False
+    penalty=False,
+    subset=False,
+    idth=0
 ):
 
     logging.info(f"For model training... using lr {lr}")
@@ -178,9 +186,9 @@ def diffusion(
     if model_type != "adj" and model_type != "f":
         raise ValueError(f"model_type must be either adj or f .kk. but value was #{model_type}#")
 
-    train_loader, test_loader, val_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size, val_ratio=0.2) # subset=True ... for testing med subset
+    train_loader, test_loader, val_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size, val_ratio=0.2, subset=subset) # subset=True ... for testing med subset
 
-    model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr, path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk10/mk10.pth')
+    model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr, path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk02/mk02.pth')
 
     trainable_params = sum(p.numel() for p in model_adj.parameters() if p.requires_grad)
     logging.info(f"Amount of trainable parameters: {trainable_params}")
@@ -206,14 +214,16 @@ def diffusion(
             train_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-            "train", valid_h, valid_w, scheduler
+            "train", valid_h, valid_w, scheduler,
+            idth=idth, model_path=model_path_adj.split('/')[-1].split('.')[0]
         )
 
         val_loop, model_adj, avg_loss_val = epoch_func(
             val_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-            "test", valid_h, valid_w, scheduler
+            "test", valid_h, valid_w, scheduler,
+            idth=idth, model_path=model_path_adj.split('/')[-1].split('.')[0]
         )
 
 
@@ -244,6 +254,7 @@ def diffusion(
             if all_losses_val[-1] > all_losses_val[-4]:
                 logging.info("Validation loss has not gone down for 4 epochs - stopping early")
                 break
+
     
 
     # Running on test set
@@ -262,7 +273,7 @@ def diffusion(
     plot_losses(graph_save_folder, f"{graph_name} train", all_losses)
     plot_losses(graph_save_folder, f"{graph_name} validation", all_losses_val)
 
-    torch.save(model_adj.state_dict(), model_path_adj)
+    # torch.save(model_adj.state_dict(), model_path_adj)
     if model_type == "f":
         torch.save(model_enc.state_dict(), model_enc)
     logging.info(f"done training. Saved model {model_path_adj}")

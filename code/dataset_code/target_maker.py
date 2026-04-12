@@ -41,11 +41,16 @@ def train_model():
     elif int(sys.argv[1]) == 3:
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
         name = "20j_10ma_25op_18a"
+    elif int(sys.argv[1]) == 4:
+        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
+        name = "10j_6ma_6op_mk02"
 
+    print(f'making model {name}')
+    print(f"benchmark instance: {filepath_benchmark_instance}")
+    print('parameters:')
 
     parameters = utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
- 
-
+    print(parameters)
 
     jobs = parameters['n_jobs']
     ma = parameters['n_machines']

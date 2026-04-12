@@ -1,4 +1,19 @@
 
+X kjore for mk02, se nar stopper, om stopper med en gang pa epoke 2
+X kjore for mk01, se om stopper i det hele tatt
+...
+Den stoppet a lare i midten av mk01, for mk02 stoppet den i i helt av starten av 2 epoke. men kan hende ogsa var noe tidligere
+Dette betyr at det ma vera noe med koden
+
+
+.... hvis modell for mk01 ikke feiler, sa er det ikke er koden i seg selv. det er datasettet eller modellen i seg selv, eller er sa det noe med koden i seg selv
+bruk eksisterende kode til a lage enda et mk01 datasett
+tren modell igjen for det nye lagde datasettet for mk01
+..... hvis modell ikke klarer det, veit jeg det er noe med datasettet, hvis modellen klarer det er det noe med modellen i seg selv
+
+
+
+....
 for a kjore, ma nok...
 
 X endre sa blir sammenpressa i den ene funksjonen.

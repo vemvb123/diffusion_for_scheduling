@@ -51,7 +51,9 @@ def append_results(
 
 def compute_bounds():
     # Load all stored metrics from CSV
-    df = pd.read_csv("batch_runs_metrics.csv")
+    folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals/'
+    csv_bench = 'batch_runs_metrics_mk01.csv'
+    df = pd.read_csv(f"{folder}/{csv_bench}")
 
     # We want 2.5th and 97.5th percentiles to get a 95% interval
     lower_pct = 0.025
@@ -67,8 +69,9 @@ def compute_bounds():
 
     # Save metric bounds to separate file
     bounds_df = pd.DataFrame(bounds).T
-    bounds_df.to_csv("metric_bounds_95.csv")
+    bounds_df.to_csv(f"{folder}/metric_bounds_95.csv")
 
     print("Saved 95% bounds for all metrics to metric_bounds_95.csv")
 
 
+compute_bounds()
