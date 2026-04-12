@@ -75,12 +75,12 @@ def train_models(
     logging.info("Number of GPUs:", torch.cuda.device_count())
     logging.info("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 
-    model_path_adj = model_path_adj[:-4] + '_check_old_method' + '.pth'
+    model_path_adj = model_path_adj[:-4] + '_check_old_method_lr05' + '.pth'
     logging.info(f"Saving model to {model_path_adj}")
 
     # best_lr = 0.001
     # lr =  0.001
-    lrs = [1e-4]
+    lrs = [1e-5]
     for i in range(3):
         logging.info('training')
         some, model_path, loss = training.diffusion(

@@ -129,14 +129,6 @@ def run_epoch(loop, device, timesteps,
                 loss = nn.MSELoss()(pred_valid, noise_valid)
 
 
-        if loss.item() < 0.8 and idth > 0:
-            print('reached it')
-            logging.info('reached it')
-            exit()
-
-
-
-
         loss_value = loss.item()
         total_loss += loss_value
 
@@ -217,7 +209,7 @@ def diffusion(
     logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
     logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")
     
-    model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr)
+    model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr, path=model_path_adj)
 
     trainable_params = sum(p.numel() for p in model_adj.parameters() if p.requires_grad)
     logging.info(f"Amount of trainable parameters: {trainable_params}")
