@@ -48,7 +48,7 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
     ).to(device)
     '''
 
-    model, model_enc, optimizer = get_models('adj',3, 1, 0.001, path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk02/mk02.pth')
+    model, model_enc, optimizer = get_models('adj',3, 1, 0.001, path = model_path)
 
 
 

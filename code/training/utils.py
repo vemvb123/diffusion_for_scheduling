@@ -153,6 +153,7 @@ def get_dataset_loaders(
 
 
 def get_models(model_type: str, n_base_features: int, n_embed_features, lr, device: str = "cuda", path = None):
+    print(f'path for model to load is {path}')
     model_adj, model_enc, optimizer = None, None, None
 
     if model_type == "f":
@@ -185,6 +186,7 @@ def get_models(model_type: str, n_base_features: int, n_embed_features, lr, devi
 
     if path != None:
         # im loading this
+        '''
         if os.path.exists(path):
             try:
                 checkpoint = torch.load(path, map_location=device)
@@ -192,10 +194,11 @@ def get_models(model_type: str, n_base_features: int, n_embed_features, lr, devi
                 model_adj.load_state_dict(checkpoint['model_state_dict'])
                 optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             except Exception as e:
-                model_adj = deepinv.models.DiffUNet(
+        '''
+        model_adj = deepinv.models.DiffUNet(
                     in_channels=n_base_features + 1, out_channels=1, pretrained=Path(path)
                 ).to(device)
-                optimizer = None
+        optimizer = None
 
     return model_adj, model_enc, optimizer
 
