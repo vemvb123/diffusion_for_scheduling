@@ -373,6 +373,9 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
     inference_assignments = inference_assignments[:, :, :valid_h, :valid_w]
     ops_ma_adj = ops_ma_adj[:, :, :valid_h, :valid_w]
 
+    job_ops_adj = job_ops_adj[:, :, :valid_h, :valid_w]
+    proc_times = proc_times[:, :, :valid_h, :valid_w]
+
     return td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path, report_file_path_fix, n_ops
 
 
@@ -414,7 +417,8 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
 
 
     save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis"
-    matrix_graph_schedule.show_single_sched(inference_assignments_order, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True)
+    matrix_graph_schedule.show_single_sched(inference_assignments, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True,
+                                            proc_times=proc_times, job_ops_adj=job_ops_adj, show_features=True)
     #save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis"
     #assignments_over_time.append(inference_assignments_order)
     #matrix_graph_schedule.show_sched(2, ops_ma_adj, inference_assignments_order, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
@@ -439,10 +443,11 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # matrix_graph_schedule.show_sched(2, ops_ma_adj, inference_assignments, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
 
     save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis_fix"
-    matrix_graph_schedule.show_single_sched(inference_assignments_fixed, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True)
+    matrix_graph_schedule.show_single_sched(inference_assignments_fixed, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True,
+                                            proc_times=proc_times, job_ops_adj=job_ops_adj, show_features=True)
     
-    # print('exitiing')
-    #exit()
+    print('exitiing')
+    exit()
 
     """
     index = 0
