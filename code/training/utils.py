@@ -98,7 +98,8 @@ def get_dataset_loaders(train_dataset, test_dataset, batch_size: int = 32, val_r
 import logging
 import random
 from torch.utils.data import DataLoader, Subset, random_split
-
+from pathlib import Path
+import deepinv
 
 def get_dataset_loaders(
     train_dataset,
@@ -185,17 +186,16 @@ def get_models(model_type: str, n_base_features: int, n_embed_features, lr, devi
     if path != None:
         # im loading this
         if os.path.exists(path):
-            '''
-            checkpoint = torch.load(path, map_location=device)
-    
-            model_adj.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            '''
-
-            model_adj = deepinv.models.DiffUNet(
-                in_channels=n_base_features + 1, out_channels=1, pretrained=Path(path)
-            ).to(device)
-            optimizer = None
+            try:
+                checkpoint = torch.load(path, map_location=device)
+        
+                model_adj.load_state_dict(checkpoint['model_state_dict'])
+                optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            except Exception as e:
+                model_adj = deepinv.models.DiffUNet(
+                    in_channels=n_base_features + 1, out_channels=1, pretrained=Path(path)
+                ).to(device)
+                optimizer = None
 
     return model_adj, model_enc, optimizer
 

@@ -60,7 +60,7 @@ import matplotlib.pyplot as plt
 def run_epoch(loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod, mode, valid_h, valid_w, 
-            scheduler=None, idth=0, model_path=None):
+            scheduler=None, model_path=None, epoch_num=None):
 
 
     total_loss = 0.0
@@ -142,16 +142,19 @@ def run_epoch(loop, device, timesteps,
         ax.clear()
         ax.set_xlabel("Batch")
         ax.set_ylabel("Loss")
-        ax.set_title(f"Loss {mode} (updated)")
+        ax.set_title(f"Loss {mode} (updated) epoch nr {epoch_num}")
         ax.plot(batch_losses, color="blue")
         # Save figure to disk as PNG (overwrite each batch)
         if model_path is not None:
-            fig.savefig(f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/in_epoch_{mode}_{model_path}.png")
+            fig.savefig(f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/in_epoch_{mode}_{model_path}_{epoch_num}.png")
 
  
     plt.close(fig)
 
     return loop, model_adj, total_loss / len(loop)
+
+
+
 
 
 def diffusion(
@@ -171,7 +174,7 @@ def diffusion(
     device: str = "cuda",
     batch_size: int = 32,
     use_cos=True,
-    penalty=False, idth=None
+    penalty=False
 ):
     n_base_features = train_dataset.n_base_features
 
@@ -209,7 +212,7 @@ def diffusion(
     logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
     logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")
     
-    model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr, path=model_path_adj)
+    model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr)
 
     trainable_params = sum(p.numel() for p in model_adj.parameters() if p.requires_grad)
     logging.info(f"Amount of trainable parameters: {trainable_params}")
@@ -234,14 +237,14 @@ def diffusion(
             train_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-            "train", valid_h, valid_w, scheduler, idth, model_path_adj.split('/')[-1].split('.')[0]
+            "train", valid_h, valid_w, scheduler, model_path_adj.split('/')[-1].split('.')[0], epoch_num=epoch
         )
 
         test_loop, model_adj, avg_loss_test = run_epoch_func(
             test_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-            "test", valid_h, valid_w, scheduler, idth, model_path_adj.split('/')[-1].split('.')[0]
+            "test", valid_h, valid_w, scheduler, model_path_adj.split('/')[-1].split('.')[0], epoch_num=epoch
         )
 
 
@@ -260,7 +263,11 @@ def diffusion(
         all_losses.append(avg_loss)
         all_losses_test.append(avg_loss_test)
 
-        torch.save(model_adj.state_dict(), model_path_adj)
+        torch.save({ 
+                'model_state_dict': model_adj.state_dict(), 
+                'optimizer_state_dict': optimizer.state_dict(), }, 
+            model_path_adj)
+        # torch.save(model_adj.state_dict(), model_path_adj)
         if model_type == "f":
             torch.save(model_enc.state_dict(), model_enc)
 
@@ -274,10 +281,17 @@ def diffusion(
     plot_losses(graph_save_folder, f"{graph_name} train", all_losses)
     plot_losses(graph_save_folder, f"{graph_name} test", all_losses_test)
 
-    torch.save(model_adj.state_dict(), model_path_adj)
+    torch.save({ 
+                'model_state_dict': model_adj.state_dict(), 
+                'optimizer_state_dict': optimizer.state_dict(), }, 
+            model_path_adj)
+    # torch.save(model_adj.state_dict(), model_path_adj)
     if model_type == "f":
         torch.save(model_enc.state_dict(), model_enc)
     print(f"done training. Saved model {model_path_adj}")
+
+
+
     return None, model_path_adj, all_losses[-1]
 
 

@@ -45,7 +45,7 @@ def train_models(
     train_dataset = Dataset_RL4CO(train_dataset_path, generator_params, order, h, w)
     test_dataset = Dataset_RL4CO(test_dataset_path, generator_params, order, h, w)
 
-    lrs = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+    # lrs = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
 
        
     best_loss = 1
@@ -61,7 +61,7 @@ def train_models(
     penalty = False
 
     timesteps = 1000
-    model_path_adj= f'{full_path}/models/mk01/mk01.pth'
+    # model_path_adj= f'{full_path}/models/mk01/mk01.pth'
 
 
 
@@ -75,23 +75,26 @@ def train_models(
     logging.info("Number of GPUs:", torch.cuda.device_count())
     logging.info("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 
-    model_path_adj = model_path_adj[:-4] + '_check_old_method_lr05' + '.pth'
+    # model_path_adj = model_path_adj[:-4] + '_check_old_method_lr05' + '.pth'
     logging.info(f"Saving model to {model_path_adj}")
 
-    # best_lr = 0.001
     # lr =  0.001
-    lrs = [1e-5]
-    for i in range(3):
+    lrs = [1e-4, 1e-5, 1e-6]
+    best_lr = lrs[0]
+    for lr in lrs:
         logging.info('training')
-        some, model_path, loss = training.diffusion(
+        some, model_path, last_epoch_loss = training.diffusion(
             model_type, train_dataset, test_dataset,
             embed_size, model_path_adj, model_path_enc,
             graph_name, graph_save_folder, valid_h, valid_w,
             timesteps, scheduler_timesteps,
-            testing_epochs, lrs[0], batch_size=batch_size,
-            use_cos=use_cos, penalty=penalty,
-            idth=i
+            testing_epochs, lr, batch_size=batch_size,
+            use_cos=use_cos, penalty=penalty
         )
+        if best_loss > last_epoch_loss: 
+            best_lr = lr
+            best_loss = last_epoch_loss
+
     '''
     lrs = [1e-3]
     for i in range(3):
@@ -114,8 +117,20 @@ def train_models(
     print('exiting')
     exit()
     '''
+
+
+
     # TODO ukommenter det over for a finne beste lr, og ikke sett manuelt beste lr
     logging.info(f"Best lr found: {best_lr}, for model {model_path_adj}")
+    some, model_path, last_epoch_loss = training.diffusion(
+        model_type, train_dataset, test_dataset,
+        embed_size, model_path_adj, model_path_enc,
+        graph_name, graph_save_folder, valid_h, valid_w,
+        timesteps, scheduler_timesteps,
+        run_epochs, best_lr, batch_size=batch_size,
+        use_cos=use_cos, penalty=penalty
+    )
+    '''
     path_enc, path_adj, last_epoch_loss = train_improv.diffusion(
         model_type, train_dataset, test_dataset,
         embed_size, model_path_adj, model_path_enc,
@@ -124,8 +139,8 @@ def train_models(
         run_epochs, best_lr, batch_size=batch_size,
         use_cos=use_cos, penalty=penalty
     )
-
-    logging.info(f"Ended training model {path_adj} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+    '''
+    logging.info(f"Ended training model {model_path} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
 
 
 
@@ -148,7 +163,7 @@ def four():
     w = 24
     valid_h = 4
     valid_w = 16
-    testing_epochs = 2
+    testing_epochs = 3
     run_epochs = 100
 
 
@@ -188,7 +203,7 @@ def mk01():
     w = 64
     valid_h = 6
     valid_w = 55
-    testing_epochs = 1
+    testing_epochs = 2
     run_epochs = 50
 
 
@@ -232,7 +247,7 @@ def mk02():
     w = 64
     valid_h = 6
     valid_w = 55
-    testing_epochs = 1
+    testing_epochs = 2
     run_epochs = 50
 
 
@@ -274,10 +289,10 @@ def mk10():
     embed_size = 80
 
     h = 24
-    w = 280
+    w = 288
     valid_h = 15
     valid_w = 280
-    testing_epochs = 1
+    testing_epochs = 2
     run_epochs = 50
 
 
@@ -299,8 +314,9 @@ def mk10():
 
 
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = four()
-# generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk10()
-generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk01()
+generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk10()
+# generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk01()
+# generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk02()
 
 train_models(model_type, order,
     generator_params,
