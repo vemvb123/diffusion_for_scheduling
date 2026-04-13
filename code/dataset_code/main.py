@@ -8,7 +8,7 @@ import sys
 
 def main(instance_type = None):
     ### Lag dataset
-
+    print("Beginning dataset creation...")
 
     train_size = 100000
     test_size = int(train_size * 0.2)
@@ -95,7 +95,7 @@ def main(instance_type = None):
 def check_benchmark_parameters():
     print("checking benchmark parameters...")
     #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
-    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk03.txt'
     #filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
@@ -141,9 +141,9 @@ def check_dataset():
     dataset[0]
     """
 
-# check_benchmark_parameters()
+check_benchmark_parameters()
 
-check_dataset()
+# check_dataset()
 #instance_type = "mk01"
 # main()
 

@@ -44,6 +44,12 @@ def train_model():
     elif int(sys.argv[1]) == 4:
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
         name = "10j_6ma_6op_mk02"
+    elif int(sys.argv[1]) == 5:
+        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk03.txt'
+        name = "15j_8ma_10op_mk03"
+
+
+
 
     print(f'making model {name}')
     print(f"benchmark instance: {filepath_benchmark_instance}")
@@ -99,7 +105,7 @@ def train_model():
     policy = L2DPolicy(embed_dim=embed_dim, num_encoder_layers=num_encoder_layers, env_name="fjsp")
 
     # Model: default is AM with REINFORCE and greedy rollout baseline
-    lrs = [1e-3]
+    lrs = [1e-4]
     for lr in lrs:
         model = L2DModel(env,
                          policy=policy, 
