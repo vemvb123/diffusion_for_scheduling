@@ -1,4 +1,14 @@
 
+Kjore...
+V mk10
+mk02 fortsette å trene modell
+mk03
+
+
+...
+
+
+
 X kjore for mk02, se nar stopper, om stopper med en gang pa epoke 2
 X kjore for mk01, se om stopper i det hele tatt
 ...

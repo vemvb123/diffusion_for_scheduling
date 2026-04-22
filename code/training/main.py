@@ -29,6 +29,97 @@ from code.dataset_code.dataset import Dataset_RL4CO
 model_type = "adj"
 order = True
 
+
+def continue_training(
+    model_type, order,
+    generator_params,
+    embed_size,
+    h, w,
+    testing_epochs, run_epochs,
+    graph_name, graph_save_folder,
+    train_dataset_path, test_dataset_path,
+    model_path_enc, model_path_adj,
+    valid_h, valid_w
+    ):
+
+    train_dataset = Dataset_RL4CO(train_dataset_path, generator_params, order, h, w)
+    test_dataset = Dataset_RL4CO(test_dataset_path, generator_params, order, h, w)
+
+
+    scheduler_timesteps = 1000
+    batch_size = 32
+    timesteps = 1000
+
+    full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
+    use_cos = True
+    penalty = False
+
+    timesteps = 1000
+    # model_path_adj= f'{full_path}/models/mk01/mk01.pth'
+
+
+
+    # TODO kan legge til penalty for infeasible, men vil helst først trene modeller med mindre tidssteg,
+    # egner ikke særlig å gi penalty på et tidssteg som jeg uansett ikke bruker
+    best_lr = 1e-4
+
+
+    logging.info(f"Began training timestep model {model_path_adj} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+    logging.info("CUDA available:", torch.cuda.is_available())
+    logging.info("Number of GPUs:", torch.cuda.device_count())
+    logging.info("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
+
+    # model_path_adj = model_path_adj[:-4] + '_check_old_method_lr05' + '.pth'
+    logging.info(f"loading model {model_path_adj}")
+    '''
+    lrs = [1e-3]
+    for i in range(3):
+        # TODO Idee... bare bruk flere epoker her... ... husk a fjerne at bare bruker subset i treninga
+        logging.info(f"Training with lr {lrs[0]}")
+        path_enc, path_adj, last_epoch_loss = train_improv.diffusion(
+            model_type, train_dataset, test_dataset,
+            embed_size, model_path_adj, model_path_enc,
+            graph_name, graph_save_folder, valid_h, valid_w, 
+            timesteps, scheduler_timesteps,
+            testing_epochs, lrs[0], batch_size=batch_size, # testing epochs ble brukt opprinnelig
+            use_cos=use_cos, penalty=penalty,
+            subset=False,
+            idth=i
+        ) 
+        if best_loss > last_epoch_loss: 
+            # best_lr = lr
+            # best_loss = last_epoch_loss
+            pass
+    print('exiting')
+    exit()
+    '''
+
+    # TODO ukommenter det over for a finne beste lr, og ikke sett manuelt beste lr
+    logging.info(f"Best lr: {best_lr}, for model {model_path_adj}")
+    some, model_path, last_epoch_loss = training.diffusion(
+        model_type, train_dataset, test_dataset,
+        embed_size, model_path_adj, model_path_enc,
+        graph_name, graph_save_folder, valid_h, valid_w,
+        timesteps, scheduler_timesteps,
+        run_epochs, best_lr, batch_size=batch_size,
+        use_cos=use_cos, penalty=penalty
+    )
+    '''
+    path_enc, path_adj, last_epoch_loss = train_improv.diffusion(
+        model_type, train_dataset, test_dataset,
+        embed_size, model_path_adj, model_path_enc,
+        graph_name, graph_save_folder, valid_h, valid_w, 
+        timesteps, scheduler_timesteps,
+        run_epochs, best_lr, batch_size=batch_size,
+        use_cos=use_cos, penalty=penalty
+    )
+    '''
+    logging.info(f"Ended training model {model_path} at time {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+
+
+
+
+
 def train_models(
     model_type, order,
     generator_params,
@@ -314,11 +405,22 @@ def mk10():
 
 
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = four()
-generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk10()
+# generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk10()
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk01()
-# generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk02()
-
+generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk02()
+'''
 train_models(model_type, order,
+    generator_params,
+    embed_size,
+    h, w,
+    testing_epochs, run_epochs,
+    graph_name, graph_save_folder,
+    train_dataset_path, test_dataset_path,
+    model_path_enc, model_path_adj, 
+    valid_h, valid_w)
+
+'''
+continue_training(model_type, order,
     generator_params,
     embed_size,
     h, w,

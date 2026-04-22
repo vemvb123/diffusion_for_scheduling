@@ -146,7 +146,7 @@ def run_epoch(loop, device, timesteps,
         ax.plot(batch_losses, color="blue")
         # Save figure to disk as PNG (overwrite each batch)
         if model_path is not None:
-            fig.savefig(f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/in_epoch_{mode}_{model_path}_{epoch_num}.png")
+            fig.savefig(f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/in_epoch_{mode}_{model_path}_{epoch_num}_x.png")
 
  
     plt.close(fig)
@@ -212,7 +212,7 @@ def diffusion(
     logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
     logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")
     
-    model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr)
+    model_adj, model_enc, optimizer = get_models(model_type, n_base_features, n_embed_features, lr, path=model_path_adj)
 
     trainable_params = sum(p.numel() for p in model_adj.parameters() if p.requires_grad)
     logging.info(f"Amount of trainable parameters: {trainable_params}")
