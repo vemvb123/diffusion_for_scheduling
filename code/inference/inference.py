@@ -47,7 +47,7 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
 
     try:
         model = deepinv.models.DiffUNet(
-            in_channels=3,
+            in_channels=4,
             out_channels=1,
             pretrained=Path(model_path)
         ).to(device)
@@ -55,7 +55,7 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
     except Exception as e:
         checkpoint = torch.load(model_path, map_location=device)
 
-        model = deepinv.models.DiffUNet(in_channels=3, out_channels=1)
+        model = deepinv.models.DiffUNet(in_channels=4, out_channels=1, pretrained=None)
         model = model.to(device)
         model.load_state_dict(checkpoint["model_state_dict"])
 
