@@ -8,6 +8,7 @@ import code.dataset_code.benchmark_utils
 import code.dataset_code.dataset_maker
 import code.inference.experimental
 import code.inference.infeasibilities
+import code.inference.infeasibilities_try
 import code.inference.inferenced_to_schedule
 import code.inference.report_infeasibilities
 import code.inference.utils as utils
