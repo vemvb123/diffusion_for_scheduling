@@ -439,6 +439,8 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     print(n_ops)
     print(inference_assignments.shape)
 
+
+
     '''
     save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis"
     matrix_graph_schedule.show_sched(2, ops_ma_adj, inference_assignments, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
@@ -449,17 +451,13 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # inference_assignments_order = code.inference.inferenced_to_schedule.fix_x(inference_assignments, ops_ma_adj) # mk10 order visning
     print('n ops... ')
     print(n_ops)
-    print(report_file_path)
     report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = code.inference.report_infeasibilities.count_infeasibilities(inference_assignments_order, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
     code.inference.report_infeasibilities.add_elapsed_time_report(elapsed, report_file_path)
 
-    # BRUK DETTE
     '''
     save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis"
-    matrix_graph_schedule.show_single_sched(inference_assignments, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True,
-                                            proc_times=proc_times, job_ops_adj=job_ops_adj, show_features=True)
+    matrix_graph_schedule.show_single_sched(inference_assignments_order, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True)
     '''
-    # IGNORER DETTE
     #save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis"
     #assignments_over_time.append(inference_assignments_order)
     #matrix_graph_schedule.show_sched(2, ops_ma_adj, inference_assignments_order, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
@@ -480,14 +478,12 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     n_ops=n_ops
     )
 
-    # IGNORER DETTE
+
     # save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis_fix"
     # matrix_graph_schedule.show_sched(2, ops_ma_adj, inference_assignments, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
-    # BRUK DETTE
     '''
     save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis_fix"
-    matrix_graph_schedule.show_single_sched(inference_assignments_fixed, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True,
-                                            proc_times=proc_times, job_ops_adj=job_ops_adj, show_features=True)
+    matrix_graph_schedule.show_single_sched(inference_assignments_fixed, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True)
     '''
     print('exitiing')
     exit()
@@ -544,13 +540,17 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # report, total_errors, error_list, total_error, avg_amt_infeas_ops, avg_amt_infeas_multi, avg_amt_infeas_seq, infeas_ops, avg_infeas_multi, amt_infeas_sched, percent_infeas_sched
 
 
-    benchmark = 'mk02'
+    benchmark = 'mk01'
     confidence_interval_utils.append_results( 
         min_makespan, avg_makespan, max_makespan, elapsed,
         total_errors, total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p,
         total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix,
         benchmark
     )
+
+   
+
+
 
    
 
