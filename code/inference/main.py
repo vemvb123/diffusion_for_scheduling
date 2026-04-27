@@ -469,8 +469,8 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     print("2")
     print("fixed infeasibilities")
 
-    # inference_assignments_fixed = code.inference.infeasibilities.fix_infeas_mk10(inference_assignments_order, ops_ma_adj, td["ops_sequence_order"])
-    inference_assignments_fixed = code.inference.infeasibilities.fix_infeasibilities(inference_assignments, ops_ma_adj, td["ops_sequence_order"], inference_assignments_order, n_ops)
+    inference_assignments_fixed = code.inference.infeasibilities.fix_infeas_mk10(inference_assignments_order, ops_ma_adj, td["ops_sequence_order"])
+    # inference_assignments_fixed = code.inference.infeasibilities.fix_infeasibilities(inference_assignments, ops_ma_adj, td["ops_sequence_order"], inference_assignments_order, n_ops)
     inference_assignments_order = code.inference.inferenced_to_schedule.show_order_clear(inference_assignments_fixed, n_ops, ops_ma_adj)
 
     report_fix, total_errors_fix, error_list, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix = code.inference.report_infeasibilities.count_infeasibilities(
