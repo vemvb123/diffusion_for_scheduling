@@ -47,6 +47,11 @@ def train_model():
     elif int(sys.argv[1]) == 5:
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk03.txt'
         name = "15j_8ma_10op_mk03"
+    elif int(sys.argv[1]) == 6:
+        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk04.txt'
+        name = "15j_8ma_9op_mk04"
+
+
 
 
 
