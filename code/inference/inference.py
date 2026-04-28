@@ -316,6 +316,9 @@ def inference_guide(
     given_assignments = []
     variation_over_time = []
 
+    g_loss_over_time = []
+    g_var = []
+
     x = None
     with torch.no_grad():
         x = torch.randn(n_samples, 1, h_when_masked, w_when_masked).to(device)
@@ -364,17 +367,31 @@ def inference_guide(
             # ---- 4. Apply corrected update ----
             x = x + u_safe
 
-
+            # ---- MEASURE VIOLATION ----
+            b = only_increasing(x, valid_h, valid_w, job_lengths)
+            loss = torch.relu(-b).sum(dim=1).mean().item()
+            viol = (b < 0).sum(dim=1).float().mean().item()
+            g_loss_over_time.append(loss)
+            g_var.append(viol)
 
             # if t % 10 == 0:
             if t == 0:
                 given_assignments.append(x.clone())
 
+            # x = zero_unused_slots(x, ops_ma_adj, valid_h, valid_w, device)
 
-            x = zero_unused_slots(x, ops_ma_adj, valid_h, valid_w, device)
+    plt.plot(g_loss_over_time, label="Violation magnitude")
+    plt.plot(g_var, label="Number of violations")
 
+    plt.title("Constraint improvement over time")
+    plt.xlabel("Diffusion step")
+    plt.ylabel("Value")
 
+    plt.legend()
 
+    plt.savefig("results/g_loss.png")  # 🔥 saves image
+
+    plt.close()  # optional but recommended
 
 
     # end timer

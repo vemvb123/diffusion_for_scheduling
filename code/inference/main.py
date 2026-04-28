@@ -284,6 +284,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         #inference_assignments, elapsed, assignments_over_time = experimental.adj_inference_ddpm_batch_improvement(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h=valid_h, valid_w=valid_w, timesteps=timesteps, cos=True, t_replace=t_replace, ops_sequence_order=ops_sequence_order, n_ops=n_ops)
         # === VANLID
 
+        '''
         inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
             jump=None, 
             cos=cos,
@@ -300,7 +301,6 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         )
         eta = 0.9
 
-        '''
         """
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
         # === LOOK AHEAD
@@ -467,6 +467,8 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = code.inference.report_infeasibilities.count_infeasibilities(inference_assignments_order, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
     code.inference.report_infeasibilities.add_elapsed_time_report(elapsed, report_file_path)
 
+    exit()
+
     '''
     save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis"
     matrix_graph_schedule.show_single_sched(inference_assignments_order, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True)
@@ -479,7 +481,6 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
 
     print("2")
     print("fixed infeasibilities")
-    '''
     inference_assignments_fixed = code.inference.infeasibilities.fix_infeas_mk10(inference_assignments_order, ops_ma_adj, td["ops_sequence_order"]) # Bruker denne
     # inference_assignments_fixed = code.inference.infeasibilities.fix_infeasibilities(inference_assignments, ops_ma_adj, td["ops_sequence_order"], inference_assignments_order, n_ops)
     inference_assignments_order = code.inference.inferenced_to_schedule.show_order_clear(inference_assignments_fixed, n_ops, ops_ma_adj)
@@ -490,7 +491,6 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     report_file_path=report_file_path_fix,
     n_ops=n_ops
     )
-    '''
 
     # save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis_fix"
     # matrix_graph_schedule.show_sched(2, ops_ma_adj, inference_assignments, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
@@ -715,7 +715,7 @@ h = 4
 n_jobs = 4
 
 
-benchmark = "mk02"
+benchmark = "mk01"
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 # ins = None
 get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins)
