@@ -53,6 +53,8 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
         ).to(device)
 
     except Exception as e:
+        print('There was an error. Loading model by dictinary')
+        print(f'errir: {e}')
         checkpoint = torch.load(model_path, map_location=device)
 
         model = deepinv.models.DiffUNet(in_channels=4, out_channels=1, pretrained=None)
@@ -179,5 +181,209 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
     given_assignments.append(x.clone())
     return x, elapsed, given_assignments, variation_over_time
 
+
+
+
+
+
+
+
+def smoothmax(col, beta=20.0):
+    # col shape [B,H]
+    return torch.logsumexp(beta * col, dim=1) / beta
+
+
+def only_increasing(x, valid_h, valid_w, job_lengths, eps=0.0):
+
+    # remove dummy channel
+    x = x[:, 0, :valid_h, :valid_w]   # [B,H,W]
+
+    B, H, W = x.shape
+
+    vals = []
+    start = 0
+
+    for length in job_lengths:
+        end = start + length
+
+        for j in range(start + 1, end):
+
+            mj   = smoothmax(x[:, :, j])      # [B,H]
+            mj_1 = smoothmax(x[:, :, j-1])    # [B,H]
+
+            b = mj - mj_1 - eps
+            vals.append(b)
+
+        start = end
+
+    if len(vals) == 0:
+        return torch.empty(B, 0, device=x.device)
+
+    return torch.stack(vals, dim=1)
+
+
+def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, eps=0.0):
+
+    x = x.detach().clone().requires_grad_(True)
+    u = u_nominal.clone()
+
+    b = only_increasing(x, valid_h, valid_w, job_lengths, eps=eps)   # [B,K]
+
+    # if already feasible
+    if (b >= 0).all():
+        return u
+
+    total = b.sum()
+    grad_b = torch.autograd.grad(total, x)[0]
+
+    # alpha like paper
+    alpha = b.clamp(min=0) + b
+
+    # aggregate violation
+    lhs = (grad_b * u).sum(dim=(1,2), keepdim=True)
+
+    # rhs = alpha.mean(dim=1, keepdim=True).unsqueeze(-1)
+    rhs = alpha.mean(dim=1).view(-1,1,1,1)
+
+    violation = lhs + rhs
+
+    grad_norm = (grad_b * grad_b).sum(dim=(1,2), keepdim=True) + 1e-8
+
+    lam = torch.clamp(-violation / grad_norm, min=0)
+
+    # print("ham")
+    # print(u.shape)
+    # print(lam.shape)
+    # print(grad_b.shape)
+
+    u_safe = u + lam * grad_b
+
+    return u_safe.detach()
+
+
+
+
+def inference_guide(
+        proc_times,
+        job_ops_adj,
+        ops_ma_adj,
+        model_path,
+        n_samples,
+        h_when_masked,
+        w_when_masked,
+        timesteps=1000,
+        jump=None,
+        cos=False,
+        smart_init=False,
+        job_lengths=None
+        ):
+
+    device = "cuda"
+    print(f"Using model {model_path}, with timesteps {timesteps}, and cos: {cos}")
+
+    model = deepinv.models.DiffUNet(
+        in_channels=4, out_channels=1, pretrained=Path(model_path)
+    ).to(device)
+
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logging.info(f"Amount of trainable parameters: {trainable_params}")
+
+
+    # beta start var opprinnelig 1e-4
+    beta_start = 1e-4
+    beta_end = 0.02
+    betas, alphas, alphas_cumprod, = get_inference_schedule(beta_start, beta_end, timesteps, device = "cuda")
+
+    model.eval()
+
+    scheduler = DDPMScheduler(
+        num_train_timesteps=timesteps,
+        beta_start=beta_start,
+        beta_end=beta_end,
+        beta_schedule="squaredcos_cap_v2",  # cosine schedule
+        clip_sample=True,
+        prediction_type="epsilon",
+    )
+
+
+
+    valid_h = 6   # valid rows
+    valid_w = 55  # valid columns
+    device = 'cuda'  # or 'cpu'
+
+
+
+    given_assignments = []
+    variation_over_time = []
+
+    x = None
+    with torch.no_grad():
+        x = torch.randn(n_samples, 1, h_when_masked, w_when_masked).to(device)
+
+        # må fore inn maske...
+        features = torch.cat([
+            proc_times,
+            job_ops_adj,
+            ops_ma_adj,
+        ], dim=1)
+
+        features = features.to(device, dtype=torch.float32)
+        features = features.repeat(n_samples, 1, 1, 1)
+        x = x.to(device, dtype=torch.float32)
+
+        # start timer
+        start_time = time.perf_counter()
+
+        for t in reversed(range(timesteps)):
+
+            t_tensor = torch.ones(n_samples, device=device).long() * t
+
+            inputs = torch.cat([
+                x,
+                features,
+            ], dim=1)
+
+            predicted_noise = model(inputs, t_tensor, type_t="timestep")
+            x_denoised = scheduler.step(predicted_noise, t, x).prev_sample
+
+            # ---- 2. Convert to update (IMPORTANT) ----
+            u_nominal = x_denoised - x   # diffusion direction
+            # ---- 3. Solve QP (core of paper) ----
+
+            with torch.enable_grad():
+                u_safe = solve_column_qp(
+                    u_nominal,
+                    x,
+                    valid_h,
+                    valid_w,
+                    job_lengths,
+                    eps=0.0
+                )
+
+
+            # ---- 4. Apply corrected update ----
+            x = x + u_safe
+
+
+
+            # if t % 10 == 0:
+            if t == 0:
+                given_assignments.append(x.clone())
+
+
+            x = zero_unused_slots(x, ops_ma_adj, valid_h, valid_w, device)
+
+
+
+
+
+    # end timer
+    end_time = time.perf_counter()
+    elapsed = end_time - start_time
+
+    x = torch.clamp(x, 0, 1)
+
+    given_assignments.append(x.clone())
+    return x, elapsed, given_assignments, variation_over_time
 
 

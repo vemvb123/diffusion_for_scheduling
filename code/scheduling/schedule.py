@@ -347,12 +347,18 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         delayed(code.scheduling.fix_scheduling_gaps.compress_schedule)(td["start_times"], td["finish_times"], ma_op_map, n_jobs, td, filler_machine=99)
         for td, ma_op_map in zip(tds, machine_assignments_maps)
     )
+    '''
     makespans = [
     td["finish_times"][td["finish_times"] != 9999.0].max().item()
     for td in tds
     if td["finish_times"][td["finish_times"] != 9999.0].max().item() >= 30.0
     ]
-
+    '''
+    makespans = [
+        td["finish_times"][td["finish_times"] != 9999.0].max().item()
+        for td in tds
+    ]
+    print(f'makespans made: {len(makespans)}')
     td_best = tds[ makespans.index( min(makespans) ) ]
 
     """
