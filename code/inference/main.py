@@ -297,7 +297,8 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
             jump=None, 
             cos=cos,
             smart_init=False,
-            job_lengths=compute_job_lengths(td["ops_sequence_order"])
+            job_lengths=compute_job_lengths(td["ops_sequence_order"]),
+            td=td
         )
         eta = 0.9
 

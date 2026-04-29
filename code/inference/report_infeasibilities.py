@@ -196,9 +196,9 @@ def count_infeasibilities(ma_seq_matrix, ops_sequence_order, do_print=True, vali
 
     if only_results:
         print('use only res')
-        total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = write_report(report, total_errors, error_list, print_report=True, save_as_file=report_file_path, n_ops=n_ops)
+        total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = write_report(report, total_errors, error_list, print_report=do_print, save_as_file=report_file_path, n_ops=n_ops)
         return report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p
-    total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = write_report(report, total_errors, error_list, print_report=True, save_as_file=report_file_path, n_ops=n_ops)
+    total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = write_report(report, total_errors, error_list, print_report=do_print, save_as_file=report_file_path, n_ops=n_ops)
     return report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p
 
 

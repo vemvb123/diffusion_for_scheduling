@@ -1,8 +1,8 @@
 """
 inference.py contains code for running inference with trained models
 """
-
-
+from code.inference.inferenced_to_schedule import show_order_clear
+from code.inference.report_infeasibilities import count_infeasibilities
 from diffusers import CosineDPMSolverMultistepScheduler, DDPMScheduler
 
 from code.inference.denoise import denoise_ddpm, get_inference_schedule
@@ -222,6 +222,7 @@ def only_increasing(x, valid_h, valid_w, job_lengths, eps=0.0):
     return torch.stack(vals, dim=1)
 
 
+'''
 def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, eps=0.0):
 
     x = x.detach().clone().requires_grad_(True)
@@ -233,14 +234,24 @@ def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, eps=0.0):
     if (b >= 0).all():
         return u
 
-    total = b.sum()
+    # total = b.sum()
+    mask = (b < 0).float()
+    total = (mask * b).sum()
     grad_b = torch.autograd.grad(total, x)[0]
 
     # alpha like paper
-    alpha = b.clamp(min=0) + b
-
+    # alpha = b.clamp(min=0) + b
+    alpha = -torch.relu(-b)   # only penalize violations
+'''
+    # alpha = torch.where(
+    # b >= 0,
+    # b,
+    # 10.0 * b   # 🔥 stronger push when violated
+    # )
+'''
     # aggregate violation
-    lhs = (grad_b * u).sum(dim=(1,2), keepdim=True)
+    # lhs = (grad_b * u).sum(dim=(1,2), keepdim=True)
+    lhs = (grad_b * u).sum(dim=(1,2,3), keepdim=True)
 
     # rhs = alpha.mean(dim=1, keepdim=True).unsqueeze(-1)
     rhs = alpha.mean(dim=1).view(-1,1,1,1)
@@ -259,8 +270,42 @@ def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, eps=0.0):
     u_safe = u + lam * grad_b
 
     return u_safe.detach()
+'''
 
+def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, t, eps=0.0):
 
+    x = x.detach().clone().requires_grad_(True)
+    u = u_nominal.clone()
+
+    b = only_increasing(x, valid_h, valid_w, job_lengths, eps=eps)   # [B,K]
+
+    if (b >= 0).all():
+        return u
+
+    # 🔥 ONLY violated constraints
+    mask = (b < 0).float()
+    total = (mask * b).sum()
+
+    grad_b = torch.autograd.grad(total, x)[0]
+
+    # 🔥 simple and stable
+    alpha = -torch.relu(-b)
+
+    lhs = (grad_b * u).sum(dim=(1,2,3), keepdim=True)
+    rhs = alpha.mean(dim=1).view(-1,1,1,1)
+
+    violation = lhs + rhs
+
+    grad_norm = (grad_b * grad_b).sum(dim=(1,2,3), keepdim=True) + 1e-8
+
+    gamma = 2.0
+    # gamma = 2.0 * torch.relu(-b).mean(dim=1).view(-1,1,1,1)
+    # gamma = torch.relu(-b).mean(dim=1).view(-1,1,1,1)
+    lam = torch.clamp((-violation + gamma) / grad_norm, min=0)
+
+    u_safe = u + lam * grad_b
+
+    return u_safe.detach(), gamma
 
 
 def inference_guide(
@@ -275,7 +320,8 @@ def inference_guide(
         jump=None,
         cos=False,
         smart_init=False,
-        job_lengths=None
+        job_lengths=None,
+        td=None,
         ):
 
     device = "cuda"
@@ -349,23 +395,54 @@ def inference_guide(
             predicted_noise = model(inputs, t_tensor, type_t="timestep")
             x_denoised = scheduler.step(predicted_noise, t, x).prev_sample
 
+            n_ops = sum(x for x in job_lengths if x != 1)
+            ops_ma_adj_sc = ops_ma_adj[:, :, :valid_h, :valid_w].clone()
+
+            report_file_path = f'results/report_g.txt'
+            x_denoised_sc= x_denoised[:, :, :valid_h, :valid_w].clone()
+            x_denoised_sc = show_order_clear(x_denoised_sc, n_ops,ops_ma_adj_sc, r_global=False) # tidligere order visning ... DENNE ER KLART BEDRE, far langt mindre feil for mk01
+            report, total_errors_bg, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = count_infeasibilities(
+            x_denoised_sc, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops, do_print=False)
+                
             # ---- 2. Convert to update (IMPORTANT) ----
-            u_nominal = x_denoised - x   # diffusion direction
-            # ---- 3. Solve QP (core of paper) ----
+            stop_guide = 6
+            gamma = None
+            if t > stop_guide:
 
-            with torch.enable_grad():
-                u_safe = solve_column_qp(
-                    u_nominal,
-                    x,
-                    valid_h,
-                    valid_w,
-                    job_lengths,
-                    eps=0.0
-                )
+                u_nominal = x_denoised - x   # diffusion direction
+                # ---- 3. Solve QP (core of paper) ----
+
+                with torch.enable_grad():
+                    u_safe, gamma = solve_column_qp(
+                        u_nominal,
+                        x,
+                        valid_h,
+                        valid_w,
+                        job_lengths,
+                        t,
+                        eps=0.0
+                    )
 
 
-            # ---- 4. Apply corrected update ----
-            x = x + u_safe
+                # ---- 4. Apply corrected update ----
+                x = x + u_safe
+            else:
+                x = x_denoised
+
+            report_file_path = f'results/report_g.txt'
+            x_sc = x[:, :, :valid_h, :valid_w].clone()
+            x_sc = show_order_clear(x_sc, n_ops, ops_ma_adj_sc, r_global=False) # tidligere order visning ... DENNE ER KLART BEDRE, far langt mindre feil for mk01
+            report, total_errors_ag, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = count_infeasibilities(
+                x_sc, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops, do_print=False)
+            
+            if t == stop_guide:
+                print(f'timestep reached {stop_guide}. Stopped guiding')
+                print(f'infeasibilities before correction at timestep {t}: {total_errors_bg}, after correction: {total_errors_ag}')
+            else:
+                try:
+                    print(f'infeasibilities before correction at timestep {t}, with gamma {gamma.mean().item()}: {total_errors_bg}, after correction: {total_errors_ag}')
+                except:
+                    print(f'infeasibilities before correction at timestep {t}, with gamma {gamma}: {total_errors_bg}, after correction: {total_errors_ag}')
 
             # ---- MEASURE VIOLATION ----
             b = only_increasing(x, valid_h, valid_w, job_lengths)
