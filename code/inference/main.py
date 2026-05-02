@@ -716,7 +716,7 @@ h = 4
 n_jobs = 4
 
 
-benchmark = "mk01"
+benchmark = "mk03"
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 # ins = None
 get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins)
