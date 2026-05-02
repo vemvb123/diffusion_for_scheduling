@@ -263,6 +263,7 @@ def diffusion(
         all_losses.append(avg_loss)
         all_losses_test.append(avg_loss_test)
 
+        model_path_adj.parent.mkdir(parents=True, exist_ok=True)
         torch.save({ 
                 'model_state_dict': model_adj.state_dict(), 
                 'optimizer_state_dict': optimizer.state_dict(), }, 

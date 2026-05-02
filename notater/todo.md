@@ -4,6 +4,15 @@ V mk10
 mk02 fortsette å trene modell
 mk03
 
+tips:
+end kjøringa når loss er for det meste under 0.015-0.010
+
+
+Yfirsikt yfir treningarinn:
+trener modell mk04
+trener modell mk03 - Sikker ferdig med trening Lørdag, i føge det over med loss
+Lager target modell for mk05 - sikker også ferdig Lørdag, kan da byrja at skipa mk05 datasett
+
 
 ...
 

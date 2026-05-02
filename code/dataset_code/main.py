@@ -71,6 +71,14 @@ def main(instance_type = None):
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk03.txt'
         target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_15j_8ma_10op_mk03.ckpt'
 
+    elif int(sys.argv[1]) == 6:
+        print("making mk04 dataset")
+        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_8ma_9op_mk04'
+        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk04.txt'
+        target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_15j_8ma_9op_mk04.ckpt'
+
+
+
 
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
     print(parameters)
@@ -101,7 +109,7 @@ def main(instance_type = None):
 def check_benchmark_parameters():
     print("checking benchmark parameters...")
     #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
-    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk04.txt'
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk05.txt'
     #filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
@@ -110,7 +118,7 @@ def check_benchmark_parameters():
 def check_dataset():
     # --- process test image
     instance_idx = 10
-    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444'
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_8ma_9op_mk04'
     td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
 
 
@@ -148,8 +156,12 @@ def check_dataset():
     """
 
 # mk04 er: 
+# w: 8, h: 135 -> 24, 136
 # {'n_jobs': 15, 'n_machines': 8, 'min_processing_time': 1, 'max_processing_time': 9, 'fewest_operations': 3, 'most_operations': 9, 'min_machine_options': 1, 'max_machine_options': 3}
-check_benchmark_parameters()
+
+
+# mk05 er: 
+# check_benchmark_parameters()
 
 # check_dataset()
 #instance_type = "mk01"
