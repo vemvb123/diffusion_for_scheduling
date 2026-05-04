@@ -14,6 +14,13 @@ trener modell mk03 - Sikker ferdig med trening Lørdag, i føge det over med los
 Lager target modell for mk05 - sikker også ferdig Lørdag, kan da byrja at skipa mk05 datasett
 
 
+..
+
+Fikse infeas..
+Ide:
+Rapporter infeas for hvert steg i fiksinga, slik at du kan se når det går gærent,
+sammenlign stega med mk01
+
 ...
 
 
