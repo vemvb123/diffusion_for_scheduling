@@ -61,6 +61,14 @@ ong all values
 
 
 def show_order_clear(x, n_values, valid_slots, r_global=True):
+    print("in show order clear...")
+    print(x.shape)
+    print(n_values)
+    print(valid_slots.shape)
+    print(r_global)
+    print("...")
+
+
     """
     Rank the top-n_values entries.
     - If valid_slots has any 1s: only consider those positions
