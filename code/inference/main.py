@@ -149,6 +149,33 @@ def get_problem_type(problem_type : str):
         adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
 
+    elif problem_type == "mk03":
+        
+        filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk03.txt'
+        # TODO
+        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_8ma_10op_mk03'
+        #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
+        parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+
+        env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
+            n_ma=parameters['n_machines'], 
+            n_jobs=parameters['n_jobs'], 
+            max_op_per_job=parameters['most_operations'], 
+            min_op_per_job=parameters['fewest_operations'], 
+            max_proc_time=parameters['max_processing_time'], 
+            min_proc_time=parameters['min_processing_time'], 
+            max_eligable_ma_per_op=parameters['max_machine_options'], 
+            min_eligable_ma_per_op=parameters['min_machine_options'], 
+            batch_size=1
+        )
+        print(parameters)
+
+        mask_h = 24
+        mask_w = 64
+        valid_h = 6
+        valid_w = 55
+
+        adj_model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk03/mk03_0.0001.pth'
 
 
 
