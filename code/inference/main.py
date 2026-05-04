@@ -171,9 +171,9 @@ def get_problem_type(problem_type : str):
         print(parameters)
 
         mask_h = 24
-        mask_w = 64
-        valid_h = 6
-        valid_w = 55
+        mask_w = 152
+        valid_h = 8
+        valid_w = 150
 
         adj_model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk03/mk03_0.0001.pth'
 
