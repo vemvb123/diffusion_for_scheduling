@@ -4,7 +4,7 @@ import code.scheduling.schedule as schedule
 from code.dataset_code.dataset import Dataset_RL4CO
 from code.dataset_code import benchmark_utils
 import sys
-
+from code.dataset_code.benchmark_values import get_benchmark_values
 
 def main(instance_type = None):
     ### Lag dataset
@@ -77,7 +77,8 @@ def main(instance_type = None):
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk04.txt'
         target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_15j_8ma_9op_mk04.ckpt'
 
-
+    elif int(sys.argv[1]) == 7:
+        target_model, _, dataset_folder, _, filepath_benchmark_instance, _, _, _, _ = get_benchmark_values('mk05')
 
 
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
@@ -165,7 +166,7 @@ def check_dataset():
 
 # check_dataset()
 #instance_type = "mk01"
-# main()
+main()
 
 # ins = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
 # td = benchmark_utils.make_the_stuff(ins)
