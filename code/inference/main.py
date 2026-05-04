@@ -170,6 +170,10 @@ def get_problem_type(problem_type : str):
         )
         print(parameters)
 
+        # TODO ikke sikker på eksakt størrelse.. modell funker uansett størrelse. men ytelsen er forferdelig..
+        # veit ikke om ytedelse er forferdelig fordi ikke trent nok, eller feil mask_w
+        # problem størrelsen er også en del større enn mk02, så kan være at bare problemet er så stort at det er veldig vansklig å ikke ha noe som helst feil
+        # rate er 4.8 operasjoner, av 150.. så er ikke alt for ille
         mask_h = 24
         mask_w = 152
         valid_h = 8
@@ -268,7 +272,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         n_samples =32
         n_ops = int(torch.count_nonzero(target_assignments))
 
-        timesteps = 100
+        timesteps = 300
         #sampling_steps = 60
         ddim_eta = 1.0
         
@@ -296,6 +300,9 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
             adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth" # BRUK DENNE FOR MK01
         elif problem_type == 'mk02':
             adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk02/mk02.pth" # BRUK DENNE FOR MK02
+        elif problem_type == 'mk03':
+            adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk03/mk03_0.0001.pth" # BRUK DENNE FOR MK03
+
 
         print(f"using model at path: {adj_model_path}")
         # === DDIM
@@ -747,7 +754,7 @@ h = 4
 n_jobs = 4
 
 
-benchmark = "mk02"
+benchmark = "mk03"
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 # ins = None
 get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins)
