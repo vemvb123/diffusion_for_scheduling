@@ -119,7 +119,7 @@ def check_benchmark_parameters():
 def check_dataset():
     # --- process test image
     instance_idx = 10
-    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_8ma_9op_mk04'
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_8ma_10op_mk03'
     td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
 
 
@@ -164,9 +164,9 @@ def check_dataset():
 # mk05 er: 
 # check_benchmark_parameters()
 
-# check_dataset()
+check_dataset()
 #instance_type = "mk01"
-main()
+# main()
 
 # ins = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
 # td = benchmark_utils.make_the_stuff(ins)
