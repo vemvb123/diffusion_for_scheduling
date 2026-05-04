@@ -20,6 +20,7 @@ Fikse infeas..
 Ide:
 Rapporter infeas for hvert steg i fiksinga, slik at du kan se når det går gærent,
 sammenlign stega med mk01
+.. trur bare kan fikse på main branchen, main og ikke-main har vell det samme problemet.
 
 ...
 
