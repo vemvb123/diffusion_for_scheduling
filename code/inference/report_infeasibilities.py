@@ -114,6 +114,10 @@ def count_infeasibilities(ma_seq_matrix, ops_sequence_order, do_print=True, vali
 
     ops = ops_sequence_order.tolist()
     n = len(ops)
+    print('------')
+    print(n)
+    print(n_columns)
+    print('------')
     assert n == n_columns, "ops_sequence_order must match number of columns"
 
     # ---- build blocks (once) ----

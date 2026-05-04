@@ -21,6 +21,8 @@ import code.dataset_code.dataset_utils as dataset_utils
 import code.inference.confidence_interval as confidence_interval_utils
 import code.inference.matrix_graph_schedule as matrix_graph_schedule
 import code.dataset_code.benchmark_utils as benchmark_utils
+import code.dataset_code.benchmark_values as benchmark_values
+
 
 import torch
 import code.inference.experimental as experimental
@@ -70,149 +72,24 @@ def compute_job_lengths(indices):
 
 def get_problem_type(problem_type : str):
     (td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, valid_h, valid_w) = (None,) * 10
+    
+    _, model_path, dataset_folder, _, filepath_brandimarte_instance, valid_h, valid_w, mask_w, mask_h, _ = benchmark_values.get_benchmark_values(problem_type)
 
-    if problem_type == "444":
+    parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+    env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
+        n_ma=parameters['n_machines'], 
+        n_jobs=parameters['n_jobs'], 
+        max_op_per_job=parameters['most_operations'], 
+        min_op_per_job=parameters['fewest_operations'], 
+        max_proc_time=parameters['max_processing_time'], 
+        min_proc_time=parameters['min_processing_time'], 
+        max_eligable_ma_per_op=parameters['max_machine_options'], 
+        min_eligable_ma_per_op=parameters['min_machine_options'], 
+        batch_size=1
+    )
+    print(parameters)
 
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444_TEST'
-        env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
-            n_ma=4, 
-            n_jobs=4, 
-            max_op_per_job=4, 
-            min_op_per_job=4, 
-            max_proc_time=50, 
-            min_proc_time=5, 
-            max_eligable_ma_per_op=4, 
-            min_eligable_ma_per_op=4, 
-            batch_size=1
-        )
-        mask_h = 24
-        mask_w = 24
-        valid_h = 4
-        valid_w = 16
-        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/444/adj_type_adj_order_{order}.pth"
-
-    elif problem_type == "mk01":
-        
-        filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
-        # TODO
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
-        #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
-        parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
-
-        env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
-            n_ma=parameters['n_machines'], 
-            n_jobs=parameters['n_jobs'], 
-            max_op_per_job=parameters['most_operations'], 
-            min_op_per_job=parameters['fewest_operations'], 
-            max_proc_time=parameters['max_processing_time'], 
-            min_proc_time=parameters['min_processing_time'], 
-            max_eligable_ma_per_op=parameters['max_machine_options'], 
-            min_eligable_ma_per_op=parameters['min_machine_options'], 
-            batch_size=1
-        )
-        print(parameters)
-
-        mask_h = 24
-        mask_w = 64
-        valid_h = 6
-        valid_w = 55
-
-        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
-
-    elif problem_type == "mk02":
-        
-        filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
-        # TODO
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_10j_6ma_6op_mk02'
-        #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
-        parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
-
-        env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
-            n_ma=parameters['n_machines'], 
-            n_jobs=parameters['n_jobs'], 
-            max_op_per_job=parameters['most_operations'], 
-            min_op_per_job=parameters['fewest_operations'], 
-            max_proc_time=parameters['max_processing_time'], 
-            min_proc_time=parameters['min_processing_time'], 
-            max_eligable_ma_per_op=parameters['max_machine_options'], 
-            min_eligable_ma_per_op=parameters['min_machine_options'], 
-            batch_size=1
-        )
-        print(parameters)
-
-        mask_h = 24
-        mask_w = 64
-        valid_h = 6
-        valid_w = 58
-
-        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
-
-    elif problem_type == "mk03":
-        
-        filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk03.txt'
-        # TODO
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_8ma_10op_mk03'
-        #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
-        parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
-
-        env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
-            n_ma=parameters['n_machines'], 
-            n_jobs=parameters['n_jobs'], 
-            max_op_per_job=parameters['most_operations'], 
-            min_op_per_job=parameters['fewest_operations'], 
-            max_proc_time=parameters['max_processing_time'], 
-            min_proc_time=parameters['min_processing_time'], 
-            max_eligable_ma_per_op=parameters['max_machine_options'], 
-            min_eligable_ma_per_op=parameters['min_machine_options'], 
-            batch_size=1
-        )
-        print(parameters)
-
-        # TODO ikke sikker på eksakt størrelse.. modell funker uansett størrelse. men ytelsen er forferdelig..
-        # veit ikke om ytedelse er forferdelig fordi ikke trent nok, eller feil mask_w
-        # problem størrelsen er også en del større enn mk02, så kan være at bare problemet er så stort at det er veldig vansklig å ikke ha noe som helst feil
-        # rate er 4.8 operasjoner, av 150.. så er ikke alt for ille
-        mask_h = 24
-        mask_w = 152
-        valid_h = 8
-        valid_w = 150
-
-        adj_model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk03/mk03_0.0001.pth'
-
-
-
-    elif problem_type == "mk10":
-
-        filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk10.txt'
-        # TODO
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk10_20j_15ma_14op'
-        #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
-        parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
-
-        env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
-            n_ma=parameters['n_machines'], 
-            n_jobs=parameters['n_jobs'], 
-            max_op_per_job=parameters['most_operations'], 
-            min_op_per_job=parameters['fewest_operations'], 
-            max_proc_time=parameters['max_processing_time'], 
-            min_proc_time=parameters['min_processing_time'], 
-            max_eligable_ma_per_op=parameters['max_machine_options'], 
-            min_eligable_ma_per_op=parameters['min_machine_options'], 
-            batch_size=1
-        )
-        print(parameters)
-
-        mask_h = 24
-        mask_w = 280
-        valid_h = 15
-        valid_w = 280
-
-        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk10/mk10.pth"
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
-
-    return dataset_folder, env, mask_h, mask_w, valid_h, valid_w, adj_model_path
+    return dataset_folder, env, mask_h, mask_w, valid_h, valid_w, model_path
 
 
 
@@ -292,6 +169,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_beta.pth"
         ##adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
         #adj_model_path = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/further_improved/trained_on_100_timesteps_sch_1000.pth"
+        '''
         print(problem_type)
         adj_model_path = None
         if problem_type == 'mk10':
@@ -303,6 +181,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         elif problem_type == 'mk03':
             adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk03/mk03_0.0001.pth" # BRUK DENNE FOR MK03
 
+        '''
 
         print(f"using model at path: {adj_model_path}")
         # === DDIM
@@ -754,7 +633,7 @@ h = 4
 n_jobs = 4
 
 
-benchmark = "mk02"
+benchmark = "mk01"
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 # ins = None
 get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins)
