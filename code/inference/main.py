@@ -5,8 +5,13 @@ results.py contains code for gathering results.
 Such as gathering mean makespan of scheduled instances, graphs, training results, etc
 """
 import code.dataset_code.benchmark_utils
+import code.dataset_code.dataset_maker
+import code.inference.experimental
 import code.inference.infeasibilities
+# import code.inference.infeasibilities_try
+import code.inference.inferenced_to_schedule
 import code.inference.report_infeasibilities
+import code.inference.utils as utils
 import code.scheduling.utils as schedule_utils
 import code.inference.guidence as guidence
 import code.inference.inference as inference
@@ -65,10 +70,6 @@ def compute_job_lengths(indices):
 
 def get_problem_type(problem_type : str):
     (td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, valid_h, valid_w) = (None,) * 10
-    dataset_folder = None
-    adj_model_path = None
-    benchmark = None
-    order = True
 
     if problem_type == "444":
 
@@ -89,40 +90,6 @@ def get_problem_type(problem_type : str):
         valid_h = 4
         valid_w = 16
         adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/444/adj_type_adj_order_{order}.pth"
-        benchmark = '444'
-
-
-    elif problem_type == "mk02":
-        
-        filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
-        # TODO
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_10j_6ma_6op_mk02'
-        #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
-        parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
-
-        env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
-            n_ma=parameters['n_machines'], 
-            n_jobs=parameters['n_jobs'], 
-            max_op_per_job=parameters['most_operations'], 
-            min_op_per_job=parameters['fewest_operations'], 
-            max_proc_time=parameters['max_processing_time'], 
-            min_proc_time=parameters['min_processing_time'], 
-            max_eligable_ma_per_op=parameters['max_machine_options'], 
-            min_eligable_ma_per_op=parameters['min_machine_options'], 
-            batch_size=1
-        )
-        print(parameters)
-
-        mask_h = 24
-        mask_w = 64
-        valid_h = 6
-        valid_w = 55
-
-        # adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
-        adj_model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk02/mk02.pth'
-        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
-        benchmark = 'mk02'
-
 
     elif problem_type == "mk01":
         
@@ -152,7 +119,69 @@ def get_problem_type(problem_type : str):
 
         adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
-        benchmark = 'mk01'
+
+    elif problem_type == "mk02":
+        
+        filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
+        # TODO
+        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_10j_6ma_6op_mk02'
+        #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
+        parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+
+        env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
+            n_ma=parameters['n_machines'], 
+            n_jobs=parameters['n_jobs'], 
+            max_op_per_job=parameters['most_operations'], 
+            min_op_per_job=parameters['fewest_operations'], 
+            max_proc_time=parameters['max_processing_time'], 
+            min_proc_time=parameters['min_processing_time'], 
+            max_eligable_ma_per_op=parameters['max_machine_options'], 
+            min_eligable_ma_per_op=parameters['min_machine_options'], 
+            batch_size=1
+        )
+        print(parameters)
+
+        mask_h = 24
+        mask_w = 64
+        valid_h = 6
+        valid_w = 58
+
+        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_{order}.pth"
+        #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
+
+    elif problem_type == "mk03":
+        
+        filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk03.txt'
+        # TODO
+        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_8ma_10op_mk03'
+        #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
+        parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+
+        env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
+            n_ma=parameters['n_machines'], 
+            n_jobs=parameters['n_jobs'], 
+            max_op_per_job=parameters['most_operations'], 
+            min_op_per_job=parameters['fewest_operations'], 
+            max_proc_time=parameters['max_processing_time'], 
+            min_proc_time=parameters['min_processing_time'], 
+            max_eligable_ma_per_op=parameters['max_machine_options'], 
+            min_eligable_ma_per_op=parameters['min_machine_options'], 
+            batch_size=1
+        )
+        print(parameters)
+
+        # TODO ikke sikker på eksakt størrelse.. modell funker uansett størrelse. men ytelsen er forferdelig..
+        # veit ikke om ytedelse er forferdelig fordi ikke trent nok, eller feil mask_w
+        # problem størrelsen er også en del større enn mk02, så kan være at bare problemet er så stort at det er veldig vansklig å ikke ha noe som helst feil
+        # rate er 4.8 operasjoner, av 150.. så er ikke alt for ille
+        mask_h = 24
+        mask_w = 152
+        valid_h = 8
+        valid_w = 150
+
+        adj_model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk03/mk03_0.0001.pth'
+
+
 
     elif problem_type == "mk10":
 
@@ -182,24 +211,20 @@ def get_problem_type(problem_type : str):
 
         adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk10/mk10.pth"
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_{timesteps}.pth"
-        benchmark = 'mk10'
 
-    return dataset_folder, env, mask_h, mask_w, valid_h, valid_w, adj_model_path, benchmark
-
+    return dataset_folder, env, mask_h, mask_w, valid_h, valid_w, adj_model_path
 
 
 
 
 
-def get_inference_result(problem_type, instance_idx, benchmark_instance = None):
-    print(f'using becnhmark instance {benchmark_instance is not None}')
+
+def get_inference_result(problem_type, instance_idx, model_type, order: bool, benchmark_instance = None):
     print("starting inference")
-    order = True
-    model_type = "adj"
     # instantiate all return values as None
     (td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, valid_h, valid_w) = (None,) * 10
 
-    dataset_folder, env, mask_h, mask_w, valid_h, valid_w, adj_model_path, benchmark = get_problem_type(problem_type)
+    dataset_folder, env, mask_h, mask_w, valid_h, valid_w, adj_model_path = get_problem_type(problem_type)
 
     print(f"dataset_folder: {dataset_folder}")
     # TODO skjekk om samme dimensjoner
@@ -247,26 +272,17 @@ def get_inference_result(problem_type, instance_idx, benchmark_instance = None):
         n_samples =32
         n_ops = int(torch.count_nonzero(target_assignments))
 
-        t_replace = 92
-        cos = True
         timesteps = 100
         #sampling_steps = 60
         ddim_eta = 1.0
         
-        graph_folder  = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/{benchmark}"
-        graph_name = f"result_schedule_{benchmark}.png"
+        graph_folder  = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/{problem_type}"
+        graph_name = f"result_schedule_{problem_type}_bench.png"
         graph_save_path = f"{graph_folder}/{graph_name}"
 
-        report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b_zero_{benchmark}.txt"
-        report_file_path_fix = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b_zero_{benchmark}.txt"
 
-        # adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk10/mk10.pth" # BRUK DENNE FOR MK10
-        adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth" # BRUK DENNE FOR MK01
-        # adj_model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk02/mk02.pth'
-        # adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/444/adj_type_adj_order_True.pth" # BRUK DENNE FOR 444
-
-
-
+        report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b_zero_{problem_type}.txt"
+        report_file_path_fix = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b_zero_{problem_type}.txt"
         # report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b.txt"
         # report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_random_mk01.txt"
 
@@ -276,8 +292,19 @@ def get_inference_result(problem_type, instance_idx, benchmark_instance = None):
         #adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_beta.pth"
         ##adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_timestep_200.pth"
         #adj_model_path = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/further_improved/trained_on_100_timesteps_sch_1000.pth"
+        print(problem_type)
+        adj_model_path = None
+        if problem_type == 'mk10':
+            adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk10/mk10.pth" # BRUK DENNE FOR MK10
+        elif problem_type == 'mk01':
+            adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth" # BRUK DENNE FOR MK01
+        elif problem_type == 'mk02':
+            adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk02/mk02.pth" # BRUK DENNE FOR MK02
+        elif problem_type == 'mk03':
+            adj_model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk03/mk03_0.0001.pth" # BRUK DENNE FOR MK03
 
 
+        print(f"using model at path: {adj_model_path}")
         # === DDIM
         #inference_assignments, elapsed, assignments_over_time = experimental.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, sampling_steps = sampling_steps, ddim_eta = ddim_eta, timesteps = timesteps)
         #elapsed = None 
@@ -285,15 +312,29 @@ def get_inference_result(problem_type, instance_idx, benchmark_instance = None):
         ## == CACHE
         # inference_assignments, elapsed, assignments_over_time, columns_done, done_at_t = cache_inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, order, mask_h, mask_w, after_ts_check, valid_h, valid_w, n_ops, threshold )
         # ==== ERSTATTER BATCHES
+        t_replace = 92
+        cos = True
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
         #inference_assignments, elapsed, assignments_over_time = experimental.adj_inference_ddpm_batch_improvement(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h=valid_h, valid_w=valid_w, timesteps=timesteps, cos=True, t_replace=t_replace, ops_sequence_order=ops_sequence_order, n_ops=n_ops)
         # === VANLID
+
         inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
             jump=None, 
             cos=cos,
             smart_init=False)
         eta = 0.9
 
+        '''
+        # GUIDING
+        inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.inference_guide(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
+            jump=None, 
+            cos=cos,
+            smart_init=False,
+            job_lengths=compute_job_lengths(td["ops_sequence_order"]),
+            td=td
+        )
+        eta = 0.9
+        '''
         """
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
         # === LOOK AHEAD
@@ -415,23 +456,21 @@ def get_inference_result(problem_type, instance_idx, benchmark_instance = None):
 
     inference_assignments = inference_assignments[:, :, :valid_h, :valid_w]
     ops_ma_adj = ops_ma_adj[:, :, :valid_h, :valid_w]
-    n_jobs = sum(1 for x in job_lengts if x != 1)
-    print(f"n jobs: {n_jobs}")
-    print(f"n ops: {n_ops}")
-    print(f'job lengths: {job_lengts}')
-    print('exiting')
 
-    return td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path, report_file_path_fix, n_ops, n_jobs, benchmark
+    job_ops_adj = job_ops_adj[:, :, :valid_h, :valid_w]
+    proc_times = proc_times[:, :, :valid_h, :valid_w]
+
+    return td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path, report_file_path_fix, n_ops
 
 
 
 
 
 
-def get_inference_result_cached(instance_idx, problem_type, benchmark_instance = None, analysis=False):
+def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs, problem_type, benchmark_instance = None):
     print("inside get inference cached")
     # TODO endre hvis bruker annet
-    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path, report_file_path_fix, n_ops, n_jobs, benchmark = get_inference_result(problem_type, instance_idx, benchmark_instance)
+    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path, report_file_path_fix, n_ops = get_inference_result(problem_type, instance_idx, model_type, order, benchmark_instance)
     # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
     print("herkafaen")
     print(inference_assignments.shape)
@@ -440,12 +479,14 @@ def get_inference_result_cached(instance_idx, problem_type, benchmark_instance =
     target_assignments = target_assignments[:, :, :valid_h, :valid_w]
     print(target_assignments.shape)
     print("result")
-    print(inference_assignments)
+    # print(inference_assignments)
     #zero_cols = zero_only_columns(inference_assignments)
     #print(f"zeo cols: {zero_cols}")
     print("show")
     print(n_ops)
     print(inference_assignments.shape)
+
+
 
     '''
     save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis"
@@ -460,21 +501,25 @@ def get_inference_result_cached(instance_idx, problem_type, benchmark_instance =
     report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = code.inference.report_infeasibilities.count_infeasibilities(inference_assignments_order, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
     code.inference.report_infeasibilities.add_elapsed_time_report(elapsed, report_file_path)
 
-    assignments_over_time.append(inference_assignments_order)
 
+    '''
+    save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis"
+    matrix_graph_schedule.show_single_sched(inference_assignments_order, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True)
+    '''
+    #save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis"
+    #assignments_over_time.append(inference_assignments_order)
+    #matrix_graph_schedule.show_sched(2, ops_ma_adj, inference_assignments_order, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
 
-    if analysis:
-        save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/{benchmark}/analysis"
-        matrix_graph_schedule.show_single_sched(inference_assignments_order, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True)
 
 
     print("2")
     print("fixed infeasibilities")
-
-    inference_assignments_fixed = code.inference.infeasibilities.fix_infeas_mk10(inference_assignments_order, ops_ma_adj, td["ops_sequence_order"])
+    inference_assignments_fixed = code.inference.infeasibilities.fix_infeas_mk10(inference_assignments_order, ops_ma_adj, td["ops_sequence_order"], 
+                                                                                 valid_w=valid_w, n_ops=n_ops, td=td, analyse_infeas=False) # Bruker denne .. inkluder bare de nedre argumenta hvis skal analysere
     # inference_assignments_fixed = code.inference.infeasibilities.fix_infeasibilities(inference_assignments, ops_ma_adj, td["ops_sequence_order"], inference_assignments_order, n_ops)
     inference_assignments_order = code.inference.inferenced_to_schedule.show_order_clear(inference_assignments_fixed, n_ops, ops_ma_adj)
-
+    
+    print("after fixing everything... finally")
     report_fix, total_errors_fix, error_list, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix = code.inference.report_infeasibilities.count_infeasibilities(
     inference_assignments_order,
     td["ops_sequence_order"][:valid_w],
@@ -482,15 +527,16 @@ def get_inference_result_cached(instance_idx, problem_type, benchmark_instance =
     n_ops=n_ops
     )
 
+
+    print('exiting')
+    exit()
+
     # save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis_fix"
     # matrix_graph_schedule.show_sched(2, ops_ma_adj, inference_assignments, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
-
-    if analysis:
-        save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/{benchmark}/analysis_fix"
-        matrix_graph_schedule.show_single_sched(inference_assignments_fixed, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True)
-    
-    print('exitiing')
-    exit()
+    '''
+    save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis_fix"
+    matrix_graph_schedule.show_single_sched(inference_assignments_fixed, 2, td["ops_sequence_order"], ops_ma_adj, valid_h, valid_w, save_path, n_ops, cell_size=0.8, show_values=True)
+    '''
 
     """
     index = 0
@@ -522,9 +568,7 @@ def get_inference_result_cached(instance_idx, problem_type, benchmark_instance =
     # n_machines = 6 # mk01
     n_machines = valid_h
     print(f'n machines... {n_machines}')
-    order = True
     td_scheduled, min_makespan, max_makespan, avg_makespan = schedule.schedule_from_inference(inference_assignments_order, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path,
-
                                                                                               fill_gaps=True)
     
     code.inference.report_infeasibilities.add_makespans_report(min_makespan, max_makespan, avg_makespan, report_file_path)
@@ -545,13 +589,18 @@ def get_inference_result_cached(instance_idx, problem_type, benchmark_instance =
     # report_fix, total_errors_fix, error_list, total_error_fix, avg_amt_infeas_ops_fix, avg_amt_infeas_multi_fix, avg_amt_infeas_seq_fix, infeas_ops_fix, avg_infeas_multi_fix, amt_infeas_sched_fix, percent_infeas_sched_fix
     # report, total_errors, error_list, total_error, avg_amt_infeas_ops, avg_amt_infeas_multi, avg_amt_infeas_seq, infeas_ops, avg_infeas_multi, amt_infeas_sched, percent_infeas_sched
 
-
+    '''
+    benchmark = 'mk02'
     confidence_interval_utils.append_results( 
         min_makespan, avg_makespan, max_makespan, elapsed,
         total_errors, total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p,
         total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix,
         benchmark
     )
+    '''
+   
+
+
 
    
 
@@ -559,28 +608,137 @@ def get_inference_result_cached(instance_idx, problem_type, benchmark_instance =
 
 
 # HER
-def get_mk01_params():
-    pass
-def get_mk10_params():
-    pass
-def get_mk02_params():
-    pass
-def get_444_params():
-    valid_w = 16
-    valid_h = 4
+def compare_inference(model_type: str, order: bool, adj_model_path, enc_model_path, dataset_folder, instance_idx):
+
+    w = 60
+    h = 10
+    n_jobs = 10
+
+    # GETTING DATA OF TEST INSTANCE TO CHECK
+    td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
+
+    env, td_ignore, generator_params = code.dataset_code.dataset_maker.make_instance(
+        n_ma=4, 
+        n_jobs=4, 
+        max_op_per_job=4, 
+        min_op_per_job=4, 
+        max_proc_time=50, 
+        min_proc_time=5, 
+        max_eligable_ma_per_op=4, 
+        min_eligable_ma_per_op=4, 
+        batch_size=1
+    )
+
+
+    target_assignments, proc_times, job_ops_adj, ops_ma_adj = dataset_utils.get_dataset_features(td, env, order)
+
+    target_assignments = target_assignments.unsqueeze(0)
+    proc_times = proc_times.unsqueeze(0)
+    job_ops_adj = job_ops_adj.unsqueeze(0)
+    ops_ma_adj = ops_ma_adj.unsqueeze(0)
+
+    # GETTING THE INFERENCED RESULT
+    embed_size = 80
+    n_samples = 1
+
+    print("Running inference")
+
+
+    conditions = torch.cat([            
+        proc_times,
+        job_ops_adj,
+        ops_ma_adj,
+    ], dim=1)
+
+    inference_assignments = None
+    if model_type == "adj":
+        print("running inference")
+        # NORMAL INFERENCE
+        inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples)
+        print("running comparison inference")
+        # INFERENCE DDIM
+        comparison_inference_assignments, comparison_elapsed, comparison_assignments_over_time = code.inference.experimental.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples)
+        # INFERENCE GUIDE
+        # guided_inference_assignments, guided_elapsed, guidence.guided_assignments_over_time, errors = guide_adj_inference(conditions,3+1, adj_model_path, n_samples, 1)
+
+    elif model_type == "f":
+        pass
+    else:
+        raise ValueError("Model type must be either adj or f")
+    
+
+    print("skjekker når final result er...")
+    print(f"comparison of assignlents.. {len(comparison_assignments_over_time)}")
+    utils.check_when_inference_makes_final_schedule(comparison_assignments_over_time, comparison_inference_assignments, order)
+    utils.check_when_inference_makes_final_schedule(assignments_over_time, inference_assignments, order)
+  
+    print(f"Inference took {elapsed} time")
+    print(f"ddim inference took {comparison_elapsed} time")
+
+    comparison_inference_assignments = comparison_inference_assignments[:, :, :h, :w]
+    inference_assignments = inference_assignments[:, :, :h, :w]
+
+     #for value in [x.item() for x in errors]:
+    #    print(value)
+ 
+    # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
+    #if order:
+    inference_assignments = code.inference.inferenced_to_schedule.round_to_values(inference_assignments, 16, ops_ma_adj)
+    comparison_inference_assignments = code.inference.inferenced_to_schedule.round_to_values(comparison_inference_assignments, 16, ops_ma_adj)
+    #else:
+    #    inference_assignments = show_order_clear(inference_assignments, 16)
+    #    guided_inference_assignments = show_order_clear(guided_inference_assignments, 16)
+
+    print("RESULT")
 
 
 
 
+    print(inference_assignments)
+    print(comparison_inference_assignments)
+
+    # SCHEDULING THE INFERENCED SCHEDULE
+    graph_folder  = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results"
+    graph_name = f"scheduled_model_type_{model_type} order_{order}.png"
+    graph_name_comp = f"scheduled_model_type_{model_type} order_{order}_comp.png"
+    graph_save_path = f"{graph_folder}/{graph_name}"
+    graph_save_path_comp = f"{graph_folder}/{graph_name_comp}"
+
+    # TODO fjern
+    # td_scheduled = inferenced_schedule(target_assignments, order, env, td.copy(), graph_save_path)
+    # TODO gjør seinere så ikke kommenter ut
+    td_scheduled = schedule.schedule_from_inference(inference_assignments, order, env, td.copy(), graph_save_path, n_jobs)
+    td_scheduled_comp = schedule.schedule_from_inference(comparison_inference_assignments, order, env, td.copy(), graph_save_path_comp, n_jobs)
+
+    # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
+    makespan = td_scheduled['time']
+    makespan_comp = td_scheduled_comp['time']
+    print(makespan)
+    print(makespan_comp)
+
+   
+
+print("ran")
 
 
+
+model_type = "adj"
+order = True
+
+enc_model_path = None
+adj_model_path = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/444/adj_type_adj_order_{order}.pth'
 
 # dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444_TEST'
 # dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
 # dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01_TEST'
+instance_idx = 10
 
+print("inference result")
 # w = 64
 # h = 24
+w = 16
+h = 4
+n_jobs = 4
 # get_inference_result_444(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs)
 # compare_inference(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx)
 # get_inference_result_mk01(model_type, order, adj_model_path, enc_model_path, dataset_folder, instance_idx, w, h, n_jobs)
@@ -588,10 +746,16 @@ def get_444_params():
 # w = 64
 # h = 24
 # n_jobs = 10
+model_type = "adj"
+order = True
+instance_i = 500
+w = 16
+h = 4
+n_jobs = 4
 
-# putt benchmark instance til None, hvis vil ikke bruke eksakt instanse fra benchmark
-instance_idx = 10
-ins = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
-get_inference_result_cached(instance_idx, "mk01", ins, analysis=True)
+
+benchmark = "mk02"
+ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
+# ins = None
+get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins)
 # exit()
-

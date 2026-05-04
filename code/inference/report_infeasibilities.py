@@ -10,7 +10,7 @@ def write_report(report, total_errors, error_list, print_report=False, save_as_f
         if value["total"] == 0:
             amt_feas += 1
             case_str = f"{key} .. {value} .. NO ERRORS"
-            if print_report: print(case_str)
+            # if print_report: print(case_str)
 
         else:
             seq_rate = value["seq"] / n_ops if n_ops is not None else value["seq"]
@@ -109,7 +109,8 @@ def count_infeasibilities(ma_seq_matrix, ops_sequence_order, do_print=True, vali
     error_list = [0] * B
 
     if do_print:
-        print(f"B IS: {B}")
+        pass
+        # print(f"B IS: {B}")
 
     ops = ops_sequence_order.tolist()
     n = len(ops)
@@ -189,17 +190,17 @@ def count_infeasibilities(ma_seq_matrix, ops_sequence_order, do_print=True, vali
                     total_errors += 1
                     break
         if do_print:
-            print(" ")
+            pass
+            # print(" ")
 
         # ---- store only failing batches ----
         report[b] = errors
 
     if only_results:
         print('use only res')
-        total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = write_report(report, total_errors, error_list, print_report=True, save_as_file=report_file_path, n_ops=n_ops)
+        total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = write_report(report, total_errors, error_list, print_report=do_print, save_as_file=report_file_path, n_ops=n_ops)
         return report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p
-    total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = write_report(report, total_errors, error_list, print_report=True, save_as_file=report_file_path, n_ops=n_ops)
+    total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = write_report(report, total_errors, error_list, print_report=do_print, save_as_file=report_file_path, n_ops=n_ops)
     return report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p
-
 
 

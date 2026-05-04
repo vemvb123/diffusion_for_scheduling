@@ -204,6 +204,8 @@ def when_pred_same_value_make_not_same(x, largest_values, job_lengths, epsilon=0
 
     return out
 
+
+# ======= START FIX
 def fix_order_mk10(x_order, valid_slots, job_lengths):
     B, C, H, W = x_order.shape
     x_fixed = x_order.clone()
@@ -350,6 +352,7 @@ def fix_0s_mk10(x_order, valid_slots, job_lengths, eps=0.01):
 
     return x_fixed
 """
+
 def fix_same_value_in_job_mk10(x_order, valid_slots, job_lengths, eps=1e-3):
     B, C, H, W = x_order.shape
     x_fixed = x_order.clone()
@@ -433,16 +436,40 @@ def fix_same_value_global_mk10(x_order, valid_slots, eps=0.01):
 
     return x_fixed
 
+import code.inference.report_infeasibilities as report_infeasibilities
 
+def fix_infeas_mk10(x_order, valid_slots, ops_sequence_order, 
+                    valid_w=None, n_ops=None, td=None, analyse_infeas=False):
 
-def fix_infeas_mk10(x_order, valid_slots, ops_sequence_order):
+    report_file_path = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/infeas_report_mk10_hold_slett_seinere.txt"
+
     job_lengths = get_job_lengths(ops_sequence_order)
+    if analyse_infeas:
+        report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x_order, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
+
     x = fix_0s_mk10(x_order, valid_slots, job_lengths, eps=0.01)
+    if analyse_infeas:
+        report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
+        print("after fix 0s")
+
     x = fix_same_value_in_job_mk10(x, valid_slots, job_lengths, eps=0.01)
+    if analyse_infeas:
+        report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
+        print("after fix same value in job")
+
     x = fix_same_value_global_mk10(x, valid_slots, eps=0.01)
+    if analyse_infeas:
+        report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
+        print("after fix same value global")
+
     x = fix_order_mk10(x, valid_slots, job_lengths)
+    if analyse_infeas:
+        report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
+        print("after fix order")
+
     return x
 
+# ======= END FIX
 
 
 
@@ -465,5 +492,4 @@ def fix_infeasibilities(x: torch.Tensor, valid_slots: torch.Tensor, ops_sequence
     x = when_break_pred_switch_order(x, valid_slots, largest_values, job_lengths)
 
     return x
-
 
