@@ -438,32 +438,34 @@ def fix_same_value_global_mk10(x_order, valid_slots, eps=0.01):
 
 import code.inference.report_infeasibilities as report_infeasibilities
 
-def fix_infeas_mk10(x_order, valid_slots, ops_sequence_order, valid_w, n_ops, td):
+def fix_infeas_mk10(x_order, valid_slots, ops_sequence_order, 
+                    valid_w=None, n_ops=None, td=None, analyse_infeas=False):
+
     report_file_path = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/infeas_report_mk10_hold_slett_seinere.txt"
+
     job_lengths = get_job_lengths(ops_sequence_order)
+    if analyse_infeas:
+        report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x_order, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
 
-    print("before any fix")
-    report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x_order, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
-
-    print("--------------")
     x = fix_0s_mk10(x_order, valid_slots, job_lengths, eps=0.01)
-    report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
-    print("after fix 0s")
+    if analyse_infeas:
+        report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
+        print("after fix 0s")
 
-    print("--------------")
     x = fix_same_value_in_job_mk10(x, valid_slots, job_lengths, eps=0.01)
-    report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
-    print("after fix same value in job")
+    if analyse_infeas:
+        report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
+        print("after fix same value in job")
 
-    print("--------------")
     x = fix_same_value_global_mk10(x, valid_slots, eps=0.01)
-    report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
-    print("after fix same value global")
+    if analyse_infeas:
+        report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
+        print("after fix same value global")
 
-    print("--------------")
     x = fix_order_mk10(x, valid_slots, job_lengths)
-    report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
-    print("after fix order")
+    if analyse_infeas:
+        report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = report_infeasibilities.count_infeasibilities(x, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops)
+        print("after fix order")
 
     return x
 

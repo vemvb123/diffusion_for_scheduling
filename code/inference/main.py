@@ -507,7 +507,8 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
 
     print("2")
     print("fixed infeasibilities")
-    inference_assignments_fixed = code.inference.infeasibilities.fix_infeas_mk10(inference_assignments_order, ops_ma_adj, td["ops_sequence_order"], valid_w, n_ops, td) # Bruker denne
+    inference_assignments_fixed = code.inference.infeasibilities.fix_infeas_mk10(inference_assignments_order, ops_ma_adj, td["ops_sequence_order"], 
+                                                                                 valid_w=valid_w, n_ops=n_ops, td=td, analyse_infeas=False) # Bruker denne .. inkluder bare de nedre argumenta hvis skal analysere
     # inference_assignments_fixed = code.inference.infeasibilities.fix_infeasibilities(inference_assignments, ops_ma_adj, td["ops_sequence_order"], inference_assignments_order, n_ops)
     inference_assignments_order = code.inference.inferenced_to_schedule.show_order_clear(inference_assignments_fixed, n_ops, ops_ma_adj)
     
