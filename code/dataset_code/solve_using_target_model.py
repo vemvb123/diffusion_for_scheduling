@@ -1,4 +1,5 @@
 import code.dataset_code.benchmark_utils as benchmark_utils
+import code.dataset_code.benchmark_values as benchmark_values
 
 import csv
 import torch
@@ -101,10 +102,8 @@ def solve_trained_model_on_benchmark_instance_batch(instance_value: str, batch_s
     # ---------------------------
     # 1. LOAD CHECKPOINT
     # ---------------------------
-    if instance_value == "mk02":
-        checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.001_10j_6ma_6op_mk02.ckpt'
-    else:
-        raise ValueError(f"{instance_value} not supported")
+
+    checkpoint_path, _, _, _, _, _, _, _, _ = benchmark_values.get_benchmark_values(instance_value)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -200,9 +199,10 @@ def solve_trained_model_on_benchmark_instance_batch(instance_value: str, batch_s
     print(f"Saved {batch_size} results to {csv_path}")
 
 
-instance = "mk01"
-batch_size = 500
+# TODO kan ikke ha dette her.. det kalles på når man lager target modell
+# instance = "mk01"
+# batch_size = 500
 
-path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results'
-csv_path = f"{path}/results_{instance}.csv"
-solve_trained_model_on_benchmark_instance_batch(instance, batch_size=batch_size, csv_path=csv_path)
+# path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results'
+# csv_path = f"{path}/results_{instance}.csv"
+# solve_trained_model_on_benchmark_instance_batch(instance, batch_size=batch_size, csv_path=csv_path)

@@ -5,7 +5,7 @@ to make targets.
 The targets can later be used in a dataset
 """
 
-
+import code.dataset_code.benchmark_values as benchmark_values
 import sys
 import torch
 import numpy as np
@@ -32,36 +32,7 @@ def train_model():
     print("Beginning training of target model")
 
 
-    filepath_benchmark_instance = None
-    name = None
-    if int(sys.argv[1]) == 1:
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk15.txt'
-        name = "30j_15ma_11op_mk15"
-    elif int(sys.argv[1]) == 2:
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk10.txt'
-        name = "20j_15ma_14op_mk10"
-    elif int(sys.argv[1]) == 3:
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
-        name = "20j_10ma_25op_18a"
-    elif int(sys.argv[1]) == 4:
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
-        name = "10j_6ma_6op_mk02"
-    elif int(sys.argv[1]) == 5:
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk03.txt'
-        name = "15j_8ma_10op_mk03"
-    elif int(sys.argv[1]) == 6:
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk04.txt'
-        name = "15j_8ma_9op_mk04"
-    elif int(sys.argv[1]) == 7:
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk05.txt'
-        name = "15j_4ma_9op_mk05"
-
-
-
-
-
-
-
+    _, _, _, _, filepath_benchmark_instance, _, _, _, _, name = benchmark_values.get_benchmark_values(sys.argv[1])
 
     print(f'making model {name}')
     print(f"benchmark instance: {filepath_benchmark_instance}")

@@ -80,6 +80,10 @@ def main(instance_type = None):
     elif int(sys.argv[1]) == 7:
         target_model, _, dataset_folder, _, filepath_benchmark_instance, _, _, _, _ = get_benchmark_values('mk05')
 
+    elif int(sys.argv[1]) == 8:
+        target_model, _, dataset_folder, _, filepath_benchmark_instance, _, _, _, _ = get_benchmark_values('mk06')
+
+
 
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
     print(parameters)
@@ -110,7 +114,7 @@ def main(instance_type = None):
 def check_benchmark_parameters():
     print("checking benchmark parameters...")
     #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
-    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk05.txt'
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk06.txt'
     #filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
@@ -164,9 +168,9 @@ def check_dataset():
 # mk05 er: 
 # check_benchmark_parameters()
 
-check_dataset()
+# check_dataset()
 #instance_type = "mk01"
-# main()
+main()
 
 # ins = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
 # td = benchmark_utils.make_the_stuff(ins)

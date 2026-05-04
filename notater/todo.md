@@ -1,17 +1,15 @@
 tips:
 end kjøringa når loss er for det meste under 0.015-0.010
 
-
-Yfirsikt yfir treningarinn:
-trener modell mk04
-trener modell mk03 - Sikker ferdig med trening Lørdag, i føge det over med loss
 ...
 mk05 dataset
-trener mk10
-trener mk03
-- trene mk04 modell
+trener mk10 diff modell
+trene mk04 diff modell
+..
+stoppet å trene mk03 modell fordi jeg trur den er ferdig, men må skjekke prestasjon.
+Hvis ikke, så fortsett trening
 
-
+trene target modell mk06
 ..
 
 Fikse infeas..
@@ -21,6 +19,15 @@ sammenlign stega med mk01
 .. trur bare kan fikse på main branchen, main og ikke-main har vell det samme problemet.
 
 ...
+
+
+
+
+
+
+
+
+
 
 
 

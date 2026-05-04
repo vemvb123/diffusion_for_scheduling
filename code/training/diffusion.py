@@ -3,6 +3,7 @@ diffusion.py contains code for training diffusion models
 """
 from diffusers import CosineDPMSolverMultistepScheduler, DDPMScheduler
 
+import os
 import logging
 
 from code.training.experimental import run_epoch_feature, run_epoch_penalty_feasibility
@@ -263,7 +264,7 @@ def diffusion(
         all_losses.append(avg_loss)
         all_losses_test.append(avg_loss_test)
 
-        model_path_adj.parent.mkdir(parents=True, exist_ok=True)
+        os.makedirs(os.path.dirname(model_path_adj), exist_ok=True)
         torch.save({ 
                 'model_state_dict': model_adj.state_dict(), 
                 'optimizer_state_dict': optimizer.state_dict(), }, 
