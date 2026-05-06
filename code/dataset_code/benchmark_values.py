@@ -18,7 +18,7 @@ def get_benchmark_values(benchmark_instance: str):
 
     elif benchmark_instance == "mk01":
         checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_10j_6ma_6op_mk01.ckpt'
-        model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_True.pth"
+        model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/cos_beta/timestep_1000_cos.pth'
         dataset_train_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
         dataset_test_path = dataset_train_path + '_TEST'
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
@@ -87,7 +87,6 @@ def get_benchmark_values(benchmark_instance: str):
         valid_h = 15
         valid_w = 280
         name = "20j_15ma_14op_mk10"
-
     else:
         raise ValueError(f"{benchmark_instance} not supported")
 
