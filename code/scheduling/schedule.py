@@ -129,23 +129,26 @@ from functorch import vmap
 # notbusy .. will skip action if machine not avalible at the time
 
 def do_actions(actions, n_machines, td, env):
+    invalid_action_counter = 0
 
     for action in actions:
         # machine index that this action refers to
         ma_to_use = (action - 1) % n_machines
 
-
+        # If action cant be scheduled because machine is busy, then skip forward in time
         while td["busy_until"][0, ma_to_use].item() > td["time"].item():
             invalid_action = torch.tensor([0])  
             td["action"] = invalid_action
 
             td = env.step(td)["next"]
+            invalid_action_counter += 1
 
+        # Doing valid actions
         if action != 0:
             td["action"] = torch.tensor([action])
             td = env.step(td)["next"]
 
-    return td
+    return td, invalid_action_counter
 
 
 
@@ -329,7 +332,7 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
 
     # Scheduling
     feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0] 
-    tds = Parallel(n_jobs=jobs_to_make)(
+    tds, invalid_action_counters = Parallel(n_jobs=jobs_to_make)(
         delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env )
         for f_i in feasible_indecies
     )
@@ -388,8 +391,13 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         print(f"Saved scheduled image at path {path_save_image}")
 
 
+    invalid_actions_counter_rate = [x / len(all_actions[0]) for x in invalid_action_counters]
 
-    return td_best, min_makespan, max_makespan, avg_makespan
+    print(f"invalid action counters: {invalid_action_counters}")
+    print(f"invalid action counter rates: {invalid_actions_counter_rate}")
+    exit()
+
+    return td_best, min_makespan, max_makespan, avg_makespan, invalid_action_counters, invalid_actions_counter_rate
 
 
 

@@ -411,10 +411,11 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # n_machines = 6 # mk01
     n_machines = valid_h
     print(f'n machines... {n_machines}')
-    td_scheduled, min_makespan, max_makespan, avg_makespan = schedule.schedule_from_inference(inference_assignments_order, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path,
+    td_scheduled, min_makespan, max_makespan, avg_makespan, n_invalid_actions, invalid_actions_rate = schedule.schedule_from_inference(inference_assignments_order, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path,
                                                                                               fill_gaps=True)
     
     code.inference.report_infeasibilities.add_makespans_report(min_makespan, max_makespan, avg_makespan, report_file_path)
+
 
     # GETTING THE MKESPAN OF THE SCHEDULED INFERENCED
     makespan = td_scheduled['time']
@@ -432,6 +433,7 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # report_fix, total_errors_fix, error_list, total_error_fix, avg_amt_infeas_ops_fix, avg_amt_infeas_multi_fix, avg_amt_infeas_seq_fix, infeas_ops_fix, avg_infeas_multi_fix, amt_infeas_sched_fix, percent_infeas_sched_fix
     # report, total_errors, error_list, total_error, avg_amt_infeas_ops, avg_amt_infeas_multi, avg_amt_infeas_seq, infeas_ops, avg_infeas_multi, amt_infeas_sched, percent_infeas_sched
 
+    # TODO før også inn invalid actions
     '''
     benchmark = 'mk02'
     confidence_interval_utils.append_results( 
@@ -600,5 +602,6 @@ n_jobs = 4
 benchmark = "mk01"
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 # ins = None
-get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "random")
+# inference_type = random, guide, ddpm
+get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "ddpm")
 # exit()
