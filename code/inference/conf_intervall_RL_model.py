@@ -9,8 +9,7 @@ import os
 
 def make_conf_RL_model(checkpoint_path, benchmark_path, batch_size, n_in_intervall, report_path):
     # get td for benchmark, with batched
-    td, env= make_td_from_benchmark_working(benchmark_path, return_env=True)
-    td = from_dict(td)      # dict → TensorDict
+    td, env = make_td_from_benchmark_working(benchmark_path, return_env=True)
     td = td.unsqueeze(0).expand(n_in_intervall * batch_size).clone()
 
     # make actions from td

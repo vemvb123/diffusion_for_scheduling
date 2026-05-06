@@ -11,6 +11,7 @@ import torch
 
 import numpy as np
 
+from tensordict import from_dict
 
 '''
 use make_td_from_benchmark(file: str) to make a benchmark instance into a td
@@ -385,6 +386,9 @@ def make_td_from_benchmark_working(file: str, batch_size: int = 1,return_env: bo
 
     # removing first dimension [batch, height, width] into [height, width]
     env_state = {k: v.squeeze(0) for k, v in env_state.items()}
+
+    # TODO la til dette, for å konvertere til tensordict. hvis ikke funker, så fjern
+    td = from_dict(td) 
 
     if return_env:
         return env_state, env
