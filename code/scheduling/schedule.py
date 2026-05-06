@@ -331,11 +331,15 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         print(td['ops_ma_adj'].shape)  # torch.Size([1, 6, 60])
 
     # Scheduling
+    raise Exception('Kan ikke kjøre enda, fordi out of memory (node var opptatt).. i metode: do_actions i schedule.py ... se om kan returnere invalid actions, og legge i cond rapport .. Exception raised i schedule.py schedule_from_inference')
     feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0] 
-    tds, invalid_action_counters = Parallel(n_jobs=jobs_to_make)(
+    results = Parallel(n_jobs=jobs_to_make)(
         delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env )
         for f_i in feasible_indecies
     )
+    tds, invalid_action_counters = zip(*results)
+    tds = list(tds)
+    invalid_action_counters = list(invalid_action_counters)
 
     # filling gaps
     ## mapping operations to machines
@@ -391,7 +395,11 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         print(f"Saved scheduled image at path {path_save_image}")
 
 
-    invalid_actions_counter_rate = [x / len(all_actions[0]) for x in invalid_action_counters]
+    denom = len(all_actions[0])
+    invalid_actions_counter_rate = [
+        x / denom if denom > 0 else 0
+        for x in invalid_action_counters
+    ]
 
     print(f"invalid action counters: {invalid_action_counters}")
     print(f"invalid action counter rates: {invalid_actions_counter_rate}")

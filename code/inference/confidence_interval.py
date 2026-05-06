@@ -7,7 +7,7 @@ def append_results(
         min_makespan, avg_makespan, max_makespan, elapsed,
         total_errors, total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p,
         total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix,
-        benchmark
+        benchmark, n_invalid_actions, invalid_actions_rate
     ):
     
     import os, csv
@@ -16,7 +16,7 @@ def append_results(
     csv_path = f"{path_before}/batch_runs_metrics_{benchmark}.csv"
 
     fieldnames = [
-        "min_makespan", "avg_makespan", "max_makespan", "elapsed",
+        "min_makespan", "avg_makespan", "max_makespan", "elapsed", 'n_invalid_actions', 'invalid_actions_rate'
 
         # before fixing schedule
         "total_errors", "total_error", "total_error_p", "multi_p", "seq_p",
@@ -37,7 +37,7 @@ def append_results(
     with open(csv_path, "a", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
-            min_makespan, avg_makespan, max_makespan, elapsed,
+            min_makespan, avg_makespan, max_makespan, elapsed, n_invalid_actions, invalid_actions_rate
 
             # before fixing schedule
             total_errors, total_error, total_error_p, multi_p, seq_p,
