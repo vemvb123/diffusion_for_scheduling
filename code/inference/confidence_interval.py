@@ -37,7 +37,7 @@ def append_results(
     with open(csv_path, "a", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
-            min_makespan, avg_makespan, max_makespan, elapsed, n_invalid_actions, invalid_actions_rate
+            min_makespan, avg_makespan, max_makespan, elapsed, n_invalid_actions, invalid_actions_rate,
 
             # before fixing schedule
             total_errors, total_error, total_error_p, multi_p, seq_p,
