@@ -22,7 +22,7 @@ def get_benchmark_values(benchmark_instance: str):
         dataset_train_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
         dataset_test_path = dataset_train_path + '_TEST'
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
-        w = 60 # unsure if should be actually 60
+        w = 64 # unsure if should be actually 60
         h = 24
         valid_w = 55
         valid_h = 6

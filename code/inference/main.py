@@ -36,7 +36,7 @@ import numpy as np
 
 def get_problem_type(problem_type : str):
     (td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, valid_h, valid_w) = (None,) * 10
-    
+
     _, model_path, dataset_folder, _, filepath_brandimarte_instance, valid_h, valid_w, mask_w, mask_h, _ = benchmark_values.get_benchmark_values(problem_type)
 
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)

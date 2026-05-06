@@ -20,7 +20,9 @@ sammenlign stega med mk01
 
 ...
 
-
+OPS: 
+mk03?? kan ha dårlig prest i infeasibility fordi jeg bruker feil maske.
+Brukte 60 maske på mk01, og fikk da mye mer feil enn når jeg brukte maske for 64 (det modellen var trent på)
 
 
 
