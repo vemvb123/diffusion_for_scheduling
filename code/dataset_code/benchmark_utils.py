@@ -348,7 +348,7 @@ def make_rl4co_instance(jobs, num_machines):
     return td
 
 
-def make_td_from_benchmark_working(file: str):
+def make_td_from_benchmark_working(file: str, batch_size: int = 1,return_env: bool = False):
     # -------------------------
     # load data
     # -------------------------
@@ -376,6 +376,7 @@ def make_td_from_benchmark_working(file: str):
 
     batch_td = TensorDict(batched_td, batch_size=[1])
 
+
     # -------------------------
     # reset env
     # -------------------------
@@ -384,6 +385,9 @@ def make_td_from_benchmark_working(file: str):
 
     # removing first dimension [batch, height, width] into [height, width]
     env_state = {k: v.squeeze(0) for k, v in env_state.items()}
+
+    if return_env:
+        return env_state, env
     return env_state
 
 

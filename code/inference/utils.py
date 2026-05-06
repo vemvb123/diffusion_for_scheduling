@@ -161,3 +161,40 @@ def count_duplicate_instances(x: torch.Tensor) -> int:
 
     # Count how many instances are duplicates
     return int(is_duplicate.sum().item())
+
+
+def compute_job_lengths(indices):
+    """
+    Compute lengths of jobs from a 1D tensor of indices, where each
+    job is defined as a contiguous sequence starting at 0 and increasing
+    by +1. Trailing filler zeros are ignored.
+    """
+    arr = indices.tolist()
+    job_lengths = []
+    current_length = 0
+    expected_next = 0
+
+    for i, val in enumerate(arr):
+        # If we see expected value in a sequence
+        if val == expected_next:
+            current_length += 1
+            expected_next += 1
+
+        # If we see a 0 where a new job could start
+        elif val == 0:
+            # If we already finished a valid job (current_length > 0),
+            # we record it and start a new one
+            if current_length > 0:
+                job_lengths.append(current_length)
+            current_length = 1
+            expected_next = 1
+
+        # Anything else breaks the job detection
+        else:
+            break
+
+    # After loop, if we were in a valid job, save it
+    if current_length > 0:
+        job_lengths.append(current_length)
+
+    return job_lengths

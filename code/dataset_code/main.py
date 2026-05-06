@@ -40,7 +40,6 @@ def main(instance_type = None):
     filepath_benchmark_instance = None
     target_model = None
 
-
     if int(sys.argv[1]) == 1:
         print("making mk15 dataset")
         dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk15_30j_15ma_11op'
@@ -114,7 +113,7 @@ def main(instance_type = None):
 def check_benchmark_parameters():
     print("checking benchmark parameters...")
     #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
-    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk06.txt'
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk05.txt'
     #filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
@@ -123,7 +122,7 @@ def check_benchmark_parameters():
 def check_dataset():
     # --- process test image
     instance_idx = 10
-    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_8ma_10op_mk03'
+    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_4ma_9op_mk05'
     td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
 
 

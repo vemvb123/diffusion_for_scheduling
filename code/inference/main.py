@@ -12,6 +12,7 @@ import code.inference.infeasibilities
 import code.inference.inferenced_to_schedule
 import code.inference.report_infeasibilities
 import code.inference.utils as utils
+from code.inference.utils import compute_job_lengths
 import code.scheduling.utils as schedule_utils
 import code.inference.guidence as guidence
 import code.inference.inference as inference
@@ -32,43 +33,6 @@ matplotlib.use('Agg')
 
 import torch
 import numpy as np
-
-def compute_job_lengths(indices):
-    """
-    Compute lengths of jobs from a 1D tensor of indices, where each
-    job is defined as a contiguous sequence starting at 0 and increasing
-    by +1. Trailing filler zeros are ignored.
-    """
-    arr = indices.tolist()
-    job_lengths = []
-    current_length = 0
-    expected_next = 0
-
-    for i, val in enumerate(arr):
-        # If we see expected value in a sequence
-        if val == expected_next:
-            current_length += 1
-            expected_next += 1
-
-        # If we see a 0 where a new job could start
-        elif val == 0:
-            # If we already finished a valid job (current_length > 0),
-            # we record it and start a new one
-            if current_length > 0:
-                job_lengths.append(current_length)
-            current_length = 1
-            expected_next = 1
-
-        # Anything else breaks the job detection
-        else:
-            break
-
-    # After loop, if we were in a valid job, save it
-    if current_length > 0:
-        job_lengths.append(current_length)
-
-    return job_lengths
-
 
 def get_problem_type(problem_type : str):
     (td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, valid_h, valid_w) = (None,) * 10
@@ -95,8 +59,8 @@ def get_problem_type(problem_type : str):
 
 
 
-
-def get_inference_result(problem_type, instance_idx, model_type, order: bool, benchmark_instance = None):
+# inference types: ddpm, guide, random# inference types: ddpm, guide, random
+def get_inference_result(problem_type, instance_idx, model_type, order: bool, benchmark_instance = None, inference_type = "ddpm"):
     print("starting inference")
     # instantiate all return values as None
     (td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, valid_h, valid_w) = (None,) * 10
@@ -196,25 +160,27 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
         #inference_assignments, elapsed, assignments_over_time = experimental.adj_inference_ddpm_batch_improvement(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h=valid_h, valid_w=valid_w, timesteps=timesteps, cos=True, t_replace=t_replace, ops_sequence_order=ops_sequence_order, n_ops=n_ops)
         # === VANLID
+        inference_assignments, elapsed, assignments_over_time, variation_over_time = None, None, None, None
+        if inference_type == "ddpm":
+            print("doing inference ddpm")
+            inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
+                jump=None, 
+                cos=cos,
+                smart_init=False)
+            eta = 0.9
 
-        inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
-            jump=None, 
-            cos=cos,
-            smart_init=False)
-        eta = 0.9
-
-        '''
         # GUIDING
-        inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.inference_guide(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
-            jump=None, 
-            cos=cos,
-            smart_init=False,
-            job_lengths=compute_job_lengths(td["ops_sequence_order"]),
-            td=td
-        )
-        eta = 0.9
-        '''
-        """
+        if inference_type == "guide":
+            print("doing inference guided")
+            inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.inference_guide(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
+                jump=None, 
+                cos=cos,
+                smart_init=False,
+                job_lengths=compute_job_lengths(td["ops_sequence_order"]),
+                td=td
+            )
+            eta = 0.9
+            """
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
         # === LOOK AHEAD
         """
@@ -226,24 +192,24 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
             )
         """
         # ==== RANDOM
-        """
-        assignments_to_make = 20
-        ops_seq_order = td["ops_sequence_order"]
-        job_lengts = compute_job_lengths(ops_seq_order)
-        print(f"job lengths: {job_lengts}")
-        valid_w = 280
-        inference_assignments = schedule.schedule_randomly(ops_ma_adj, valid_h, valid_w, job_lengts, N=n_ops)
-        for i in range(assignments_to_make-1):
-            instance_batch= schedule.schedule_randomly(ops_ma_adj, valid_h, valid_w, job_lengts)
-            inference_assignments = torch.cat([inference_assignments, instance_batch], dim=0)
+        if inference_type == "random":
+            print("doing inference random")
+            assignments_to_make = 32
+            ops_seq_order = td["ops_sequence_order"]
+            job_lengts = compute_job_lengths(ops_seq_order)
+            print(f"job lengths: {job_lengts}")
+            valid_w = 280
+            inference_assignments = schedule.schedule_randomly(ops_ma_adj, valid_h, valid_w, job_lengts, N=n_ops)
+            for i in range(assignments_to_make-1):
+                instance_batch= schedule.schedule_randomly(ops_ma_adj, valid_h, valid_w, job_lengts)
+                inference_assignments = torch.cat([inference_assignments, instance_batch], dim=0)
 
 
-        print(f"random assignments shape: {inference_assignments.shape}")
-        print(inference_assignments)
-        elapsed = 0
-        assignments_over_time = None
-        """
-        """
+            print(f"random assignments shape: {inference_assignments.shape}")
+            print(inference_assignments)
+            elapsed = 0
+            assignments_over_time = None
+            """
         inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
             jump=None, 
             cos=cos,
@@ -346,10 +312,10 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
 
 
 
-def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs, problem_type, benchmark_instance = None):
+def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs, problem_type, benchmark_instance = None, inference_type = "ddpm"):
     print("inside get inference cached")
     # TODO endre hvis bruker annet
-    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path, report_file_path_fix, n_ops = get_inference_result(problem_type, instance_idx, model_type, order, benchmark_instance)
+    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path, report_file_path_fix, n_ops = get_inference_result(problem_type, instance_idx, model_type, order, benchmark_instance, inference_type)
     # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
     print("herkafaen")
     print(inference_assignments.shape)
@@ -407,8 +373,6 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     )
 
 
-    print('exiting')
-    exit()
 
     # save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis_fix"
     # matrix_graph_schedule.show_sched(2, ops_ma_adj, inference_assignments, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
@@ -636,5 +600,5 @@ n_jobs = 4
 benchmark = "mk01"
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 # ins = None
-get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins)
+get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "random")
 # exit()

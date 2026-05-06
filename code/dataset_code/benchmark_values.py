@@ -17,12 +17,12 @@ def get_benchmark_values(benchmark_instance: str):
 
 
     elif benchmark_instance == "mk01":
-        checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.001_10j_6ma_6op_mk01.ckpt'
+        checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_10j_6ma_6op_mk01.ckpt'
         model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/adj_type_adj_order_True.pth"
         dataset_train_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
         dataset_test_path = dataset_train_path + '_TEST'
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
-        w = 64
+        w = 60 # unsure if should be actually 60
         h = 24
         valid_w = 55
         valid_h = 6
@@ -54,14 +54,14 @@ def get_benchmark_values(benchmark_instance: str):
 
     elif benchmark_instance == "mk05":
         checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_15j_4ma_9op_mk05.ckpt'
-        model_path = None
+        model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk05/mk05_0.0001.pth'
         dataset_train_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_4ma_9op_mk05'
         dataset_test_path = dataset_train_path + '_TEST'
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk05.txt'
-        valid_h = None
-        valid_w = None
-        w = None
-        h = None 
+        valid_h = 4
+        valid_w = 135
+        w = 136
+        h = 24
         name = "15j_4ma_9op_mk05"
 
     elif benchmark_instance == "mk06":

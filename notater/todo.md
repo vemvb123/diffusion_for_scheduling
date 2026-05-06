@@ -2,7 +2,7 @@ tips:
 end kjøringa når loss er for det meste under 0.015-0.010
 
 ...
-mk05 dataset
+trener mk05 diff modell
 trener mk10 diff modell
 trene mk04 diff modell
 ..

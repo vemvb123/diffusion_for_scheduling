@@ -10,6 +10,22 @@ from tensordict import TensorDict
 from typing import Dict, List, Tuple
 
 
+def make_actions_for_instance(td: TensorDict, checkpoint_path: str) -> Tuple[TensorDict, List]:
+    model = L2DModel.load_from_checkpoint(checkpoint_path)
+    model = model.to("cpu")
+
+    with torch.inference_mode():
+        out = model(td,
+                    decode_type="multistart_sampling",
+                    num_starts=5,
+                    select_best=True,
+                    return_actions=True)
+    actions = out["actions"]
+
+    return actions
+
+
+
 def make_target(env: FJSPEnv, td: TensorDict, checkpoint_path: str, order: bool = False) -> Tuple[TensorDict, List]:
     model = L2DModel.load_from_checkpoint(checkpoint_path)
     model = model.to("cpu")

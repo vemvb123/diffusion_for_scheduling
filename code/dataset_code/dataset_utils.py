@@ -109,6 +109,12 @@ def make_dataset(n: int, dataset_folder: str,
             min_eligable_ma_per_op=min_eligable_ma_per_op, 
             batch_size=batch_size)
         # fa target fra instance
+        # TODO fjern
+        # print(td.shape)
+        # print(td['ops_ma_adj'].shape)
+        # print(type(td))
+        # print("exiting")
+        # exit()
 
         td_target, actions, ordered_assignments = code.dataset_code.dataset_maker.make_target(env, td.copy(), target_model, order)
 
