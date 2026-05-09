@@ -331,7 +331,7 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         print(td['ops_ma_adj'].shape)  # torch.Size([1, 6, 60])
 
     # Scheduling
-    raise Exception('Kan ikke kjøre enda, fordi out of memory (node var opptatt).. i metode: do_actions i schedule.py ... se om kan returnere invalid actions, og legge i cond rapport .. Exception raised i schedule.py schedule_from_inference')
+    # raise Exception('Kan ikke kjøre enda, fordi out of memory (node var opptatt).. i metode: do_actions i schedule.py ... se om kan returnere invalid actions, og legge i cond rapport .. Exception raised i schedule.py schedule_from_inference')
     feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0] 
     results = Parallel(n_jobs=jobs_to_make)(
         delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env )
@@ -359,8 +359,9 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     for td in tds
     if td["finish_times"][td["finish_times"] != 9999.0].max().item() >= 30.0
     ]
-
-    td_best = tds[ makespans.index( min(makespans) ) ]
+    best_index = makespans.index( min(makespans) )
+    worst_index = makespans.index( max(makespans) )
+    td_best = tds[ best_index ]
 
     """
     start_times = td_best["start_times"]
@@ -401,11 +402,21 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         for x in invalid_action_counters
     ]
 
-    print(f"invalid action counters: {invalid_action_counters}")
-    print(f"invalid action counter rates: {invalid_actions_counter_rate}")
-    exit()
+    invalid_act_of_max = invalid_action_counters[ worst_index ]
+    invalid_act_of_min = invalid_action_counters[ best_index ]
+    invalid_act_avg = sum(invalid_action_counters) / len(invalid_action_counters)
 
-    return td_best, min_makespan, max_makespan, avg_makespan, invalid_action_counters, invalid_actions_counter_rate
+    invalid_act_rate_of_max = invalid_actions_counter_rate[ worst_index ]
+    invalid_act_rate_of_min = invalid_actions_counter_rate[ best_index ]
+    invalid_act_rate_avg = sum(invalid_actions_counter_rate) / len(invalid_actions_counter_rate)
+
+
+
+
+    # print(f"invalid action counters: {invalid_action_counters}")
+    # print(f"invalid action counter rates: {invalid_actions_counter_rate}")
+
+    return td_best, min_makespan, max_makespan, avg_makespan, invalid_act_of_min, invalid_act_of_max, invalid_act_avg, invalid_act_rate_of_min, invalid_act_rate_of_max, invalid_act_rate_avg
 
 
 

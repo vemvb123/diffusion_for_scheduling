@@ -113,7 +113,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         n_samples =32
         n_ops = int(torch.count_nonzero(target_assignments))
 
-        timesteps = 100
+        timesteps = 200
         #sampling_steps = 60
         ddim_eta = 1.0
         
@@ -411,9 +411,8 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # n_machines = 6 # mk01
     n_machines = valid_h
     print(f'n machines... {n_machines}')
-    td_scheduled, min_makespan, max_makespan, avg_makespan, n_invalid_actions, invalid_actions_rate = schedule.schedule_from_inference(inference_assignments_order, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path,
+    td_scheduled, min_makespan, max_makespan, avg_makespan, invalid_act_of_min, invalid_act_of_max, invalid_act_avg, invalid_act_rate_of_min, invalid_act_rate_of_max, invalid_act_rate_avg = schedule.schedule_from_inference(inference_assignments_order, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path,
                                                                                               fill_gaps=True)
-    
     code.inference.report_infeasibilities.add_makespans_report(min_makespan, max_makespan, avg_makespan, report_file_path)
 
 
@@ -434,15 +433,14 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # report, total_errors, error_list, total_error, avg_amt_infeas_ops, avg_amt_infeas_multi, avg_amt_infeas_seq, infeas_ops, avg_infeas_multi, amt_infeas_sched, percent_infeas_sched
 
     # TODO før også inn invalid actions
-    '''
-    benchmark = 'mk02'
+    benchmark = problem_type
+    print(f'benchmark is {benchmark}')
     confidence_interval_utils.append_results( 
         min_makespan, avg_makespan, max_makespan, elapsed,
         total_errors, total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p,
         total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix,
-        benchmark, n_invalid_actions, invalid_actions_rate
+        benchmark, invalid_act_of_min, invalid_act_of_max, invalid_act_avg, invalid_act_rate_of_min, invalid_act_rate_of_max, invalid_act_rate_avg
     )
-    '''
    
 
 
@@ -599,7 +597,7 @@ h = 4
 n_jobs = 4
 
 
-benchmark = "mk01"
+benchmark = "mk03"
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 # ins = None
 # inference_type = random, guide, ddpm
