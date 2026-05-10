@@ -1,3 +1,8 @@
+..
+må fikse skeduleringa mk10.. får lavere makespan enn hva er mulig.
+må fikse at kan skedulere mk03, får noe rar error
+
+
 tips:
 end kjøringa når loss er for det meste under 0.015-0.010
 ops... for mk01 ser det ut som om loss gikk til rundt 0.01-0.02 for test (litt lavere for train, men ikke veldig).. den trente i 15 epoker

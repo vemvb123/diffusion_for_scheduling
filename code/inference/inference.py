@@ -54,7 +54,7 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
 
     except Exception as e:
         print('There was an error loading with path. Loading model by dictinary instead')
-        print(f'errir: {e}')
+        # print(f'errir: {e}')
         checkpoint = torch.load(model_path, map_location=device)
 
         model = deepinv.models.DiffUNet(in_channels=4, out_channels=1, pretrained=None)

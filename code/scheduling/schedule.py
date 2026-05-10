@@ -1,6 +1,17 @@
 """
 scheduling_utils.py contains all code that does scheduling
 """
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message=".*failed to set start method to spawn.*"
+)
+
+warnings.filterwarnings(
+    "ignore",
+    message=".*A worker stopped while some jobs were given to the executor.*"
+)
 
 from joblib import Parallel, delayed
 
@@ -298,16 +309,21 @@ def schdule_by_utilization():
 
 
 
-
 # Takes schedule made from the model, than schedules it
 def schedule_from_inference( assignments, order: bool, env, td, path_save_image: str, n_jobs: int, n_machines: int, error_list, ops_sequence_order, report_file_path, fill_gaps: bool = False):
+
     print(f"assignments shape: {assignments.shape}")
-    n_jobs = infer_n_jobs(ops_sequence_order) 
+    
+    n_jobs = infer_n_jobs(ops_sequence_order) # for mk03 gir denne 10, når den egentlig har 15 jobber
+    # mente jeg her å få max prosesser, eller jobber? .. mk03 har 10 max prosesser
+    # n_jobs = 15
+    print(f'n jobs: {n_jobs}')
 
 
     jobs_to_make = int(os.cpu_count() / 6)
 
     print(f"making actions for assignments with {os.cpu_count()} processors")
+    print(f'n jobs: {n_jobs}')
     B = assignments.size(0)
     all_actions = Parallel(n_jobs=jobs_to_make)(
         delayed(utils.map_assignments_to_actions_text)( assignments[b], True, n_jobs )
@@ -332,6 +348,7 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
 
     # Scheduling
     # raise Exception('Kan ikke kjøre enda, fordi out of memory (node var opptatt).. i metode: do_actions i schedule.py ... se om kan returnere invalid actions, og legge i cond rapport .. Exception raised i schedule.py schedule_from_inference')
+    print(f'n_machines {n_machines}')
     feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0] 
     results = Parallel(n_jobs=jobs_to_make)(
         delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env )

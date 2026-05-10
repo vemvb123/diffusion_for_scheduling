@@ -27,7 +27,6 @@ def get_clear_sequence(assignments):
 
 
 def map_assignemnts_to_actions(assignments, order: bool, n_jobs: int):
-
     # remove batch/channel dims if present
     if assignments.dim() > 2:
         assignments = assignments.squeeze(0).squeeze(0)  # (H, W)

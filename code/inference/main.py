@@ -411,6 +411,7 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # n_machines = 6 # mk01
     n_machines = valid_h
     print(f'n machines... {n_machines}')
+    print(f'n jobs... {n_jobs}')
     td_scheduled, min_makespan, max_makespan, avg_makespan, invalid_act_of_min, invalid_act_of_max, invalid_act_avg, invalid_act_rate_of_min, invalid_act_rate_of_max, invalid_act_rate_avg = schedule.schedule_from_inference(inference_assignments_order, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path,
                                                                                               fill_gaps=True)
     code.inference.report_infeasibilities.add_makespans_report(min_makespan, max_makespan, avg_makespan, report_file_path)
