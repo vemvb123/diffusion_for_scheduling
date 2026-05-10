@@ -149,7 +149,110 @@ def map_assignments_to_actions_per_machine(assignments, order: bool, n_jobs):
     return per_machine_actions
 
 
+
+
 def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
+    """
+    Convert assignment tensor into compact action ids.
+
+    assignments shape:
+        [1, H, W] or [H, W]
+
+    H = number of machines/rows
+    W = total operation columns
+
+    n_jobs:
+        either int or list of widths per section/job
+    """
+
+    print(n_jobs)
+    print(assignments.shape)
+    print(order)
+
+    # Remove batch dimension if present
+    if assignments.dim() > 2:
+        assignments = assignments.squeeze(0)
+
+    H, W = assignments.shape
+
+    # Build widths
+    if isinstance(n_jobs, int):
+        widths = [n_jobs] * (W // n_jobs)
+    else:
+        widths = list(n_jobs)
+
+    # Remove filler widths (=1)
+    widths = [w for w in widths if w > 1]
+
+    # Cumulative section starts
+    # Example:
+    # widths = [8,7,6]
+    # section_starts = [0,8,15]
+    section_starts = torch.cumsum(
+        torch.tensor([0] + widths[:-1]),
+        dim=0
+    )
+
+    actions = []
+
+    if order:
+
+        # Get nonzero assignments
+        nonzero = torch.nonzero(assignments, as_tuple=False)
+
+        # Sort by assignment value
+        values = assignments[nonzero[:, 0], nonzero[:, 1]]
+        sorted_idx = torch.argsort(values)
+
+        for i in sorted_idx:
+
+            row, col = nonzero[i].tolist()
+
+            # Determine which section this column belongs to
+            section_idx = int((section_starts <= col).sum() - 1)
+
+            # Safety check
+            if section_idx < 0 or section_idx >= len(widths):
+                continue
+
+            local_width = widths[section_idx]
+            local_start = int(section_starts[section_idx])
+
+            # Local column within section
+            local_col = col - local_start
+
+            # Skip filler columns
+            if local_col >= local_width:
+                continue
+
+            # Compact action encoding
+            # Example:
+            # section0 -> 1..8
+            # section1 -> 9..15
+            # section2 -> 16..21
+            action = local_start + (row + 1)
+
+            actions.append(int(action))
+
+    max_len = sum(widths)
+
+    # Pad with zeros
+    actions += [0] * (max_len - len(actions))
+
+    actions_tensor = torch.tensor(actions, dtype=torch.int64)
+
+    print("Generated actions:", actions_tensor)
+    print("Max action:", actions_tensor.max().item())
+
+    return actions_tensor
+
+'''
+
+def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
+    # print(n_jobs)
+    # print(assignments.shape)
+    # print(order)
+    # exit()
     if assignments.dim() > 2:
         assignments = assignments.squeeze(0) # .squeeze(0)
 
@@ -192,6 +295,7 @@ def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
 
     return torch.tensor(actions, dtype=torch.int64)
 
+'''
 
 def zero_only_columns(x):
     # (if on CUDA) bring it to CPU for processing

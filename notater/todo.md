@@ -1,6 +1,5 @@
 ..
 må fikse skeduleringa mk10.. får lavere makespan enn hva er mulig.
-må fikse at kan skedulere mk03, får noe rar error
 
 
 tips:

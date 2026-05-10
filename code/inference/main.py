@@ -598,7 +598,7 @@ h = 4
 n_jobs = 4
 
 
-benchmark = "mk03"
+benchmark = "mk04"
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 # ins = None
 # inference_type = random, guide, ddpm
