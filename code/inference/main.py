@@ -23,7 +23,7 @@ import code.inference.confidence_interval as confidence_interval_utils
 import code.inference.matrix_graph_schedule as matrix_graph_schedule
 import code.dataset_code.benchmark_utils as benchmark_utils
 import code.dataset_code.benchmark_values as benchmark_values
-
+import os
 
 import torch
 import code.inference.experimental as experimental
@@ -162,12 +162,41 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         # === VANLID
         inference_assignments, elapsed, assignments_over_time, variation_over_time = None, None, None, None
         if inference_type == "ddpm":
+            # uncomment in order to debug output, without having to rerun model 
+            '''
+            save_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/saved_inf.pt'
+            if os.path.exists(save_path):
+                print("Loading saved inference results...")
+
+                checkpoint = torch.load(save_path)
+
+                inference_assignments = checkpoint["inference_assignments"]
+                elapsed = checkpoint["elapsed"]
+                assignments_over_time = checkpoint["assignments_over_time"]
+                variation_over_time = checkpoint["variation_over_time"]
+
+
+            else:
+            '''
             print("doing inference ddpm")
             inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
                 jump=None, 
                 cos=cos,
                 smart_init=False)
             eta = 0.9
+
+            print("Saving inference results...")
+            '''
+                torch.save({
+                    "inference_assignments": inference_assignments.cpu(),
+                    "elapsed": elapsed,
+                    "assignments_over_time": [x.cpu() for x in assignments_over_time],
+                    "variation_over_time": [x.cpu() for x in variation_over_time],
+                }, save_path)
+            '''
+
+
+
 
         # GUIDING
         if inference_type == "guide":
@@ -598,7 +627,7 @@ h = 4
 n_jobs = 4
 
 
-benchmark = "mk04"
+benchmark = "mk01"
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 # ins = None
 # inference_type = random, guide, ddpm

@@ -138,9 +138,21 @@ from functorch import vmap
 
 # busy ... will only schedule action if machine avalible, otherwise wait
 # notbusy .. will skip action if machine not avalible at the time
+# kanskje...
+# man tracker action som blir gjort, og tida for den actionen
+# så tracker man maskinen den blir lagt på
+# så bare har man en counter selv, som returnerer maskinen med lengst tid..
+# men det kan hende det er noe feil med enviromentet som fucker opp dette
 
-def do_actions(actions, n_machines, td, env):
+# annen mulighet ... 
+# på en eller annen måte får de valide mulige actionene... i lista av actions, velger jeg der den av actionene som er først i lista.
+'''
+def do_actions(actions, n_machines, td, env, index):
+    print('doing actions..')
     invalid_action_counter = 0
+    actions_taken = []
+    save_dir = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/sched_frames'
+    frame_idx = 0
 
     for action in actions:
         # machine index that this action refers to
@@ -158,8 +170,244 @@ def do_actions(actions, n_machines, td, env):
         if action != 0:
             td["action"] = torch.tensor([action])
             td = env.step(td)["next"]
+            actions_taken.append(action)
 
-    return td, invalid_action_counter
+            if index == 0:
+
+                plt.clf()
+                env.render(td, 0)
+                save_path = os.path.join(
+                    save_dir,
+                    f"frame_{frame_idx:04d}_act{action}_time{td['time']}.png"
+                )
+                plt.savefig(save_path, bbox_inches="tight")
+                frame_idx += 1
+
+
+    return td, invalid_action_counter, actions_taken
+'''
+import torch
+from collections import deque
+
+def do_actions(actions, n_machines, td, env, index):
+    save_dir = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/sched_frames'
+    """
+    Execute a precomputed list of actions safely in RL4CO scheduling envs.
+
+    Invalid/busy actions are postponed until they become feasible.
+    """
+
+    # queue of actions still to try
+    pending = deque(actions)
+
+    executed_actions = []
+
+
+    frame_idx = 0
+    while not td["done"].all():
+
+        mask = td["action_mask"].squeeze(0)
+
+        scheduled_this_step = False
+
+        # try every currently pending action once
+        for _ in range(len(pending)):
+
+            action = pending.popleft()
+
+            # feasible now?
+            if mask[action]:
+
+                td["action"] = torch.tensor([action], device=mask.device)
+
+                td = env.step(td)["next"]
+
+                executed_actions.append(action)
+
+                if index == 0:
+                    plt.clf()
+                    env.render(td, 0)
+                    save_path = os.path.join(
+                        save_dir,
+                        f"frame_{frame_idx:04d}_act{action}_time{td['time']}.png"
+                    )
+                    plt.savefig(save_path, bbox_inches="tight")
+                    frame_idx += 1
+
+                scheduled_this_step = True
+
+                break
+
+            else:
+                # machine busy / job not ready
+                # postpone action for later
+                pending.append(action)
+
+        # IMPORTANT:
+        # if nothing could be scheduled,
+        # env must advance time somehow
+        #
+        # RL4CO scheduling envs usually do this internally
+        # when only wait/no-op remains feasible.
+        #
+        # So we execute a valid fallback action.
+
+        if not scheduled_this_step:
+
+            valid_actions = torch.where(mask)[0]
+
+            if len(valid_actions) == 0:
+                raise RuntimeError("No valid actions available")
+
+            # choose first feasible fallback action
+            fallback = valid_actions[0]
+
+            td["action"] = fallback.unsqueeze(0)
+
+            td = env.step(td)["next"]
+
+            executed_actions.append(fallback.item())
+            if index == 0:
+                plt.clf()
+                env.render(td, 0)
+                save_path = os.path.join(
+                    save_dir,
+                    f"frame_{frame_idx:04d}_act{fallback.unsqueeze(0)}_time{td['time']}.png"
+                )
+                plt.savefig(save_path, bbox_inches="tight")
+                frame_idx += 1
+
+
+
+    return td, 0, executed_actions
+
+'''
+def do_actions(actions, td, env):
+    print('doing actions')
+
+    invalid_action_counter = 0
+    actions_taken = []
+
+    remaining_actions = [int(a) for a in actions if int(a) != 0]
+
+    while remaining_actions:
+
+        mask = td["action_mask"][0]
+
+        found_action = False
+
+        # Try to find ANY currently feasible action
+        for idx, action in enumerate(remaining_actions):
+
+            if mask[action]:
+
+                td["action"] = torch.tensor(
+                    [action],
+                    device=td.device
+                )
+
+                td = env.step(td)["next"]
+
+                actions_taken.append(action)
+
+                remaining_actions.pop(idx)
+
+                found_action = True
+
+                break
+
+        # No action currently feasible -> WAIT
+        # No action currently feasible
+        if not found_action:
+
+            current_time = td["time"].item()
+
+            # Are any machines still processing?
+            future_events_exist = torch.any(
+                td["busy_until"][0] > current_time
+            )
+
+            # If nothing is processing anymore,
+            # then remaining actions are impossible forever
+            if not future_events_exist:
+
+                print("Deadlock reached.")
+                print("Remaining actions:", remaining_actions[:20])
+
+                break
+
+            # Otherwise WAIT for next machine completion
+            td["action"] = torch.tensor(
+                [0],
+                device=td.device
+            )
+
+            td = env.step(td)["next"]
+
+            invalid_action_counter += 1
+
+    return td, invalid_action_counter, actions_taken
+'''
+# TODO problem var at hang for lenge...
+'''
+def do_actions(actions, td, env):
+
+    invalid_action_counter = 0
+    actions_taken = []
+
+    for action in actions:
+
+        action = int(action)
+
+        # Skip padding
+        if action == 0:
+            continue
+
+        while True:
+
+            mask = td["action_mask"][0]
+
+            # Action feasible -> execute
+            if mask[action]:
+
+                td["action"] = torch.tensor(
+                    [action],
+                    device=td.device
+                )
+
+                td = env.step(td)["next"]
+
+                actions_taken.append(action)
+
+                break
+
+            # No machines currently processing
+            # => action will NEVER become feasible
+            busy = td["busy_until"][0]
+            current_time = td["time"].item()
+
+            future_events_exist = torch.any(busy > current_time)
+
+            if not future_events_exist:
+
+                print(f"Skipping permanently infeasible action {action}")
+
+                invalid_action_counter += 1
+
+                break
+
+            # Otherwise WAIT until next event
+            td["action"] = torch.tensor(
+                [0],
+                device=td.device
+            )
+
+            td = env.step(td)["next"]
+
+            invalid_action_counter += 1
+
+    return td, invalid_action_counter, actions_taken
+'''
 
 
 
@@ -317,13 +565,11 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     n_jobs = infer_n_jobs(ops_sequence_order) # for mk03 gir denne 10, når den egentlig har 15 jobber
     # mente jeg her å få max prosesser, eller jobber? .. mk03 har 10 max prosesser
     # n_jobs = 15
-    print(f'n jobs: {n_jobs}')
 
 
     jobs_to_make = int(os.cpu_count() / 6)
 
     print(f"making actions for assignments with {os.cpu_count()} processors")
-    print(f'n jobs: {n_jobs}')
     B = assignments.size(0)
     all_actions = Parallel(n_jobs=jobs_to_make)(
         delayed(utils.map_assignments_to_actions_text)( assignments[b], True, n_jobs )
@@ -332,7 +578,6 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     all_actions = torch.stack(all_actions)
     all_actions = all_actions.to(torch.int64) 
 
-    print(f"all actions shape: {all_actions.shape}")
     if any("opt_" in key for key in td):
         td.del_("opt_assignment")
         td.del_("opt_assignment_order")
@@ -344,42 +589,57 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         # Wrap in a TensorDict
         td = TensorDict(td, batch_size=[1])
 
-        print(td['ops_ma_adj'].shape)  # torch.Size([1, 6, 60])
 
     # Scheduling
     # raise Exception('Kan ikke kjøre enda, fordi out of memory (node var opptatt).. i metode: do_actions i schedule.py ... se om kan returnere invalid actions, og legge i cond rapport .. Exception raised i schedule.py schedule_from_inference')
-    print(f'n_machines {n_machines}')
+
+
+
     feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0] 
     results = Parallel(n_jobs=jobs_to_make)(
-        delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env )
+        delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env , None) # erstatt None med en index for å se hvordan den blir skedulert over tid.
         for f_i in feasible_indecies
     )
-    tds, invalid_action_counters = zip(*results)
+
+    tds, invalid_action_counters, actions_taken = zip(*results)
     tds = list(tds)
     invalid_action_counters = list(invalid_action_counters)
+    actions_taken = list(actions_taken)
+
 
     # filling gaps
     ## mapping operations to machines
+    '''
     machine_assignments_maps = Parallel(n_jobs=jobs_to_make)(
         delayed(utils.map_operation_to_machines)(td["ma_assignment"])
         for td in tds
     )
+    '''
     #machine_assignments_maps = [list(m) for m in machine_assignments_maps]
 
     ## filling gaps
+    '''
     tds = Parallel(n_jobs=jobs_to_make)(
         delayed(code.scheduling.fix_scheduling_gaps.compress_schedule)(td["start_times"], td["finish_times"], ma_op_map, n_jobs, td, filler_machine=99)
         for td, ma_op_map in zip(tds, machine_assignments_maps)
     )
+    '''
     makespans = [
     td["finish_times"][td["finish_times"] != 9999.0].max().item()
     for td in tds
-    if td["finish_times"][td["finish_times"] != 9999.0].max().item() >= 30.0
+    if td["finish_times"][td["finish_times"] != 9999.0].max().item() # >= 30.0
     ]
+
     best_index = makespans.index( min(makespans) )
     worst_index = makespans.index( max(makespans) )
     td_best = tds[ best_index ]
+    best_actions = actions_taken[makespans.index( min(makespans ))]
 
+    p = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/best_actions.pt'
+    torch.save(best_actions, p)
+
+
+    # TODO ignorer
     """
     start_times = td_best["start_times"]
     finish_times = td_best["finish_times"]
@@ -394,7 +654,6 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     ]
     """
 
-    print("")
 
     min_makespan = min(makespans)
     max_makespan = max(makespans)
@@ -426,7 +685,6 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     invalid_act_rate_of_max = invalid_actions_counter_rate[ worst_index ]
     invalid_act_rate_of_min = invalid_actions_counter_rate[ best_index ]
     invalid_act_rate_avg = sum(invalid_actions_counter_rate) / len(invalid_actions_counter_rate)
-
 
 
 

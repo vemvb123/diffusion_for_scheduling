@@ -150,7 +150,49 @@ def map_assignments_to_actions_per_machine(assignments, order: bool, n_jobs):
 
 
 
+'''
+def map_assignments_to_actions_text(assignments, order, ops_per_job):
+    print('i mapping')
 
+    if assignments.dim() > 2:
+        assignments = assignments.squeeze(0)
+
+    H, W = assignments.shape
+
+    ops_per_job = [x for x in ops_per_job if x > 1]
+
+    num_jobs = len(ops_per_job)
+
+    section_starts = torch.cumsum(
+        torch.tensor([0] + ops_per_job[:-1]),
+        dim=0
+    )
+
+    actions = []
+
+    nonzero = torch.nonzero(assignments, as_tuple=False)
+
+    values = assignments[nonzero[:, 0], nonzero[:, 1]]
+
+    sorted_idx = torch.argsort(values)
+
+    for i in sorted_idx:
+
+        machine_idx, op_col = nonzero[i].tolist()
+
+        # Determine WHICH JOB owns this operation
+        job_idx = int((section_starts <= op_col).sum() - 1)
+
+        # RL4CO action encoding
+        action = machine_idx * num_jobs + job_idx + 1
+
+        actions.append(action)
+
+    return torch.tensor(actions, dtype=torch.int64)
+'''
+
+
+# TODO funker ... men ikke etter omgjorde do_actions
 def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
     """
     Convert assignment tensor into compact action ids.
@@ -165,9 +207,6 @@ def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
         either int or list of widths per section/job
     """
 
-    print(n_jobs)
-    print(assignments.shape)
-    print(order)
 
     # Remove batch dimension if present
     if assignments.dim() > 2:
@@ -241,13 +280,13 @@ def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
 
     actions_tensor = torch.tensor(actions, dtype=torch.int64)
 
-    print("Generated actions:", actions_tensor)
-    print("Max action:", actions_tensor.max().item())
+    # print("Generated actions:", actions_tensor)
+    # print("Max action:", actions_tensor.max().item())
 
     return actions_tensor
 
-'''
 
+'''
 def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
     # print(n_jobs)
     # print(assignments.shape)
