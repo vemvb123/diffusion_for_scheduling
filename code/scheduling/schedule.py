@@ -189,6 +189,242 @@ def do_actions(actions, n_machines, td, env, index):
 import torch
 from collections import deque
 
+
+
+
+def batched_schedule_rollout(
+    env,
+    td,
+    all_actions,
+    render_idx=None,
+    save_dir="frames",
+):
+    """
+    Batched RL4CO rollout with precomputed action sequences.
+
+    Parameters
+    ----------
+    env:
+        RL4CO environment
+
+    td:
+        Batched TensorDict
+        shape = [batch]
+
+    all_actions:
+        Tensor of shape:
+            [batch, seq_len]
+
+    render_idx:
+        Optional batch index to render/save
+
+    save_dir:
+        Where PNG frames are saved
+
+    Returns
+    -------
+    td:
+        final TensorDict
+
+    executed_actions:
+        tensor [batch, max_steps]
+    """
+
+    device = td.device
+
+    batch_size = all_actions.shape[0]
+    seq_len = all_actions.shape[1]
+
+    all_actions = all_actions.to(device)
+
+
+    # ---------------------------------------------------
+    # Per-batch pointer:
+    # tells which action each rollout wants next
+    # ---------------------------------------------------
+
+    current_ptr = torch.zeros(
+        batch_size,
+        dtype=torch.long,
+        device=device,
+    )
+
+    # done tracking
+    finished = torch.zeros(
+        batch_size,
+        dtype=torch.bool,
+        device=device,
+    )
+
+    # executed actions history
+    executed_history = []
+
+    skip_counter = torch.zeros(
+    batch_size,
+    dtype=torch.long,
+    device=device,
+    )
+
+    # rendering
+    if render_idx is not None:
+        os.makedirs(save_dir, exist_ok=True)
+
+    frame_idx = 0
+
+    # ---------------------------------------------------
+    # MAIN LOOP
+    # ---------------------------------------------------
+
+    while not td["done"].all():
+
+        mask = td["action_mask"]
+
+        batch_ids = torch.arange(
+            batch_size,
+            device=device,
+        )
+
+        # ---------------------------------------------
+        # Clamp pointers
+        # ---------------------------------------------
+
+        safe_ptr = torch.clamp(
+            current_ptr,
+            max=seq_len - 1
+        )
+
+        proposed_actions = all_actions[
+            batch_ids,
+            safe_ptr
+        ]
+
+        # ---------------------------------------------
+        # Check feasibility
+        # ---------------------------------------------
+
+        feasible = mask[
+            batch_ids,
+            proposed_actions
+        ]
+
+        # ---------------------------------------------
+        # If infeasible:
+        # advance pointer until feasible
+        # ---------------------------------------------
+
+        max_retries = seq_len
+
+        retries = 0
+
+        while not feasible.all():
+
+            infeasible_idx = (~feasible).nonzero(
+                as_tuple=True
+            )[0]
+
+            skip_counter[infeasible_idx] += 1
+
+            current_ptr[infeasible_idx] += 1
+
+            safe_ptr = torch.clamp(
+                current_ptr,
+                max=seq_len - 1
+            )
+
+            proposed_actions = all_actions[
+                batch_ids,
+                safe_ptr
+            ]
+
+            feasible = mask[
+                batch_ids,
+                proposed_actions
+            ]
+
+            retries += 1
+
+            if retries > max_retries:
+                break
+
+        # ---------------------------------------------
+        # fallback for impossible states
+        # ---------------------------------------------
+
+        still_bad = ~feasible
+
+        if still_bad.any():
+
+            valid_actions = mask.float().argmax(dim=1)
+
+            proposed_actions[still_bad] = valid_actions[
+                still_bad
+            ]
+
+        # ---------------------------------------------
+        # STEP ENTIRE BATCH
+        # ---------------------------------------------
+
+        td["action"] = proposed_actions
+
+        td = env.step(td)["next"]
+
+        executed_history.append(
+            proposed_actions.clone()
+        )
+
+        # ---------------------------------------------
+        # Advance pointers
+        # ---------------------------------------------
+
+        current_ptr += 1
+
+        # ---------------------------------------------
+        # OPTIONAL RENDERING
+        # ---------------------------------------------
+
+        if render_idx is not None:
+
+            plt.clf()
+
+            env.render(td, render_idx)
+
+            action_rendered = proposed_actions[
+                render_idx
+            ].item()
+
+            current_time = td["time"][
+                render_idx
+            ].item()
+
+            save_path = os.path.join(
+                save_dir,
+                f"frame_{frame_idx:04d}"
+                f"_act{action_rendered}"
+                f"_time{current_time:.2f}.png"
+            )
+
+            plt.savefig(
+                save_path,
+                bbox_inches="tight"
+            )
+
+            plt.close()
+
+            frame_idx += 1
+
+    # ---------------------------------------------------
+    # STACK HISTORY
+    # ---------------------------------------------------
+
+    executed_history = torch.stack(
+        executed_history,
+        dim=1
+    )
+
+    return td, executed_history, skip_counter
+
+
+
 def do_actions(actions, n_machines, td, env, index):
     save_dir = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/sched_frames'
     """
@@ -569,6 +805,10 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
 
     jobs_to_make = int(os.cpu_count() / 6)
 
+    print('printing..')
+    print(n_jobs)
+    print(sum(i for i in n_jobs if i > 1))
+
     print(f"making actions for assignments with {os.cpu_count()} processors")
     B = assignments.size(0)
     all_actions = Parallel(n_jobs=jobs_to_make)(
@@ -577,6 +817,9 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     )
     all_actions = torch.stack(all_actions)
     all_actions = all_actions.to(torch.int64) 
+    print(all_actions[0])
+    print(len(all_actions[0]))
+
 
     if any("opt_" in key for key in td):
         td.del_("opt_assignment")
@@ -589,22 +832,56 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         # Wrap in a TensorDict
         td = TensorDict(td, batch_size=[1])
 
-
+    print(td.shape)
+    exit()
     # Scheduling
     # raise Exception('Kan ikke kjøre enda, fordi out of memory (node var opptatt).. i metode: do_actions i schedule.py ... se om kan returnere invalid actions, og legge i cond rapport .. Exception raised i schedule.py schedule_from_inference')
 
 
-
+    '''
     feasible_indecies = [i for i in range(len(error_list)) if error_list[i] == 0] 
     results = Parallel(n_jobs=jobs_to_make)(
         delayed(do_actions)( all_actions[f_i], n_machines, td.copy(), env , None) # erstatt None med en index for å se hvordan den blir skedulert over tid.
         for f_i in feasible_indecies
     )
 
-    tds, invalid_action_counters, actions_taken = zip(*results)
-    tds = list(tds)
-    invalid_action_counters = list(invalid_action_counters)
-    actions_taken = list(actions_taken)
+    '''
+
+    batch_size = all_actions.shape[0]
+    td_batched = td.expand(batch_size).clone()
+
+    print(f'all actions shape: {all_actions.shape}')
+    td_final, executed, invalid_action_counters = batched_schedule_rollout(
+    env,
+    td_batched,
+    all_actions,
+    render_idx=None,
+    save_dir="frames",
+    )
+
+    print('done scheduling')
+    print(invalid_action_counters.shape)
+
+
+    tds = [
+        td_final[i]
+        for i in range(batch_size)
+    ]
+    invalid_action_counters = (
+        invalid_action_counters
+        .cpu()
+        .tolist()
+    )
+    actions_taken = [
+        executed[i].cpu().tolist()
+        for i in range(batch_size)
+    ]
+
+
+    #tds, invalid_action_counters, actions_taken = zip(*results)
+    #tds = list(tds)
+    #invalid_action_counters = list(invalid_action_counters)
+    #actions_taken = list(actions_taken)
 
 
     # filling gaps
@@ -635,8 +912,8 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     td_best = tds[ best_index ]
     best_actions = actions_taken[makespans.index( min(makespans ))]
 
-    p = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/best_actions.pt'
-    torch.save(best_actions, p)
+    # p = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/best_actions.pt'
+    # torch.save(best_actions, p)
 
 
     # TODO ignorer
@@ -666,7 +943,8 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
 
 
 
-    env.render(td_best, 0)
+    # env.render(td_best) # sto tidligere env.render(td_best, 0)
+    env.render(td_best.unsqueeze(0), 0)
     if path_save_image:
         plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
         print(f"Saved scheduled image at path {path_save_image}")

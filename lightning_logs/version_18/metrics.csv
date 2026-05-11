@@ -1,0 +1,2 @@
+epoch,step,train/loss,train/reward
+0,49,35.30365753173828,-36.54166793823242

@@ -19,7 +19,7 @@ def append_results(
     fieldnames = [
         "min_makespan", "avg_makespan", "max_makespan", "elapsed", 
 
-        'invalid_act_of_min', 'invalid_act_of_max', 'invalid_act_avg', 'invalid_act_rate_of_min', 'invalid_act_rate_of_max', 'invalid_act_rate_avg'
+        'invalid_act_of_min', 'invalid_act_of_max', 'invalid_act_avg', 'invalid_act_rate_of_min', 'invalid_act_rate_of_max', 'invalid_act_rate_avg',
 
         # before fixing schedule
         "total_errors", "total_error", "total_error_p", "multi_p", "seq_p",

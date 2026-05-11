@@ -24,7 +24,7 @@ import code.inference.matrix_graph_schedule as matrix_graph_schedule
 import code.dataset_code.benchmark_utils as benchmark_utils
 import code.dataset_code.benchmark_values as benchmark_values
 import os
-
+import sys
 import torch
 import code.inference.experimental as experimental
 import matplotlib
@@ -113,7 +113,19 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         n_samples =32
         n_ops = int(torch.count_nonzero(target_assignments))
 
-        timesteps = 200
+        timesteps = None
+        if problem_type == 'mk01':
+            timesteps = 100
+        if problem_type == 'mk02':
+            timesteps = 100
+        if problem_type == 'mk04':
+            timesteps = 150
+        if problem_type == 'mk05':
+            timesteps = 100
+        if problem_type == 'mk10':
+            timesteps = 170
+
+
         #sampling_steps = 60
         ddim_eta = 1.0
         
@@ -627,7 +639,7 @@ h = 4
 n_jobs = 4
 
 
-benchmark = "mk01"
+benchmark = sys.argv[1]
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 # ins = None
 # inference_type = random, guide, ddpm

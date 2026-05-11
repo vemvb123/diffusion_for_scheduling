@@ -1,21 +1,17 @@
-..
-må fikse skeduleringa mk10.. får lavere makespan enn hva er mulig.
-
 
 tips:
 end kjøringa når loss er for det meste under 0.015-0.010
 ops... for mk01 ser det ut som om loss gikk til rundt 0.01-0.02 for test (litt lavere for train, men ikke veldig).. den trente i 15 epoker
 ...
-trener mk05 diff modell
-trener mk10 diff modell 
-trene mk04 diff modell - stoppet trening
+kjøringer:
+trener target modell med mindre util for mk01
 ..
 videre:
-skaff konf intervall for:
-mk02
-mk04
-mk10
+skjekk om lessutil modell faktisk skedulerer mindre
+fikse sched problem mk05
+skaff konf intervall for mk05 og mk03
 vent med mk03 til du er sikker du veit maskestørrelsen
+skaff resultater for strategier
 ..
 stoppet å trene mk03 modell fordi jeg trur den er ferdig, men må skjekke prestasjon.
 Hvis ikke, så fortsett trening
