@@ -272,7 +272,7 @@ def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, eps=0.0):
     return u_safe.detach()
 '''
 
-def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, t, eps=0.0):
+def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, t, eps=0.0, self_adjusting_gamma=False):
 
     x = x.detach().clone().requires_grad_(True)
     u = u_nominal.clone()
@@ -298,7 +298,9 @@ def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, t, eps=0.0):
 
     grad_norm = (grad_b * grad_b).sum(dim=(1,2,3), keepdim=True) + 1e-8
 
-    gamma = 2.0
+    gamma = 0.0
+
+
     # gamma = 2.0 * torch.relu(-b).mean(dim=1).view(-1,1,1,1)
     # gamma = torch.relu(-b).mean(dim=1).view(-1,1,1,1)
     lam = torch.clamp((-violation + gamma) / grad_norm, min=0)
@@ -394,7 +396,7 @@ def inference_guide(
 
             predicted_noise = model(inputs, t_tensor, type_t="timestep")
             x_denoised = scheduler.step(predicted_noise, t, x).prev_sample
-
+            '''
             n_ops = sum(x for x in job_lengths if x != 1)
             ops_ma_adj_sc = ops_ma_adj[:, :, :valid_h, :valid_w].clone()
 
@@ -403,9 +405,9 @@ def inference_guide(
             x_denoised_sc = show_order_clear(x_denoised_sc, n_ops,ops_ma_adj_sc, r_global=False) # tidligere order visning ... DENNE ER KLART BEDRE, far langt mindre feil for mk01
             report, total_errors_bg, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = count_infeasibilities(
             x_denoised_sc, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops, do_print=False)
-                
+            '''
             # ---- 2. Convert to update (IMPORTANT) ----
-            stop_guide = 6
+            stop_guide = -2 # 6
             gamma = None
             if t > stop_guide:
 
@@ -428,7 +430,7 @@ def inference_guide(
                 x = x + u_safe
             else:
                 x = x_denoised
-
+            '''
             report_file_path = f'results/report_g.txt'
             x_sc = x[:, :, :valid_h, :valid_w].clone()
             x_sc = show_order_clear(x_sc, n_ops, ops_ma_adj_sc, r_global=False) # tidligere order visning ... DENNE ER KLART BEDRE, far langt mindre feil for mk01
@@ -451,12 +453,13 @@ def inference_guide(
             g_loss_over_time.append(loss)
             g_var.append(viol)
 
+            '''
             # if t % 10 == 0:
             if t == 0:
                 given_assignments.append(x.clone())
 
             # x = zero_unused_slots(x, ops_ma_adj, valid_h, valid_w, device)
-
+    '''
     plt.plot(g_loss_over_time, label="Violation magnitude")
     plt.plot(g_var, label="Number of violations")
 
@@ -469,7 +472,7 @@ def inference_guide(
     plt.savefig("results/g_loss.png")  # 🔥 saves image
 
     plt.close()  # optional but recommended
-
+    '''
 
     # end timer
     end_time = time.perf_counter()

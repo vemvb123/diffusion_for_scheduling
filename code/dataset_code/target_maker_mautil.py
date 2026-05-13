@@ -6,15 +6,12 @@ from rl4co.models.zoo.l2d import L2DModel
 from rl4co.models.zoo.l2d.policy import L2DPolicy
 from rl4co.utils.trainer import RL4COTrainer
 
-
 import code.dataset_code.benchmark_utils as benchmark_utils
 import code.dataset_code.benchmark_values as benchmark_values
 
 
-
-
 # ============================================================
-# Custom Environment
+# CUSTOM ENV
 # ============================================================
 
 class LimitedMachineFJSPEnv(FJSPEnv):
@@ -24,8 +21,9 @@ class LimitedMachineFJSPEnv(FJSPEnv):
         *args,
         num_jobs,
         num_machines,
-        limited_machine_id=2,   # machine 3
-        max_machine_usage=20,   # max allowed usages
+        limited_machine_id=1,
+        max_machine_usage=2,
+        penalty_strength=100000.0,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -35,6 +33,7 @@ class LimitedMachineFJSPEnv(FJSPEnv):
 
         self.limited_machine_id = limited_machine_id
         self.max_machine_usage = max_machine_usage
+        self.penalty_strength = penalty_strength
 
     # ========================================================
     # RESET
@@ -46,7 +45,6 @@ class LimitedMachineFJSPEnv(FJSPEnv):
 
         batch = td.batch_size
 
-        # Track machine usage
         td["machine_usage"] = torch.zeros(
             (*batch, self.num_machines_custom),
             device=td.device,
@@ -65,23 +63,20 @@ class LimitedMachineFJSPEnv(FJSPEnv):
 
         action = td["action"]
 
-        # ====================================================
-        # RL4CO FJSP decoding
-        #
-        # action = machine_id * num_jobs + job_id + 1
-        #
-        # action == 0 -> wait action
-        # ====================================================
-
         valid_action = action > 0
 
-        machine_id = (action - 1) // self.num_jobs_custom
+        machine_id = (
+            (action - 1)
+            // self.num_jobs_custom
+        )
 
-        # ====================================================
-        # Update machine usage
-        # ====================================================
+        # ----------------------------------------------------
+        # Track machine usage
+        # ----------------------------------------------------
 
-        next_td["machine_usage"] = td["machine_usage"].clone()
+        next_td["machine_usage"] = (
+            td["machine_usage"].clone()
+        )
 
         batch_idx = torch.arange(
             action.shape[0],
@@ -93,44 +88,50 @@ class LimitedMachineFJSPEnv(FJSPEnv):
             machine_id[valid_action]
         ] += 1
 
-        # ====================================================
-        # Check limit
-        # ====================================================
+        # ----------------------------------------------------
+        # Current usage of machine 2
+        # ----------------------------------------------------
 
-        machine_over_limit = (
-            next_td["machine_usage"][:, self.limited_machine_id]
-            >= self.max_machine_usage
+        machine_usage = next_td[
+            "machine_usage"
+        ][
+            :,
+            self.limited_machine_id
+        ]
+
+        # ----------------------------------------------------
+        # Was machine 2 used THIS step?
+        # ----------------------------------------------------
+
+        used_machine_2 = (
+            machine_id == self.limited_machine_id
+        ) & valid_action
+
+        # ----------------------------------------------------
+        # Excess usage
+        # ----------------------------------------------------
+
+        excess_usage = torch.clamp(
+            machine_usage - self.max_machine_usage,
+            min=0
         )
 
-        # ====================================================
-        # Disable actions for machine 3
-        # ====================================================
+        # ----------------------------------------------------
+        # Penalty ONLY when selecting machine 2
+        # ----------------------------------------------------
 
-        if machine_over_limit.any():
+        penalty = torch.zeros_like(
+            next_td["reward"]
+        )
 
-            action_mask = next_td["action_mask"].clone()
+        penalty[used_machine_2] = (
+            excess_usage[used_machine_2].float()
+            * self.penalty_strength
+        )
 
-            # --------------------------------------------
-            # Action indices for machine 3
-            # --------------------------------------------
-
-            start_idx = (
-                self.limited_machine_id
-                * self.num_jobs_custom
-                + 1
-            )
-
-            end_idx = (
-                start_idx + self.num_jobs_custom
-            )
-
-            # Disable machine actions
-            action_mask[
-                machine_over_limit,
-                start_idx:end_idx
-            ] = False
-
-            next_td["action_mask"] = action_mask
+        next_td["reward"] = (
+            next_td["reward"] - penalty
+        )
 
         return next_td
 
@@ -141,21 +142,17 @@ class LimitedMachineFJSPEnv(FJSPEnv):
 
 print("Beginning training of target model")
 
-
 _, _, _, _, filepath_benchmark_instance, _, _, _, _, name = \
     benchmark_values.get_benchmark_values(sys.argv[1])
 
 print(f'making model {name}')
 print(f"benchmark instance: {filepath_benchmark_instance}")
-print('parameters:')
-
 
 parameters = benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(
     filepath_benchmark_instance
 )
 
 print(parameters)
-
 
 jobs = parameters['n_jobs']
 ma = parameters['n_machines']
@@ -171,7 +168,7 @@ min_eligable_ma_per_op = parameters['min_machine_options']
 
 
 # ============================================================
-# Generator params
+# GENERATOR PARAMS
 # ============================================================
 
 generator_params = {
@@ -199,16 +196,15 @@ env = LimitedMachineFJSPEnv(
     _torchrl_mode=True,
     stepwise_reward=True,
 
-    # machine 3
-    limited_machine_id=2,
+    limited_machine_id=1,
+    max_machine_usage=2,
 
-    # max number of usages
-    max_machine_usage=20
+    penalty_strength=100000.0
 )
 
 
 # ============================================================
-# Hardware
+# HARDWARE
 # ============================================================
 
 if torch.cuda.is_available():
@@ -217,7 +213,7 @@ if torch.cuda.is_available():
 
     batch_size = 24
 
-    train_data_size = 2_000
+    train_data_size = 2000
 
     embed_dim = 128
 
@@ -229,7 +225,7 @@ else:
 
     batch_size = 32
 
-    train_data_size = 1_000
+    train_data_size = 1000
 
     embed_dim = 64
 
@@ -237,7 +233,7 @@ else:
 
 
 # ============================================================
-# Policy
+# POLICY
 # ============================================================
 
 policy = L2DPolicy(
@@ -248,10 +244,10 @@ policy = L2DPolicy(
 
 
 # ============================================================
-# Train
+# TRAIN
 # ============================================================
 
-lrs = [1e-4]
+lrs = [1e-2]
 
 for lr in lrs:
 
@@ -261,12 +257,12 @@ for lr in lrs:
         baseline="rollout",
         batch_size=batch_size,
         train_data_size=train_data_size,
-        val_data_size=1_000,
+        val_data_size=1000,
         optimizer_kwargs={"lr": lr}
     )
 
     trainer = RL4COTrainer(
-        max_epochs=100,
+        max_epochs=300,
         accelerator=accelerator,
         devices=1,
         logger=None,
@@ -274,7 +270,12 @@ for lr in lrs:
 
     trainer.fit(model)
 
-    model_name = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/rl4co_model_{lr}_{name}_less2util.ckpt'
+    model_name = (
+        f'/cluster/datastore/vemundvb/'
+        f'diffusion/diff_project/mindre_prosjekt/'
+        f'models/mk01/'
+        f'rl4co_model_{lr}_{name}_limited_machine2_lr2.ckpt'
+    )
 
     trainer.save_checkpoint(model_name)
 

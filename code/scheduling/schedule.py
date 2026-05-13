@@ -55,8 +55,268 @@ params:
   4: maximum proc time
 """
 
+from collections import deque
+import torch
+
+
+def schedule_actions_batch_mautil(
+    env,
+    actions,
+    td,
+    order=False
+):
+
+    MACHINE2_ID = 1
+    MAX_MACHINE2_USAGE = 2
+
+    batch_size = actions.shape[0]
+
+    # ========================================================
+    # TRACK REAL MACHINE2 USAGE
+    # ========================================================
+
+    machine2_usage = torch.zeros(
+        batch_size,
+        dtype=torch.long,
+        device=actions.device
+    )
+
+    # ========================================================
+    # ORDER TRACKING
+    # ========================================================
+
+    prev_adj = td["ma_assignment"].clone()
+
+    ordered_assignments = torch.zeros_like(
+        prev_adj,
+        dtype=torch.float
+    )
+
+    actions_assigned = 0
+
+    # ========================================================
+    # CREATE ACTION QUEUES
+    # ========================================================
+
+    queues = []
+
+    for b in range(batch_size):
+
+        queues.append(
+            deque(actions[b].tolist())
+        )
+
+    # ========================================================
+    # MAIN LOOP
+    # ========================================================
+
+    while not td["done"].all():
+
+        current_action = torch.zeros(
+            batch_size,
+            dtype=torch.long,
+            device=actions.device
+        )
+
+        mask = td["action_mask"]
+
+        # ====================================================
+        # SELECT ACTIONS
+        # ====================================================
+
+        for b in range(batch_size):
+
+            if td["done"][b]:
+                continue
+
+            scheduled = False
+
+            qlen = len(queues[b])
+
+            # ------------------------------------------------
+            # TRY QUEUED ACTIONS
+            # ------------------------------------------------
+
+            for _ in range(qlen):
+
+                action = queues[b].popleft()
+
+                # invalid
+                if action <= 0:
+                    continue
+
+                # currently infeasible
+                if not mask[b, action]:
+
+                    queues[b].append(action)
+                    continue
+
+                # ------------------------------------------------
+                # CHECK WHAT MACHINE THIS ACTION WOULD USE
+                # ------------------------------------------------
+                #
+                # IMPORTANT:
+                # RL4CO action ids are NOT:
+                #
+                # machine * num_jobs + job
+                #
+                # So we must infer machine using ma_assignment
+                #
+                # ------------------------------------------------
+
+                # clone td temporarily
+                td_test = td[b:b+1].clone()
+
+                td_test["action"] = torch.tensor(
+                    [action],
+                    device=actions.device
+                )
+
+                # simulate one step
+                td_next = env.step(td_test)["next"]
+
+                prev_ma = td_test["ma_assignment"]
+                next_ma = td_next["ma_assignment"]
+
+                diff = (
+                    (next_ma == 1)
+                    & (prev_ma == 0)
+                )
+
+                # no operation assigned
+                if not diff.any():
+
+                    queues[b].append(action)
+                    continue
+
+                _, machine_ids, _ = torch.where(diff)
+
+                machine_used = machine_ids[0].item()
+
+                # ------------------------------------------------
+                # MACHINE2 LIMIT
+                # ------------------------------------------------
+
+                if (
+                    machine_used == MACHINE2_ID
+                    and machine2_usage[b]
+                    >= MAX_MACHINE2_USAGE
+                ):
+
+                    # postpone forever
+                    queues[b].append(action)
+
+                    continue
+
+                # ------------------------------------------------
+                # ACCEPT ACTION
+                # ------------------------------------------------
+
+                current_action[b] = action
+
+                scheduled = True
+
+                break
+
+            # ------------------------------------------------
+            # NO VALID ACTION FOUND
+            # ------------------------------------------------
+
+            if not scheduled:
+
+                # WAIT action if valid
+                if mask[b, 0]:
+
+                    current_action[b] = 0
+
+                else:
+
+                    # --------------------------------------------
+                    # no feasible non-machine2 action exists
+                    #
+                    # WAIT and retry later
+                    # --------------------------------------------
+
+                    if mask[b, 0]:
+
+                        current_action[b] = 0
+
+                    else:
+
+                        # force no-op
+                        current_action[b] = 0
+
+
+        # ====================================================
+        # APPLY ACTIONS
+        # ====================================================
+
+        td["action"] = current_action
+
+        prev_adj = td["ma_assignment"].clone()
+
+        td = env.step(td)["next"]
+
+        new_adj = td["ma_assignment"]
+
+        # ====================================================
+        # TRACK REAL MACHINE USAGE
+        # ====================================================
+
+        diff = (
+            (new_adj == 1)
+            & (prev_adj == 0)
+        )
+
+        if diff.any():
+
+            batch_ids, machine_ids, _ = torch.where(diff)
+
+            for b, m in zip(batch_ids, machine_ids):
+
+                if m.item() == MACHINE2_ID:
+
+                    machine2_usage[b] += 1
+
+        print("----------------------------------------")
+        print(
+            f"machine2 usage: "
+            f"{machine2_usage.tolist()}"
+        )
+
+        # ====================================================
+        # ORDER TRACKING
+        # ====================================================
+
+        if order:
+
+            diff = (
+                (new_adj == 1)
+                & (prev_adj == 0)
+            )
+
+            if diff.any():
+
+                actions_assigned += 1
+
+                ordered_assignments[
+                    diff
+                ] = actions_assigned
+
+    return td, ordered_assignments
+
+
+
+
+
+
+
+
+
+
 # actions: [batch_size, seq_len]
 def schedule_actions_batch(env: FJSPEnv, actions: List, td: TensorDict, order: bool) -> TensorDict:
+    print('scheduling')
 
     n_actions = len(actions)
     prev_adj = td["ma_assignment"].clone()
@@ -82,6 +342,15 @@ def schedule_actions_batch(env: FJSPEnv, actions: List, td: TensorDict, order: b
     else:
         return td, None
 
+
+from collections import deque
+import torch
+
+from collections import deque
+import torch
+
+from collections import deque
+import torch
 
 
 # bruk hvis ordered, for å se klart sekvens
@@ -832,8 +1101,6 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         # Wrap in a TensorDict
         td = TensorDict(td, batch_size=[1])
 
-    print(td.shape)
-    exit()
     # Scheduling
     # raise Exception('Kan ikke kjøre enda, fordi out of memory (node var opptatt).. i metode: do_actions i schedule.py ... se om kan returnere invalid actions, og legge i cond rapport .. Exception raised i schedule.py schedule_from_inference')
 

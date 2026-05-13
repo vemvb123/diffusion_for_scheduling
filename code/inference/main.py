@@ -51,6 +51,7 @@ def get_problem_type(problem_type : str):
         min_eligable_ma_per_op=parameters['min_machine_options'], 
         batch_size=1
     )
+
     print(parameters)
 
     return dataset_folder, env, mask_h, mask_w, valid_h, valid_w, model_path
@@ -130,12 +131,12 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         ddim_eta = 1.0
         
         graph_folder  = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/{problem_type}"
-        graph_name = f"result_schedule_{problem_type}_bench.png"
+        graph_name = f"result_schedule_{problem_type}_bench_{inference_type}.png"
         graph_save_path = f"{graph_folder}/{graph_name}"
 
 
-        report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b_zero_{problem_type}.txt"
-        report_file_path_fix = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b_zero_{problem_type}.txt"
+        report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b_zero_{problem_type}_{inference_type}.txt"
+        report_file_path_fix = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b_zero_{problem_type}_{inference_type}.txt"
         # report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_file_{timesteps}t_{n_samples}b.txt"
         # report_file_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/inference_reports/inference_report_random_mk01.txt"
 
@@ -239,7 +240,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
             ops_seq_order = td["ops_sequence_order"]
             job_lengts = compute_job_lengths(ops_seq_order)
             print(f"job lengths: {job_lengts}")
-            valid_w = 280
+            # valid_w = 280
             inference_assignments = schedule.schedule_randomly(ops_ma_adj, valid_h, valid_w, job_lengts, N=n_ops)
             for i in range(assignments_to_make-1):
                 instance_batch= schedule.schedule_randomly(ops_ma_adj, valid_h, valid_w, job_lengts)
@@ -475,9 +476,14 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # report, total_errors, error_list, total_error, avg_amt_infeas_ops, avg_amt_infeas_multi, avg_amt_infeas_seq, infeas_ops, avg_infeas_multi, amt_infeas_sched, percent_infeas_sched
 
     # TODO før også inn invalid actions
+
     benchmark = problem_type
     print(f'benchmark is {benchmark}')
-    confidence_interval_utils.append_results( 
+ 
+    path_before_csv = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals'
+    csv_path = f"{path_before_csv}/batch_runs_metrics_{benchmark}_{inference_type}_gamma0.csv"
+    confidence_interval_utils.append_results(
+        csv_path,
         min_makespan, avg_makespan, max_makespan, elapsed,
         total_errors, total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p,
         total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix,
@@ -643,5 +649,5 @@ benchmark = sys.argv[1]
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 # ins = None
 # inference_type = random, guide, ddpm
-get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "ddpm")
+get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "guide")
 # exit()
