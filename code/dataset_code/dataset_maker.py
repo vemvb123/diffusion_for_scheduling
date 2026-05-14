@@ -51,8 +51,10 @@ def make_target(env: FJSPEnv, td: TensorDict, checkpoint_path: str, order: bool 
     actions = out["actions"]
     td_scheduled, ordered_assignments = schedule_actions_batch(env, actions, td.copy(), order)
 
-
     return td_scheduled, actions, ordered_assignments
+
+
+
 
 def make_target_mauti_mautill():
 

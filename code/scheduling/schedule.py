@@ -343,15 +343,6 @@ def schedule_actions_batch(env: FJSPEnv, actions: List, td: TensorDict, order: b
         return td, None
 
 
-from collections import deque
-import torch
-
-from collections import deque
-import torch
-
-from collections import deque
-import torch
-
 
 # bruk hvis ordered, for å se klart sekvens
 # første operasjon er laveste tallet i return matrisen, det er annerledes enn hvordan det ellers er, der største verdi rett fra modell er første operasjon

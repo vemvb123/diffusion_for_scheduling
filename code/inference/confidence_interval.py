@@ -169,7 +169,7 @@ def test_better():
     print(f"DDPM mean min_makespan:  {mean_makespan_ddpm:.6f}")
 
 
-test_better()
+# test_better()
 
 
 def compute_bounds():
