@@ -207,7 +207,6 @@ def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
         either int or list of widths per section/job
     """
 
-
     # Remove batch dimension if present
     if assignments.dim() > 2:
         assignments = assignments.squeeze(0)
@@ -269,7 +268,17 @@ def map_assignments_to_actions_text(assignments, order: bool, n_jobs):
             # section0 -> 1..8
             # section1 -> 9..15
             # section2 -> 16..21
-            action = local_start + (row + 1)
+            job = section_idx
+
+            machine = row
+
+            action = (
+                job * H
+                + machine
+                + 1
+            )
+
+            # action = local_start + (row + 1)
 
             actions.append(int(action))
 

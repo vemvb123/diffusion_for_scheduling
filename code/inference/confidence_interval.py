@@ -6,15 +6,12 @@ def append_results(csv_path,
         min_makespan, avg_makespan, max_makespan, elapsed,
         total_errors, total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p,
         total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix,
-        benchmark, 
-        invalid_act_of_min, invalid_act_of_max, invalid_act_avg, invalid_act_rate_of_min, invalid_act_rate_of_max, invalid_act_rate_avg
+        benchmark
     ):
     
 
     fieldnames = [
         "min_makespan", "avg_makespan", "max_makespan", "elapsed", 
-
-        'invalid_act_of_min', 'invalid_act_of_max', 'invalid_act_avg', 'invalid_act_rate_of_min', 'invalid_act_rate_of_max', 'invalid_act_rate_avg',
 
         # before fixing schedule
         "total_errors", "total_error", "total_error_p", "multi_p", "seq_p",
@@ -36,9 +33,6 @@ def append_results(csv_path,
         writer = csv.writer(f)
         writer.writerow([
             min_makespan, avg_makespan, max_makespan, elapsed, 
-
-
-            invalid_act_of_min, invalid_act_of_max, invalid_act_avg, invalid_act_rate_of_min, invalid_act_rate_of_max, invalid_act_rate_avg,
 
             # before fixing schedule
             total_errors, total_error, total_error_p, multi_p, seq_p,

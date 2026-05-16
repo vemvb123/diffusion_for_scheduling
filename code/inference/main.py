@@ -454,7 +454,7 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     n_machines = valid_h
     print(f'n machines... {n_machines}')
     print(f'n jobs... {n_jobs}')
-    td_scheduled, min_makespan, max_makespan, avg_makespan, invalid_act_of_min, invalid_act_of_max, invalid_act_avg, invalid_act_rate_of_min, invalid_act_rate_of_max, invalid_act_rate_avg = schedule.schedule_from_inference(inference_assignments_order, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path,
+    td_scheduled, min_makespan, max_makespan, avg_makespan = schedule.schedule_from_inference(inference_assignments_order, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path,
                                                                                               fill_gaps=True)
     code.inference.report_infeasibilities.add_makespans_report(min_makespan, max_makespan, avg_makespan, report_file_path)
 
@@ -476,18 +476,17 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # report, total_errors, error_list, total_error, avg_amt_infeas_ops, avg_amt_infeas_multi, avg_amt_infeas_seq, infeas_ops, avg_infeas_multi, amt_infeas_sched, percent_infeas_sched
 
     # TODO før også inn invalid actions
-
     benchmark = problem_type
     print(f'benchmark is {benchmark}')
  
     path_before_csv = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals'
-    csv_path = f"{path_before_csv}/batch_runs_metrics_{benchmark}_{inference_type}_gamma0.csv"
+    csv_path = f"{path_before_csv}/batch_runs_metrics_{benchmark}_{inference_type}.csv"
     confidence_interval_utils.append_results(
         csv_path,
         min_makespan, avg_makespan, max_makespan, elapsed,
         total_errors, total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p,
         total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix,
-        benchmark, invalid_act_of_min, invalid_act_of_max, invalid_act_avg, invalid_act_rate_of_min, invalid_act_rate_of_max, invalid_act_rate_avg
+        benchmark
     )
    
 
@@ -646,8 +645,16 @@ n_jobs = 4
 
 
 benchmark = sys.argv[1]
+
+
+
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
+times = 1
+if sys.argv[2] == 'inf':
+    times = 500
 # ins = None
 # inference_type = random, guide, ddpm
-get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "guide")
+for i in range(times):
+    get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "guide")
 # exit()
+# TODO hvis skal laghe intervall... Husk ta vekk exit greier, og husk å tracke skippa actions onklig..

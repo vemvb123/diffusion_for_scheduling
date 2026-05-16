@@ -298,7 +298,7 @@ def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, t, eps=0.0, sel
 
     grad_norm = (grad_b * grad_b).sum(dim=(1,2,3), keepdim=True) + 1e-8
 
-    gamma = 0.0
+    gamma = 1.0
 
 
     # gamma = 2.0 * torch.relu(-b).mean(dim=1).view(-1,1,1,1)

@@ -116,7 +116,8 @@ def dataset_ma_util(problem_type):
     ### Lag dataset
     print("Beginning dataset creation...")
 
-    train_size = 100000
+    # train_size = 100000
+    train_size = 50000
     test_size = int(train_size * 0.2)
     n = train_size + test_size
 

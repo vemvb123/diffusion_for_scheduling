@@ -1246,6 +1246,175 @@ def check_processing_times(
                 invalid_mask
             ]
         )
+from collections import defaultdict
+
+def check_duplicate_job_precedence(
+    queue_machines
+):
+    """
+    Checks whether the same:
+        (job, precedence)
+
+    appears multiple times
+    across machine queues.
+
+    queue format:
+    {
+        machine: [
+            (action, job, precedence),
+            ...
+        ]
+    }
+    """
+
+    seen = defaultdict(list)
+
+    # -----------------------------------
+    # Collect occurrences
+    # -----------------------------------
+
+    for machine, queue in queue_machines.items():
+
+        for action, job, precedence in queue:
+
+            key = (job, precedence)
+
+            seen[key].append(
+                (machine, action)
+            )
+
+    # -----------------------------------
+    # Find duplicates
+    # -----------------------------------
+
+    duplicates = {}
+
+    for key, occurrences in seen.items():
+
+        if len(occurrences) > 1:
+
+            duplicates[key] = occurrences
+
+    # -----------------------------------
+    # Print result
+    # -----------------------------------
+
+    if len(duplicates) == 0:
+
+        print(
+            "No duplicate "
+            "(job, precedence) pairs found."
+        )
+
+    else:
+
+        print(
+            "Duplicate "
+            "(job, precedence) pairs found:"
+        )
+
+        for (
+            job,
+            precedence
+        ), occurrences in duplicates.items():
+
+            print(
+                f"job={job}, "
+                f"precedence={precedence}"
+            )
+
+            for machine, action in occurrences:
+
+                print(
+                    f"    machine={machine}, "
+                    f"action={action}"
+                )
+
+    return duplicates
+
+
+
+def validate_actions_mautil(
+    actions,
+    ops_ma_adj,
+    job_lengths,
+    n_machines
+):
+
+    # -----------------------------------
+    # operation count per job
+    # -----------------------------------
+
+    job_counter = [0] * len(job_lengths)
+
+    for action in actions:
+
+        action = action.item()
+
+        if action == 0:
+            continue
+
+        # -----------------------------------
+        # decode machine/job
+        # -----------------------------------
+
+        machine = (
+            (action - 1)
+            % n_machines
+        )
+
+        job = (
+            (action - 1)
+            // n_machines
+        )
+
+        # -----------------------------------
+        # where does this job start
+        # in operation columns?
+        # -----------------------------------
+
+        job_start = sum(
+            job_lengths[:job]
+        )
+
+        # -----------------------------------
+        # operation index inside job
+        # -----------------------------------
+
+        precedence = job_counter[job]
+
+        # -----------------------------------
+        # actual operation column
+        # -----------------------------------
+
+        op_col = (
+            job_start
+            + precedence
+        )
+
+        # -----------------------------------
+        # validity
+        # -----------------------------------
+
+        valid = (
+            ops_ma_adj[
+                machine,
+                op_col
+            ].item()
+            == 1
+        )
+
+        print(
+            f'action={action}, '
+            f'job={job}, '
+            f'precedence={precedence}, '
+            f'machine={machine}, '
+            f'op_col={op_col}, '
+            f'valid={valid}'
+        )
+
+        # increment AFTER checking
+        job_counter[job] += 1
 
 
 def schedule_single_instance_mautil(
@@ -1254,14 +1423,31 @@ def schedule_single_instance_mautil(
     actions,
     order=True # include ordered assignments ma_assignments, specifying in what order the assignments were done
 ):
+    
+
+
     device = td.device
 
     ops_ma_adj_before_schedule = td['ops_ma_adj'].clone()
     proc_times_before_schedule = td['proc_times'].clone()
+    job_lengths = (
+        td["job_ops_adj"][0]
+        .sum(dim=1)
+        .tolist()
+    )
 
     _, n_machines, _ = (
         td["ma_assignment"].shape
     )
+
+    # used to debug if all actions are on valid machines for the operations
+    '''
+    print(ops_ma_adj_before_schedule)
+    print(job_lengths)
+    print('..')
+    validate_actions_mautil(actions, ops_ma_adj_before_schedule[0], job_lengths, n_machines)
+    '''
+
 
     # -------------------------------------------------
     # Build queues
@@ -1273,6 +1459,8 @@ def schedule_single_instance_mautil(
             n_machines
         )
     )
+    duplicates = check_duplicate_job_precedence(queue_machines)
+
     num_jobs = td["job_ops_adj"].shape[1]
     job_counter = [0 for _ in range(num_jobs)]
 
@@ -1285,6 +1473,7 @@ def schedule_single_instance_mautil(
     )
 
     actions_assigned = 0
+    job_actions_done = [[] for i in range(num_jobs)]
 
     # schedule
     while not td['done'].all():
@@ -1334,6 +1523,7 @@ def schedule_single_instance_mautil(
             td["action"] = torch.tensor([action])
 
             td = env.step(td)["next"]
+            job_actions_done[ job ].append(popped_item)
             job_counter[ job ] += 1
             scheduled = True
 
@@ -1458,10 +1648,12 @@ def schedule_batch_instances_mautil(
         dim=0
     )
 
-    ordered_assignments = torch.cat(
-        ordered_assignments_list,
-        dim=0
-    )
+    ordered_assignments = None
+    if order:
+        ordered_assignments = torch.cat(
+            ordered_assignments_list,
+            dim=0
+        )
 
     return (
         td_scheduled,
@@ -1856,6 +2048,27 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     print(n_jobs)
     print(sum(i for i in n_jobs if i > 1))
 
+
+    # for debugging wether assignments are made to only valid machines for each operation
+    '''
+    padding = torch.zeros(*assignments.shape[:-1],5,device=assignments.device)
+    assignments_padded = torch.cat([assignments, padding],dim=-1)
+
+    ops_ma_adj = td["ops_ma_adj"].to(assignments_padded.device)
+
+    print(assignments_padded.shape)
+    print(ops_ma_adj.shape)
+
+    invalid = ((assignments_padded != 0) & (ops_ma_adj == 0))
+
+    print('her')
+    print(invalid.any())
+    print(torch.nonzero(invalid))
+
+    exit()
+    '''
+
+
     print(f"making actions for assignments with {os.cpu_count()} processors")
     B = assignments.size(0)
     all_actions = Parallel(n_jobs=jobs_to_make)(
@@ -1895,6 +2108,7 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     batch_size = all_actions.shape[0]
     td_batched = td.expand(batch_size).clone()
 
+    '''
     print(f'all actions shape: {all_actions.shape}')
     td_final, executed, invalid_action_counters = batched_schedule_rollout(
     env,
@@ -1903,15 +2117,26 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     render_idx=None,
     save_dir="frames",
     )
+    '''
+    
+    td_final, ordered_assignments = schedule_batch_instances_mautil(
+        env,
+        td_batched,
+        all_actions,
+        order=False
+    )
 
-    print('done scheduling')
-    print(invalid_action_counters.shape)
 
 
     tds = [
         td_final[i]
         for i in range(batch_size)
     ]
+    # TODO fjern etterpå
+    '''
+    print('done scheduling')
+    print(invalid_action_counters.shape)
+
     invalid_action_counters = (
         invalid_action_counters
         .cpu()
@@ -1921,7 +2146,7 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         executed[i].cpu().tolist()
         for i in range(batch_size)
     ]
-
+    '''
 
     #tds, invalid_action_counters, actions_taken = zip(*results)
     #tds = list(tds)
@@ -1955,7 +2180,7 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     best_index = makespans.index( min(makespans) )
     worst_index = makespans.index( max(makespans) )
     td_best = tds[ best_index ]
-    best_actions = actions_taken[makespans.index( min(makespans ))]
+    # best_actions = actions_taken[makespans.index( min(makespans ))]
 
     # p = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/best_actions.pt'
     # torch.save(best_actions, p)
@@ -1989,12 +2214,14 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
 
 
     # env.render(td_best) # sto tidligere env.render(td_best, 0)
+    '''
     env.render(td_best.unsqueeze(0), 0)
     if path_save_image:
         plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
         print(f"Saved scheduled image at path {path_save_image}")
-
-
+    '''
+    # TODO ukkomenter etterpå
+    '''
     denom = len(all_actions[0])
     invalid_actions_counter_rate = [
         x / denom if denom > 0 else 0
@@ -2009,12 +2236,11 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     invalid_act_rate_of_min = invalid_actions_counter_rate[ best_index ]
     invalid_act_rate_avg = sum(invalid_actions_counter_rate) / len(invalid_actions_counter_rate)
 
-
-
     # print(f"invalid action counters: {invalid_action_counters}")
     # print(f"invalid action counter rates: {invalid_actions_counter_rate}")
+    '''
 
-    return td_best, min_makespan, max_makespan, avg_makespan, invalid_act_of_min, invalid_act_of_max, invalid_act_avg, invalid_act_rate_of_min, invalid_act_rate_of_max, invalid_act_rate_avg
+    return td_best, min_makespan, max_makespan, avg_makespan
 
 
 
