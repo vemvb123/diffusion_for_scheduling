@@ -148,7 +148,7 @@ def make_dataset(n: int, dataset_folder: str,
 # TODO endre batch_size tilbake til 1280
 def make_dataset_ma_util(n: int, dataset_folder: str, 
                  n_jobs, n_ma, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, max_eligable_ma_per_op, min_eligable_ma_per_op,
-                 target_model: str, order: bool, batch_size: int = 32, startpoint: int = 0):
+                 target_model: str, order: bool, batch_size: int = 1280, startpoint: int = 0):
 
     logging.info("Making dataset... in mautil")
     print('in matuil making dataset..')
@@ -166,7 +166,7 @@ def make_dataset_ma_util(n: int, dataset_folder: str,
             min_eligable_ma_per_op=min_eligable_ma_per_op, 
             batch_size=batch_size)
 
-        td_target, ordered_assignments = code.dataset_code.dataset_maker.make_target_ma_util(env, td.copy(), target_model, order)
+        td_target, actions, ordered_assignments = code.dataset_code.dataset_maker.make_target_ma_util(env, td.copy(), target_model, order)
 
         td.set('opt_assignment', td_target['ma_assignment'])
         td.set('opt_actions', torch.tensor(actions))

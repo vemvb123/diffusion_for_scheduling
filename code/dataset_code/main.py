@@ -121,6 +121,7 @@ def dataset_ma_util(problem_type):
     n = train_size + test_size
 
     target_model, _, dataset_folder, _, filepath_benchmark_instance, _, _, _, _, _ = get_benchmark_values(problem_type)
+    dataset_folder = dataset_folder + '_mautil'
 
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
     print(parameters)

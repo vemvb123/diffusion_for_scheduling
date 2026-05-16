@@ -49,8 +49,9 @@ def make_target(env: FJSPEnv, td: TensorDict, checkpoint_path: str, order: bool 
                     select_best=True,
                     return_actions=True)
     actions = out["actions"]
-    td_scheduled, ordered_assignments = schedule_actions_batch(env, actions, td.copy(), order)
 
+
+    td_scheduled, ordered_assignments = schedule_actions_batch(env, actions, td.copy(), order)
     return td_scheduled, actions, ordered_assignments
 
 
@@ -67,45 +68,9 @@ def make_target_ma_util(env: FJSPEnv, td: TensorDict, checkpoint_path: str, orde
     actions = out["actions"]
 
     actions_modified = modify_actions_batch_mautil(actions, td.copy())
+    td_scheduled, ordered_assignments = schedule_batch_instances_mautil(env, td.copy(), actions_modified)
 
-    print(actions_modified[0])
-    machines = (((actions_modified[0] - 1) % 6) + 1)
-    machine_2_mask = (machines == 2)
-    machine_2_actions = actions_modified[0][machine_2_mask]
-    count_machine_2 = machine_2_actions.numel()
-    print("Machine 2 actions:")
-    print(machine_2_actions)
-    print("Count:")
-    print(count_machine_2)
-
-
-    td_scheduled, ordered_assignments, actions_taken_b0 = schedule_batch_instances_mautil(env, td, actions_modified)
-    print('============')
-
-
-    print(actions_taken_b0)
-    machines = (((actions_taken_b0 - 1) % 6) + 1)
-    machine_2_mask = (machines == 2)
-    machine_2_actions = actions_taken_b0[machine_2_mask]
-    count_machine_2 = machine_2_actions.numel()
-    print("Machine 2 actions:")
-    print(machine_2_actions)
-    print("Count:")
-    print(count_machine_2)
-
-
-
-    path_save_image = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/dataset_code/sched.png'
-    env.render(td_scheduled, 0)
-    if path_save_image:
-        plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
-        print(f"Saved scheduled image at path {path_save_image}")
-
-    print('exit')
-    exit()
-
-
-    return td_scheduled, actions, ordered_assignments
+    return td_scheduled, actions_modified, ordered_assignments
 
 
 

@@ -1276,6 +1276,17 @@ def schedule_single_instance_mautil(
     num_jobs = td["job_ops_adj"].shape[1]
     job_counter = [0 for _ in range(num_jobs)]
 
+    # track order of assignments
+    prev_adj = td["ma_assignment"].clone()
+
+    ordered_assignments = torch.zeros_like(
+        prev_adj,
+        dtype=torch.float
+    )
+
+    actions_assigned = 0
+
+    # schedule
     while not td['done'].all():
 
         scheduled = False
@@ -1325,7 +1336,21 @@ def schedule_single_instance_mautil(
             td = env.step(td)["next"]
             job_counter[ job ] += 1
             scheduled = True
-           
+
+            # track order of assignments
+            if order:
+                new_adj = td["ma_assignment"]
+                diff = (
+                    (new_adj == 1)
+                    & (prev_adj == 0)
+                )
+                if diff.any():
+                    actions_assigned += 1
+                    ordered_assignments[
+                        diff
+                    ] = actions_assigned
+                prev_adj = new_adj.clone()
+            
 
 
         # IMPORTANT:
@@ -1356,7 +1381,7 @@ def schedule_single_instance_mautil(
         print(invalid.any())
         print(torch.where(invalid))
 
-
+    '''
     path_save_image = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/sched_mautil.png'
     env.render(td, 0)
     if path_save_image:
@@ -1365,15 +1390,11 @@ def schedule_single_instance_mautil(
             dpi=150,
             bbox_inches='tight'
         )
-
-
-    ordered_assignments = None
-    exit()
-
-    return (
-        td,
-        ordered_assignments
-    )
+    '''
+    if order:
+        return td, ordered_assignments
+    else:
+        return td, None
 
 
 def schedule_batch_instances_mautil(
@@ -1411,8 +1432,7 @@ def schedule_batch_instances_mautil(
 
         (
             td_single,
-            ordered_assignments,
-            actions_taken
+            ordered_assignments
         ) = schedule_single_instance_mautil(
             td_single,
             env,
@@ -1428,11 +1448,6 @@ def schedule_batch_instances_mautil(
             ordered_assignments
         )
 
-        if b == 0:
-
-            actions_taken_b0 = (
-                actions_taken
-            )
 
     # -------------------------------------------------
     # Concatenate outputs
@@ -1450,8 +1465,7 @@ def schedule_batch_instances_mautil(
 
     return (
         td_scheduled,
-        ordered_assignments,
-        actions_taken_b0
+        ordered_assignments
     )
 
 
