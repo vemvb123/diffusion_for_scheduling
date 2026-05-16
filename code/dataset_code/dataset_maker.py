@@ -1,4 +1,4 @@
-from code.scheduling.schedule import schedule_actions_batch, schedule_actions_batch_mautil
+from code.scheduling.schedule import schedule_actions_batch, modify_actions_batch_mautil, batched_schedule_rollout_keep_order, schedule_batch_instances_mautil
 
 import matplotlib
 matplotlib.use('Agg')
@@ -54,6 +54,59 @@ def make_target(env: FJSPEnv, td: TensorDict, checkpoint_path: str, order: bool 
     return td_scheduled, actions, ordered_assignments
 
 
+def make_target_ma_util(env: FJSPEnv, td: TensorDict, checkpoint_path: str, order: bool = False) -> Tuple[TensorDict, List]:
+    model = L2DModel.load_from_checkpoint(checkpoint_path)
+    model = model.to("cpu")
+
+    with torch.inference_mode():
+        out = model(td,
+                    decode_type="multistart_sampling",
+                    num_starts=5,
+                    select_best=True,
+                    return_actions=True)
+    actions = out["actions"]
+
+    actions_modified = modify_actions_batch_mautil(actions, td.copy())
+
+    print(actions_modified[0])
+    machines = (((actions_modified[0] - 1) % 6) + 1)
+    machine_2_mask = (machines == 2)
+    machine_2_actions = actions_modified[0][machine_2_mask]
+    count_machine_2 = machine_2_actions.numel()
+    print("Machine 2 actions:")
+    print(machine_2_actions)
+    print("Count:")
+    print(count_machine_2)
+
+
+    td_scheduled, ordered_assignments, actions_taken_b0 = schedule_batch_instances_mautil(env, td, actions_modified)
+    print('============')
+
+
+    print(actions_taken_b0)
+    machines = (((actions_taken_b0 - 1) % 6) + 1)
+    machine_2_mask = (machines == 2)
+    machine_2_actions = actions_taken_b0[machine_2_mask]
+    count_machine_2 = machine_2_actions.numel()
+    print("Machine 2 actions:")
+    print(machine_2_actions)
+    print("Count:")
+    print(count_machine_2)
+
+
+
+    path_save_image = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/dataset_code/sched.png'
+    env.render(td_scheduled, 0)
+    if path_save_image:
+        plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
+        print(f"Saved scheduled image at path {path_save_image}")
+
+    print('exit')
+    exit()
+
+
+    return td_scheduled, actions, ordered_assignments
+
 
 
 def make_target_mauti_mautill():
@@ -84,7 +137,7 @@ def make_target_mauti_mautill():
     actions = out["actions"]
     order = True
     # td_scheduled, ordered_assignments = schedule_actions_batch_mautil(env, actions, td.copy(), order)
-    td_scheduled, _ = schedule_actions_batch(env, actions, td, order)
+    td_scheduled, _ = schedule_batch_instances_mautil(env, actions, td, order)
 
     path_save_image = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/scheduled_by_model_lessmachilessmachine22_hmm2.png'
     print(td_scheduled[0]['time'])
@@ -119,10 +172,12 @@ def make_instance(
         "max_eligible_ma_per_op": max_eligable_ma_per_op,
     }
 
+
     env = FJSPEnv(
         generator_params=generator_params,
         _torchrl_mode=True,
-        stepwise_reward=True
+        stepwise_reward=True,
+        mask_no_ops=False
     )
     td = env.reset(batch_size=[batch_size])
     return env, td, generator_params

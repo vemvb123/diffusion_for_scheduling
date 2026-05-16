@@ -112,12 +112,49 @@ def main(instance_type = None):
     print("Done making mk00 dataset")
 
 
+def dataset_ma_util(problem_type):
+    ### Lag dataset
+    print("Beginning dataset creation...")
+
+    train_size = 100000
+    test_size = int(train_size * 0.2)
+    n = train_size + test_size
+
+    target_model, _, dataset_folder, _, filepath_benchmark_instance, _, _, _, _, _ = get_benchmark_values(problem_type)
+
+    parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
+    print(parameters)
+
+    print("stated making dataset")
+    print(f"dataset folder: {dataset_folder}")
+    print(f"benchmark instance: {filepath_benchmark_instance}")
+    print(f"target model: {target_model}")
+
+    dataset_utils.make_dataset_ma_util(
+        n, dataset_folder,
+        n_jobs=parameters['n_jobs'],
+        n_ma=parameters['n_machines'],
+        max_op_per_job=parameters['most_operations'],
+        min_op_per_job=parameters['fewest_operations'],
+        max_proc_time=parameters['max_processing_time'],
+        min_proc_time=parameters['min_processing_time'],
+        max_eligable_ma_per_op=parameters['max_machine_options'],
+        min_eligable_ma_per_op=parameters['min_machine_options'],
+        target_model=target_model,
+        order=True
+    )
+    print("Done making mk00 dataset")
+
+
+
+
+
 
 
 def check_benchmark_parameters():
     print("checking benchmark parameters...")
     #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
-    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk07.txt'
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
     #filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
@@ -173,13 +210,18 @@ def check_dataset():
 
 
 # mk05 er: 
-# check_benchmark_parameters()
 
 # check_dataset()
 #instance_type = "mk01"
-main()
+
+
+dataset_ma_util('mk01')
+# check_benchmark_parameters()
+
+
 
 # check_benchmark_parameters()
+
 # ins = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
 # td = benchmark_utils.make_the_stuff(ins)
 

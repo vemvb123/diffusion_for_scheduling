@@ -145,6 +145,41 @@ def make_dataset(n: int, dataset_folder: str,
 
     print(f'Made all {i+batch_size} instances. Done making dataset')
 
+# TODO endre batch_size tilbake til 1280
+def make_dataset_ma_util(n: int, dataset_folder: str, 
+                 n_jobs, n_ma, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, max_eligable_ma_per_op, min_eligable_ma_per_op,
+                 target_model: str, order: bool, batch_size: int = 32, startpoint: int = 0):
+
+    logging.info("Making dataset... in mautil")
+    print('in matuil making dataset..')
+
+    os.makedirs(dataset_folder, exist_ok=True)
+    for i in range(startpoint, n, batch_size):
+        # lag instanse
+        env, td, generator_params = code.dataset_code.dataset_maker.make_instance(
+            n_ma=n_ma, n_jobs=n_jobs, 
+            max_op_per_job=max_op_per_job, 
+            min_op_per_job=min_op_per_job, 
+            max_proc_time=max_proc_time, 
+            min_proc_time=min_proc_time, 
+            max_eligable_ma_per_op=max_eligable_ma_per_op, 
+            min_eligable_ma_per_op=min_eligable_ma_per_op, 
+            batch_size=batch_size)
+
+        td_target, ordered_assignments = code.dataset_code.dataset_maker.make_target_ma_util(env, td.copy(), target_model, order)
+
+        td.set('opt_assignment', td_target['ma_assignment'])
+        td.set('opt_actions', torch.tensor(actions))
+        if order:
+            td.set('opt_assignment_order', ordered_assignments)
+
+        torch.save(td.copy(), f'{dataset_folder}/{i}_{i+batch_size}.pt')
+
+        print(f'Made instance {i} to {i+batch_size}')
+
+
+    print(f'Made all {i+batch_size} instances. Done making dataset')
+
 
 
 

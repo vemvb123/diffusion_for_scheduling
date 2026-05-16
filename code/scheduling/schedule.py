@@ -56,267 +56,237 @@ params:
 """
 
 from collections import deque
+
+
 import torch
 
 
-def schedule_actions_batch_mautil(
-    env,
-    actions,
-    td,
-    order=False
+def decode_machine(action, h):
+    """
+    Example with h=6:
+
+    machine 2:
+        2, 8, 14, 20
+    """
+
+    return ((action - 1) % h) + 1
+
+
+def decode_job(action, h):
+
+    return (action - 1) // h
+
+
+def get_operation_column_from_job_counter(
+    action,
+    job_ops_adj,
+    job_use_count,
+    h
 ):
 
-    MACHINE2_ID = 1
-    MAX_MACHINE2_USAGE = 2
+    job = decode_job(
+        action,
+        h
+    )
 
-    batch_size = actions.shape[0]
+    # Columns for this job
+    job_cols = torch.where(
+        job_ops_adj[job] == 1
+    )[0]
 
-    # ========================================================
-    # TRACK REAL MACHINE2 USAGE
-    # ========================================================
+    # Which operation are we on?
+    op_idx = job_use_count[job]
 
-    machine2_usage = torch.zeros(
-        batch_size,
+    if op_idx >= len(job_cols):
+        return None
+
+    return int(job_cols[op_idx])
+
+
+def find_new_machine_for_operation(
+    action,
+    ops_ma_adj,
+    col_for_action,
+    h
+):
+    """
+    Change machine while preserving job.
+
+    HARD RULE:
+    machine 2 is forbidden.
+    """
+
+    current_machine = decode_machine(
+        action,
+        h
+    )
+
+    # Valid machines (0-based)
+    valid_machines = torch.where(
+        ops_ma_adj[:, col_for_action] == 1
+    )[0]
+
+    # Convert to 1-based
+    valid_machines = valid_machines + 1
+
+    # -----------------------------------
+    # REMOVE:
+    # - current machine
+    # - machine 2
+    # -----------------------------------
+
+    valid_machines = valid_machines[
+        (valid_machines != current_machine)
+        & (valid_machines != 2)
+    ]
+
+    # -----------------------------------
+    # NO VALID MACHINE EXISTS
+    # -----------------------------------
+
+    if len(valid_machines) == 0:
+        # FORCE REMOVE MACHINE 2
+        return action
+
+    # Random machine
+    new_machine = valid_machines[
+        torch.randint(
+            len(valid_machines),
+            (1,)
+        )
+    ].item()
+
+    # Decode job
+    job = decode_job(
+        action,
+        h
+    )
+
+    # Reconstruct action
+    new_action = (
+        job * h
+        + new_machine
+    )
+
+    return int(new_action)
+
+# this does not restrict to only 2 actions, as it might not be possible
+# but it rather limits the usage of a machine, to something less for the machin, than it otherwise wouldve been
+def modify_actions_batch_mautil(
+    actions,
+    td
+):
+    max_amount = 1
+    actions = actions.clone()
+
+    b, h, w = td["ma_assignment"].shape
+
+    # ---------------------------------------------
+    # Job counters
+    # ---------------------------------------------
+
+    max_jobs = td['job_ops_adj'].shape[1]
+
+    job_use_count = torch.zeros(
+        (b, max_jobs),
         dtype=torch.long,
         device=actions.device
     )
 
-    # ========================================================
-    # ORDER TRACKING
-    # ========================================================
+    # ---------------------------------------------
+    # MODIFY ACTIONS
+    # ---------------------------------------------
 
-    prev_adj = td["ma_assignment"].clone()
+    for t in range(actions.size(1)):
 
-    ordered_assignments = torch.zeros_like(
-        prev_adj,
-        dtype=torch.float
-    )
+        for batch_idx in range(b):
 
-    actions_assigned = 0
+            action = actions[
+                batch_idx,
+                t
+            ].item()
 
-    # ========================================================
-    # CREATE ACTION QUEUES
-    # ========================================================
-
-    queues = []
-
-    for b in range(batch_size):
-
-        queues.append(
-            deque(actions[b].tolist())
-        )
-
-    # ========================================================
-    # MAIN LOOP
-    # ========================================================
-
-    while not td["done"].all():
-
-        current_action = torch.zeros(
-            batch_size,
-            dtype=torch.long,
-            device=actions.device
-        )
-
-        mask = td["action_mask"]
-
-        # ====================================================
-        # SELECT ACTIONS
-        # ====================================================
-
-        for b in range(batch_size):
-
-            if td["done"][b]:
+            # Skip padding
+            if action == 0:
                 continue
 
-            scheduled = False
-
-            qlen = len(queues[b])
-
-            # ------------------------------------------------
-            # TRY QUEUED ACTIONS
-            # ------------------------------------------------
-
-            for _ in range(qlen):
-
-                action = queues[b].popleft()
-
-                # invalid
-                if action <= 0:
-                    continue
-
-                # currently infeasible
-                if not mask[b, action]:
-
-                    queues[b].append(action)
-                    continue
-
-                # ------------------------------------------------
-                # CHECK WHAT MACHINE THIS ACTION WOULD USE
-                # ------------------------------------------------
-                #
-                # IMPORTANT:
-                # RL4CO action ids are NOT:
-                #
-                # machine * num_jobs + job
-                #
-                # So we must infer machine using ma_assignment
-                #
-                # ------------------------------------------------
-
-                # clone td temporarily
-                td_test = td[b:b+1].clone()
-
-                td_test["action"] = torch.tensor(
-                    [action],
-                    device=actions.device
-                )
-
-                # simulate one step
-                td_next = env.step(td_test)["next"]
-
-                prev_ma = td_test["ma_assignment"]
-                next_ma = td_next["ma_assignment"]
-
-                diff = (
-                    (next_ma == 1)
-                    & (prev_ma == 0)
-                )
-
-                # no operation assigned
-                if not diff.any():
-
-                    queues[b].append(action)
-                    continue
-
-                _, machine_ids, _ = torch.where(diff)
-
-                machine_used = machine_ids[0].item()
-
-                # ------------------------------------------------
-                # MACHINE2 LIMIT
-                # ------------------------------------------------
-
-                if (
-                    machine_used == MACHINE2_ID
-                    and machine2_usage[b]
-                    >= MAX_MACHINE2_USAGE
-                ):
-
-                    # postpone forever
-                    queues[b].append(action)
-
-                    continue
-
-                # ------------------------------------------------
-                # ACCEPT ACTION
-                # ------------------------------------------------
-
-                current_action[b] = action
-
-                scheduled = True
-
-                break
-
-            # ------------------------------------------------
-            # NO VALID ACTION FOUND
-            # ------------------------------------------------
-
-            if not scheduled:
-
-                # WAIT action if valid
-                if mask[b, 0]:
-
-                    current_action[b] = 0
-
-                else:
-
-                    # --------------------------------------------
-                    # no feasible non-machine2 action exists
-                    #
-                    # WAIT and retry later
-                    # --------------------------------------------
-
-                    if mask[b, 0]:
-
-                        current_action[b] = 0
-
-                    else:
-
-                        # force no-op
-                        current_action[b] = 0
-
-
-        # ====================================================
-        # APPLY ACTIONS
-        # ====================================================
-
-        td["action"] = current_action
-
-        prev_adj = td["ma_assignment"].clone()
-
-        td = env.step(td)["next"]
-
-        new_adj = td["ma_assignment"]
-
-        # ====================================================
-        # TRACK REAL MACHINE USAGE
-        # ====================================================
-
-        diff = (
-            (new_adj == 1)
-            & (prev_adj == 0)
-        )
-
-        if diff.any():
-
-            batch_ids, machine_ids, _ = torch.where(diff)
-
-            for b, m in zip(batch_ids, machine_ids):
-
-                if m.item() == MACHINE2_ID:
-
-                    machine2_usage[b] += 1
-
-        print("----------------------------------------")
-        print(
-            f"machine2 usage: "
-            f"{machine2_usage.tolist()}"
-        )
-
-        # ====================================================
-        # ORDER TRACKING
-        # ====================================================
-
-        if order:
-
-            diff = (
-                (new_adj == 1)
-                & (prev_adj == 0)
+            # Decode machine
+            machine = decode_machine(
+                action,
+                h
             )
 
-            if diff.any():
+            # Decode job
+            job = decode_job(
+                action,
+                h
+            )
 
-                actions_assigned += 1
+            # Find operation column
+            col_for_action = (
+                get_operation_column_from_job_counter(
+                    action,
+                    td['job_ops_adj'][batch_idx],
+                    job_use_count[batch_idx],
+                    h
+                )
+            )
 
-                ordered_assignments[
-                    diff
-                ] = actions_assigned
+            if col_for_action is None:
+                continue
 
-    return td, ordered_assignments
+            # Increment job op counter
+            job_use_count[
+                batch_idx,
+                job
+            ] += 1
+
+            # -----------------------------------------
+            # CURRENT machine-2 count
+            # -----------------------------------------
+
+            current_actions = actions[
+                batch_idx
+            ]
+
+            current_machines = (
+                ((current_actions - 1) % h) + 1
+            )
+
+            current_machine_2_count = (
+                (current_machines == 2)
+                & (current_actions != 0)
+            ).sum()
+
+            # -----------------------------------------
+            # Too many machine-2 actions
+            # -----------------------------------------
+
+            if (
+                machine == 2
+                and current_machine_2_count > max_amount
+            ):
+
+                new_action = (
+                    find_new_machine_for_operation(
+                        action,
+                        td['ops_ma_adj'][batch_idx],
+                        col_for_action,
+                        h
+                    )
+                )
 
 
+                actions[
+                    batch_idx,
+                    t
+                ] = new_action
 
-
-
-
-
-
+    return actions
 
 
 # actions: [batch_size, seq_len]
 def schedule_actions_batch(env: FJSPEnv, actions: List, td: TensorDict, order: bool) -> TensorDict:
-    print('scheduling')
 
     n_actions = len(actions)
     prev_adj = td["ma_assignment"].clone()
@@ -450,6 +420,409 @@ import torch
 from collections import deque
 
 
+def batched_schedule_rollout_keep_order(
+    env,
+    td,
+    all_actions
+):
+
+    device = td.device
+
+    i = 0
+
+    actions_taken = []
+
+    batch_size = all_actions.shape[0]
+
+    seq_len = all_actions.shape[1]
+
+    all_actions = all_actions.to(device)
+
+    # -------------------------------------------------
+    # Number of machines
+    # -------------------------------------------------
+
+    _, h, _ = td["ma_assignment"].shape
+
+    # -------------------------------------------------
+    # Build machine-local queues
+    # -------------------------------------------------
+
+    machine_queues = []
+
+    for b in range(batch_size):
+
+        queues = [[] for _ in range(h)]
+
+        for t in range(seq_len):
+
+            action = all_actions[b, t].item()
+
+            if action == 0:
+                continue
+
+            machine = (
+                (action - 1) % h
+            )
+
+            queues[machine].append(action)
+
+        machine_queues.append(queues)
+
+    # -------------------------------------------------
+    # Queue pointers
+    # -------------------------------------------------
+
+    queue_ptr = torch.zeros(
+        (batch_size, h),
+        dtype=torch.long,
+        device=device
+    )
+
+    # -------------------------------------------------
+    # Track assignments
+    # -------------------------------------------------
+
+    prev_adj = td["ma_assignment"].clone()
+
+    ordered_assignments = torch.zeros_like(
+        prev_adj,
+        dtype=torch.float
+    )
+
+    actions_assigned = torch.zeros(
+        batch_size,
+        dtype=torch.long,
+        device=device
+    )
+
+    # -------------------------------------------------
+    # MAIN LOOP
+    # -------------------------------------------------
+
+    while not td["done"].all():
+
+        mask = td["action_mask"]
+
+        proposed_actions = torch.zeros(
+            batch_size,
+            dtype=torch.long,
+            device=device
+        )
+
+        found_action = torch.zeros(
+            batch_size,
+            dtype=torch.bool,
+            device=device
+        )
+
+        # -------------------------------------------------
+        # FOR EACH MACHINE:
+        # only consider FRONT of queue
+        # -------------------------------------------------
+
+        for machine in range(h):
+
+            candidate_batches = []
+
+            candidate_actions = []
+
+            for b in range(batch_size):
+
+                if found_action[b]:
+                    continue
+
+                ptr = queue_ptr[
+                    b,
+                    machine
+                ].item()
+
+                queue = machine_queues[
+                    b
+                ][machine]
+
+                if ptr >= len(queue):
+                    continue
+
+                action = queue[ptr]
+
+                candidate_batches.append(b)
+
+                candidate_actions.append(action)
+
+            if len(candidate_batches) == 0:
+                continue
+
+            candidate_batches = torch.tensor(
+                candidate_batches,
+                device=device
+            )
+
+            candidate_actions = torch.tensor(
+                candidate_actions,
+                device=device
+            )
+
+            feasible = mask[
+                candidate_batches,
+                candidate_actions
+            ]
+
+            feasible_batches = candidate_batches[
+                feasible
+            ]
+
+            feasible_actions = candidate_actions[
+                feasible
+            ]
+
+            proposed_actions[
+                feasible_batches
+            ] = feasible_actions
+
+            found_action[
+                feasible_batches
+            ] = True
+
+            # advance queue ptr
+            for idx in range(
+                len(feasible_batches)
+            ):
+
+                b = feasible_batches[
+                    idx
+                ].item()
+
+                queue_ptr[
+                    b,
+                    machine
+                ] += 1
+
+        # -------------------------------------------------
+        # NEXT TD
+        # -------------------------------------------------
+
+        next_td = td.clone()
+
+        # -------------------------------------------------
+        # FEASIBLE ACTIONS
+        # -------------------------------------------------
+
+        feasible_idx = found_action.nonzero(
+            as_tuple=True
+        )[0]
+
+        if len(feasible_idx) > 0:
+
+            td_feasible = td[
+                feasible_idx
+            ].clone()
+
+            td_feasible["action"] = (
+                proposed_actions[
+                    feasible_idx
+                ]
+            )
+
+            td_feasible = env.step(
+                td_feasible
+            )["next"]
+
+            # ---------------------------------------------
+            # SAFE UPDATE
+            # ---------------------------------------------
+
+            for key in td.keys():
+
+                target = next_td[key]
+
+                source = td_feasible[key]
+
+                # SAME SHAPE
+                if (
+                    target[
+                        feasible_idx
+                    ].shape
+                    ==
+                    source.shape
+                ):
+
+                    target[
+                        feasible_idx
+                    ] = source
+
+                # TARGET [B]
+                # SOURCE [B,1]
+                elif (
+                    target[
+                        feasible_idx
+                    ].dim() == 1
+                    and source.dim() == 2
+                    and source.shape[-1] == 1
+                ):
+
+                    target[
+                        feasible_idx
+                    ] = source.squeeze(-1)
+
+                # GENERAL CASE
+                else:
+
+                    target[
+                        feasible_idx,
+                        ...
+                    ] = source
+
+        # -------------------------------------------------
+        # NO-OP / TIME ADVANCE
+        # -------------------------------------------------
+
+        no_op_idx = (
+            (~found_action)
+            & (~td["done"].view(-1))
+        ).nonzero(as_tuple=True)[0]
+
+        if len(no_op_idx) > 0:
+
+            td_noop = td[
+                no_op_idx
+            ].clone()
+
+            td_noop["action"] = torch.zeros(
+                len(no_op_idx),
+                dtype=torch.long,
+                device=device
+            )
+
+            td_noop = env.step(
+                td_noop
+            )["next"]
+
+            # ---------------------------------------------
+            # SAFE UPDATE
+            # ---------------------------------------------
+
+            for key in td.keys():
+
+                target = next_td[key]
+
+                source = td_noop[key]
+
+                # SAME SHAPE
+                if (
+                    target[
+                        no_op_idx
+                    ].shape
+                    ==
+                    source.shape
+                ):
+
+                    target[
+                        no_op_idx
+                    ] = source
+
+                # TARGET [B]
+                # SOURCE [B,1]
+                elif (
+                    target[
+                        no_op_idx
+                    ].dim() == 1
+                    and source.dim() == 2
+                    and source.shape[-1] == 1
+                ):
+
+                    target[
+                        no_op_idx
+                    ] = source.squeeze(-1)
+
+                # GENERAL CASE
+                else:
+
+                    target[
+                        no_op_idx,
+                        ...
+                    ] = source
+
+        td = next_td
+
+        # -------------------------------------------------
+        # RECORD batch 0
+        # -------------------------------------------------
+
+        actions_taken.append(
+            proposed_actions[0].item()
+        )
+
+
+        # -------------------------------------------------
+        # OPTIONAL RENDER
+        # -------------------------------------------------
+
+        path_save_image = (
+            f'/cluster/datastore/'
+            f'vemundvb/diffusion/'
+            f'diff_project/'
+            f'mindre_prosjekt/code/'
+            f'dataset_code/steps/'
+            f'sched_{i}_'
+            f'{proposed_actions[0].item()}.png'
+        )
+
+        env.render(td, 0)
+
+        plt.savefig(
+            path_save_image,
+            dpi=150,
+            bbox_inches='tight'
+        )
+
+        plt.close()
+
+        i += 1
+
+        # -------------------------------------------------
+        # TRACK ORDER OF ASSIGNMENTS
+        # -------------------------------------------------
+
+        new_adj = td["ma_assignment"]
+
+        diff = (
+            (new_adj == 1)
+            & (prev_adj == 0)
+        )
+
+        if diff.any():
+
+            actions_assigned += (
+                diff.any(dim=(1, 2)).long()
+            )
+
+            for b in range(batch_size):
+
+                batch_diff = diff[b]
+
+                if batch_diff.any():
+
+                    ordered_assignments[b][
+                        batch_diff
+                    ] = actions_assigned[b]
+
+        prev_adj = new_adj.clone()
+
+    # -------------------------------------------------
+    # Convert actions_taken
+    # -------------------------------------------------
+
+    actions_taken = torch.tensor(
+        actions_taken,
+        device=device
+    )
+
+    return (
+        td,
+        ordered_assignments,
+        actions_taken
+    )
 
 
 def batched_schedule_rollout(
@@ -682,6 +1055,406 @@ def batched_schedule_rollout(
     )
 
     return td, executed_history, skip_counter
+
+
+
+import torch
+
+
+def make_queue_mautil(
+    actions,
+    n_machines
+):
+
+    """
+    Returns:
+
+    {
+        machine: [
+            (
+                action,
+                job,
+                precedence_in_job
+            ),
+            ...
+        ]
+    }
+    """
+
+    # -----------------------------------
+    # machine queues
+    # -----------------------------------
+
+    queue_machines = {}
+
+    for machine in range(n_machines):
+
+        queue_machines[machine] = []
+
+    # -----------------------------------
+    # count occurrences per job
+    # -----------------------------------
+
+    job_counts = {}
+
+    # -----------------------------------
+    # process actions in order
+    # -----------------------------------
+
+    for action in actions.tolist():
+
+        if action == 0:
+            continue
+
+        # -------------------------------
+        # decode machine
+        # -------------------------------
+
+        machine = (
+            (action - 1)
+            % n_machines
+        )
+
+        # -------------------------------
+        # decode job
+        # -------------------------------
+
+        job = (
+            (action - 1)
+            // n_machines
+        )
+
+        # -------------------------------
+        # precedence in job
+        # -------------------------------
+
+        if job not in job_counts:
+
+            job_counts[job] = 0
+
+        else:
+
+            job_counts[job] += 1
+
+        precedence = job_counts[job]
+
+        # -------------------------------
+        # append
+        # -------------------------------
+
+        queue_machines[
+            machine
+        ].append(
+            (
+                action,
+                job,
+                precedence
+            )
+        )
+
+    return queue_machines
+
+
+
+def get_job_counts_mautil(
+    actions,
+    td,
+    n_machines
+):
+    """
+    Returns:
+
+    1.
+    How many actions belong
+    to each job
+
+    2.
+    TRUE job lengths from env
+    """
+
+    num_jobs = td[
+        "job_ops_adj"
+    ].shape[1]
+
+    # actions per job
+    job_counts = torch.zeros(
+        num_jobs,
+        dtype=torch.long
+    )
+
+    for action in actions:
+
+        action = action.item()
+
+        if action == 0:
+            continue
+
+        # RL4CO:
+        # action = job * n_machines + machine
+        job = (
+            (action - 1)
+            // n_machines
+        )
+
+        job_counts[job] += 1
+
+    # TRUE env job lengths
+    job_lengths = (
+        td["job_ops_adj"][0]
+        .sum(dim=1)
+        .long()
+    )
+
+    return (
+        job_counts,
+        job_lengths
+    )
+
+def check_processing_times(
+    start_times,
+    finish_times,
+    min_processing_time,
+    max_processing_time
+):
+    """
+    Checks whether all scheduled operations
+    have durations within the allowed range.
+    """
+
+    durations = finish_times - start_times
+
+    # Remove padded / unscheduled operations
+    valid_mask = finish_times < 9999
+
+    valid_durations = durations[valid_mask]
+
+    too_small = valid_durations < min_processing_time
+    too_large = valid_durations > max_processing_time
+
+    invalid_mask = too_small | too_large
+    if invalid_mask.any():
+
+        print('found invalid processing duration ranges:')
+        print(valid_durations)
+        print(
+            f"\nAny invalid durations? "
+            f"{invalid_mask.any()}"
+        )
+        print("\nInvalid durations:")
+        print(
+            valid_durations[
+                invalid_mask
+            ]
+        )
+
+
+def schedule_single_instance_mautil(
+    td,
+    env,
+    actions,
+    order=True # include ordered assignments ma_assignments, specifying in what order the assignments were done
+):
+    device = td.device
+
+    ops_ma_adj_before_schedule = td['ops_ma_adj'].clone()
+    proc_times_before_schedule = td['proc_times'].clone()
+
+    _, n_machines, _ = (
+        td["ma_assignment"].shape
+    )
+
+    # -------------------------------------------------
+    # Build queues
+    # -------------------------------------------------
+
+    queue_machines = (
+        make_queue_mautil(
+            actions,
+            n_machines
+        )
+    )
+    num_jobs = td["job_ops_adj"].shape[1]
+    job_counter = [0 for _ in range(num_jobs)]
+
+    while not td['done'].all():
+
+        scheduled = False
+
+        for machine, action_job_predecence in queue_machines.items():
+            
+            # if all operations for machine scheduled already
+            if len(action_job_predecence) == 0:
+                continue
+
+            # if the machine for the operation is not busy
+            if td["busy_until"][0][machine] > td["time"]:
+                continue
+
+            next_item = action_job_predecence[0]
+            action = next_item[0]
+            job = next_item[1]
+            precedence = next_item[2]
+
+            # if the predesecor of the operation has been scheduled
+            if job_counter[ job ] != precedence:
+                continue
+            
+            # if another operation on the same job is currently being processed, but is still not done
+            if td["job_in_process"][0][job]:
+                continue
+
+
+            popped_item = action_job_predecence.pop(0)
+            action = popped_item[0]
+
+            # uncomment in case debugging is needed
+            '''
+            print(
+                f'scheduling action {action} '
+                f'for machine {machine} '
+                f'busy machines: {td['busy_until'][0]}, '
+                f'at time {td["time"]} '
+                f'actions left on machine: {action_job_predecence} '
+                f', all done? {td['done'].all()} ... {td['done']}'
+            )
+            print(f'queue machines: {queue_machines}')
+            '''
+
+            td["action"] = torch.tensor([action])
+
+            td = env.step(td)["next"]
+            job_counter[ job ] += 1
+            scheduled = True
+           
+
+
+        # IMPORTANT:
+        # nothing scheduled -> let env advance time
+        if not scheduled:
+            td["action"] = torch.tensor([0])
+            td = env.step(td)["next"]
+
+
+    # Check if there are any invalid processing times (times less or larger than the enviroment was generated with)
+    valid_proc_times = proc_times_before_schedule[ proc_times_before_schedule > 0]
+    min_processing_time = valid_proc_times.min().item()
+    max_processing_time = valid_proc_times.max().item()
+    check_processing_times(
+        td['start_times'],
+        td['finish_times'],
+        min_processing_time=min_processing_time,
+        max_processing_time=max_processing_time
+    )
+
+    # checking if any operation is assigned to a machine that cannot process it
+    invalid = (
+        (td['ma_assignment'] == 1)
+        & (ops_ma_adj_before_schedule == 0)
+    )
+    if invalid.any():
+        print("scheduled to invalid machine")
+        print(invalid.any())
+        print(torch.where(invalid))
+
+
+    path_save_image = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/sched_mautil.png'
+    env.render(td, 0)
+    if path_save_image:
+        plt.savefig(
+            path_save_image,
+            dpi=150,
+            bbox_inches='tight'
+        )
+
+
+    ordered_assignments = None
+    exit()
+
+    return (
+        td,
+        ordered_assignments
+    )
+
+
+def schedule_batch_instances_mautil(
+    env,
+    td,
+    all_actions,
+    order=True
+):
+
+    batch_size = all_actions.shape[0]
+
+    td_scheduled_list = []
+
+    ordered_assignments_list = []
+
+    actions_taken_b0 = None
+
+    # -------------------------------------------------
+    # Schedule ONE batch instance at a time
+    # -------------------------------------------------
+
+    for b in range(batch_size):
+
+        print(
+            f'\nScheduling batch {b}'
+        )
+
+        td_single = td[
+            b:b+1
+        ].clone()
+
+        actions_single = (
+            all_actions[b]
+        )
+
+        (
+            td_single,
+            ordered_assignments,
+            actions_taken
+        ) = schedule_single_instance_mautil(
+            td_single,
+            env,
+            actions_single,
+            order
+        )
+
+        td_scheduled_list.append(
+            td_single
+        )
+
+        ordered_assignments_list.append(
+            ordered_assignments
+        )
+
+        if b == 0:
+
+            actions_taken_b0 = (
+                actions_taken
+            )
+
+    # -------------------------------------------------
+    # Concatenate outputs
+    # -------------------------------------------------
+
+    td_scheduled = torch.cat(
+        td_scheduled_list,
+        dim=0
+    )
+
+    ordered_assignments = torch.cat(
+        ordered_assignments_list,
+        dim=0
+    )
+
+    return (
+        td_scheduled,
+        ordered_assignments,
+        actions_taken_b0
+    )
+
+
 
 
 
