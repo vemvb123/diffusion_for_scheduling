@@ -273,7 +273,7 @@ def four():
     
     return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
      
-def mk01():
+def mk01(mautil: bool = False):
     filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
     parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     logging.info(parameters)
@@ -299,19 +299,26 @@ def mk01():
     run_epochs = 50
 
 
-    graph_name = f"mk01"
 
     full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
 
+    graph_name = f"mk01"
     graph_save_folder = f"{full_path}/results/mk01" 
 
     train_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01'
     test_dataset_path = f'{full_path}/data/batched_mk01_10j_6ma_6op_mk01_TEST'
 
     model_path_enc = f'{full_path}/models/mk01/mk01.pth'
-
     model_path_adj = f'{full_path}/models/mk01/mk01.pth'
     
+    if mautil:
+        train_dataset_path = train_dataset_path + '_mautil'
+        test_dataset_path = train_dataset_path + '_TEST'
+        model_path_adj = f'{full_path}/models/mk01/mk01_mautil.pth'
+        model_path_enc = f'{full_path}/models/mk01/mk01_mautil.pth'
+        graph_name = graph_name + '_mautil'
+
+
     return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
     
 
@@ -519,9 +526,10 @@ def mk10():
 
 
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = four()
-generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk05()
+# generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk05()
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk10()
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk01()
+generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk01(mautil=True)
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk02()
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk03()
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk04()

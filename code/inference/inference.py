@@ -324,17 +324,53 @@ def inference_guide(
         smart_init=False,
         job_lengths=None,
         td=None,
+        valid_h = 6, valid_w = 55
         ):
+
+
+
+
 
     device = "cuda"
     print(f"Using model {model_path}, with timesteps {timesteps}, and cos: {cos}")
 
-    model = deepinv.models.DiffUNet(
-        in_channels=4, out_channels=1, pretrained=Path(model_path)
-    ).to(device)
+    model = None
+    optimizer = None
+
+    try:
+        model = deepinv.models.DiffUNet(
+            in_channels=4,
+            out_channels=1,
+            pretrained=Path(model_path)
+        ).to(device)
+
+    except Exception as e:
+        print('There was an error loading with path. Loading model by dictinary instead')
+        # print(f'errir: {e}')
+        checkpoint = torch.load(model_path, map_location=device)
+
+        model = deepinv.models.DiffUNet(in_channels=4, out_channels=1, pretrained=None)
+        model = model.to(device)
+        model.load_state_dict(checkpoint["model_state_dict"])
+
+        # define optimizer BEFORE loading its state
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+
+        if "optimizer_state_dict" in checkpoint:
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
 
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logging.info(f"Amount of trainable parameters: {trainable_params}")
+
+
+
+
+
+
+
+
+
 
 
     # beta start var opprinnelig 1e-4
@@ -355,8 +391,6 @@ def inference_guide(
 
 
 
-    valid_h = 6   # valid rows
-    valid_w = 55  # valid columns
     device = 'cuda'  # or 'cpu'
 
 

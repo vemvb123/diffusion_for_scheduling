@@ -4,10 +4,10 @@ end kjøringa når loss er for det meste under 0.015-0.010
 ops... for mk01 ser det ut som om loss gikk til rundt 0.01-0.02 for test (litt lavere for train, men ikke veldig).. den trente i 15 epoker
 ...
 kjøringer:
-datasett for mk01 mautil
-mk01 ddpm conf
+trening mk01 for mautil
 mk10 ddpm conf
-mk01 guide conf
+mk10 guide conf
+mk01 random conf
 ..
 videre:
 skjekk om lessutil modell faktisk skedulerer mindre

@@ -219,7 +219,8 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
                 cos=cos,
                 smart_init=False,
                 job_lengths=compute_job_lengths(td["ops_sequence_order"]),
-                td=td
+                td=td,
+                valid_h=valid_h, valid_w=valid_w
             )
             eta = 0.9
             """
@@ -655,6 +656,6 @@ if sys.argv[2] == 'inf':
 # ins = None
 # inference_type = random, guide, ddpm
 for i in range(times):
-    get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "guide")
+    get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "random")
 # exit()
 # TODO hvis skal laghe intervall... Husk ta vekk exit greier, og husk å tracke skippa actions onklig..
