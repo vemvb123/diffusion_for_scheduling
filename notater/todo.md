@@ -5,11 +5,19 @@ ops... for mk01 ser det ut som om loss gikk til rundt 0.01-0.02 for test (litt l
 ...
 kjøringer:
 trening mk01 for mautil
-mk10 ddpm conf
-mk10 guide conf
-mk10 random conf
+trening mk06
+
+
 ..
 videre:
+batch replacement mk01
+batch replacement mk10
+noe som kort viser mautil for trent modell der
+noe kort statistisk som viser machine busy tid = høyere makespan mk01
+trening mk07/08/09
+
+
+
 skjekk om lessutil modell faktisk skedulerer mindre
 fikse sched problem mk05
 skaff konf intervall for mk05 og mk03

@@ -79,14 +79,14 @@ def get_benchmark_values(benchmark_instance: str):
 
     elif benchmark_instance == "mk06":
         checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_10j_10ma_15op_mk06.ckpt'
-        model_path = None
+        model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk06/mk06_0.0001.pth'
         dataset_train_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_10j_10ma_15op_mk06'
         dataset_test_path = dataset_train_path + '_TEST'
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk06.txt'
-        valid_h = None
-        valid_w = None
-        w = None
-        h = None 
+        valid_h = 10
+        valid_w = 150
+        w = 152
+        h = 24
         name = "10j_10ma_15op_mk06"
 
 
