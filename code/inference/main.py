@@ -482,6 +482,7 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
  
     path_before_csv = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals'
     csv_path = f"{path_before_csv}/batch_runs_metrics_{benchmark}_{inference_type}.csv"
+    print(f'writing results to {csv_path}')
     confidence_interval_utils.append_results(
         csv_path,
         min_makespan, avg_makespan, max_makespan, elapsed,
@@ -652,10 +653,10 @@ benchmark = sys.argv[1]
 ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
 times = 1
 if sys.argv[2] == 'inf':
-    times = 500
+    times = 500 - 354
 # ins = None
 # inference_type = random, guide, ddpm
 for i in range(times):
-    get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "random")
+    get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "ddpm")
 # exit()
 # TODO hvis skal laghe intervall... Husk ta vekk exit greier, og husk å tracke skippa actions onklig..

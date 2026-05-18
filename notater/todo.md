@@ -7,7 +7,7 @@ kjøringer:
 trening mk01 for mautil
 mk10 ddpm conf
 mk10 guide conf
-mk01 random conf
+mk10 random conf
 ..
 videre:
 skjekk om lessutil modell faktisk skedulerer mindre

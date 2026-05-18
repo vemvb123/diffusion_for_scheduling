@@ -28,6 +28,10 @@ def append_results(csv_path,
             writer = csv.writer(f)
             writer.writerow(fieldnames)
 
+    line_num = None
+    with open(csv_path, "r", newline="") as f:
+        line_num = sum(1 for _ in f) + 1   # line where new row will be written
+
     # Append this batch’s results
     with open(csv_path, "a", newline="") as f:
         writer = csv.writer(f)
@@ -42,6 +46,10 @@ def append_results(csv_path,
             total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix,
             infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix
         ])
+
+    print(f'appended results to {csv_path}')
+    print(f'appended results to line {line_num}')
+    print(' ')
 
 
 
