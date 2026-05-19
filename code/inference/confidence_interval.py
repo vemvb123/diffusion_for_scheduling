@@ -107,77 +107,90 @@ import pandas as pd
 import numpy as np
 from scipy.stats import ttest_ind
 
-def test_better():
+
+def test_better(file_original, file_improv, output_file, field1_mean, field2_test):
     folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals/'
 
-    field = 'total_error'
-    field2 = 'min_makespan'
+    field = field1_mean
+    field2 = field2_test
 
-    # Gamma
-    gamma_df = pd.read_csv(f"{folder}/batch_runs_metrics_mk01_guide_gamma1.csv")
+    # Improved model
+    file_improv_df = pd.read_csv(f"{folder}/{file_improv}")
 
-    # DDPM
-    ddpm_df = pd.read_csv(f"{folder}/batch_runs_metrics_mk01_ddpm.csv")
+    # Original model
+    file_original_df = pd.read_csv(f"{folder}/{file_original}")
 
     # Extract columns
-    gamma = gamma_df[field]
-    ddpm = ddpm_df[field]
+    file_improv_cols = file_improv_df[field]
+    file_original_cols = file_original_df[field]
 
     # Means
-    mean_gamma = gamma.mean()
-    mean_ddpm = ddpm.mean()
+    mean_file_improv = file_improv_cols.mean()
+    mean_file_original = file_original_cols.mean()
 
-    # Min makespan means
-    mean_makespan_gamma = gamma_df[field2].mean()
-    mean_makespan_ddpm = ddpm_df[field2].mean()
+    # Secondary metric means
+    mean_makespan_file_improv = file_improv_df[field2].mean()
+    mean_makespan_file_original = file_original_df[field2].mean()
 
     # Improvement
-    absolute_improvement = mean_ddpm - mean_gamma
-    percent_improvement = 100 * absolute_improvement / mean_ddpm
+    absolute_improvement = mean_file_original - mean_file_improv
+    percent_improvement = 100 * absolute_improvement / mean_file_original
 
     # Welch t-test
-    t_stat, p_value = ttest_ind(ddpm, gamma, equal_var=False)
+    t_stat, p_value = ttest_ind(
+        file_original_cols,
+        file_improv_cols,
+        equal_var=False
+    )
 
     # Cohen's d
-    n1, n2 = len(ddpm), len(gamma)
+    n1, n2 = len(file_original_cols), len(file_improv_cols)
 
-    var1 = np.var(ddpm, ddof=1)
-    var2 = np.var(gamma, ddof=1)
+    var1 = np.var(file_original_cols, ddof=1)
+    var2 = np.var(file_improv_cols, ddof=1)
 
     pooled_std = np.sqrt(
         ((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2)
     )
 
-    cohens_d = (mean_ddpm - mean_gamma) / pooled_std
+    cohens_d = (
+        mean_file_original - mean_file_improv
+    ) / pooled_std
 
-    # Print
-    print("=== total_error ===")
-    print(f"Gamma mean: {mean_gamma:.6f}")
-    print(f"DDPM mean:  {mean_ddpm:.6f}")
+    # Build output string
+    output = f"""
+        === {field} ===
+        Improved mean: {mean_file_improv:.6f}
+        Original mean: {mean_file_original:.6f}
 
-    print(f"\nExpected improvement:")
-    print(f"  Absolute: {absolute_improvement:.6f}")
-    print(f"  Percent:  {percent_improvement:.2f}%")
+        Expected improvement:
+        Absolute: {absolute_improvement:.6f}
+        Percent:  {percent_improvement:.2f}%
 
-    print(f"\nStatistical test:")
-    print(f"  t-statistic: {t_stat:.4f}")
-    print(f"  p-value:     {p_value:.6e}")
+        Statistical test:
+        t-statistic: {t_stat:.4f}
+        p-value:     {p_value:.6e}
 
-    print(f"\nEffect size:")
-    print(f"  Cohen's d:   {cohens_d:.4f}")
+        Effect size:
+        Cohen's d:   {cohens_d:.4f}
 
-    print("\n=== min_makespan ===")
-    print(f"Gamma mean min_makespan: {mean_makespan_gamma:.6f}")
-    print(f"DDPM mean min_makespan:  {mean_makespan_ddpm:.6f}")
+        === {field2} ===
+        Improved mean {field2}: {mean_makespan_file_improv:.6f}
+        Original mean {field2}: {mean_makespan_file_original:.6f}
+    """
+
+    # Write to file
+    output_path = f"{folder}/{output_file}"
+
+    with open(output_path, "w") as f:
+        f.write(output)
+
+    print(f"Results written to: {output_path}")
 
 
-# test_better()
-
-
-def compute_bounds():
+def compute_bounds(csv_bench, output_name):
     # Load all stored metrics from CSV
-    folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals/'
-    csv_bench = 'batch_runs_metrics_mk01_guide_gamma1.csv'
+    folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals'
     df = pd.read_csv(f"{folder}/{csv_bench}")
 
     # We want 2.5th and 97.5th percentiles to get a 95% interval
@@ -194,9 +207,34 @@ def compute_bounds():
 
     # Save metric bounds to separate file
     bounds_df = pd.DataFrame(bounds).T
-    bounds_df.to_csv(f"{folder}/metric_bounds_95.csv")
+    bounds_df.to_csv(f"{folder}/{output_name}")
 
-    print("Saved 95% bounds for all metrics to metric_bounds_95.csv")
+    print(f"Saved 95% bounds for all metrics to {output_name}")
+
+'''
+types = ['random', 'ddpm', 'guide']
+benches = ['mk01', 'mk10']
+
+for t in types:
+    for b in benches:
+        output_name = f'intervall/metric_bounds_95_{b}_{t}.csv'
+        csv_bench = f'batch_runs_metrics_{b}_{t}.csv'
+        compute_bounds(csv_bench, output_name)
+'''
 
 
-# compute_bounds()
+
+
+
+benches = ['mk01', 'mk10']
+for b in benches:
+    file_improv = f'batch_runs_metrics_mk01_guide.csv'
+    file_original = f'batch_runs_metrics_mk01_ddpm.csv'
+    output_file = f'statistic_results_mk01_guide_ddpm.csv'
+    field1_mean = 'total_errors'
+    field2_test = 'min_makespan'
+
+    test_better(file_original, file_improv, output_file, field1_mean, field2_test)
+
+
+
