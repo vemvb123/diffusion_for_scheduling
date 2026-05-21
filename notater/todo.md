@@ -4,8 +4,9 @@ end kjøringa når loss er for det meste under 0.015-0.010
 ops... for mk01 ser det ut som om loss gikk til rundt 0.01-0.02 for test (litt lavere for train, men ikke veldig).. den trente i 15 epoker
 ...
 kjøringer:
-trening mk01 for mautil
-trening mk06
+trene mk06
+trene mk07
+target modell mk08
 
 
 ..

@@ -28,6 +28,20 @@ def get_benchmark_values(benchmark_instance: str):
         valid_h = 6
         name = "10j_6ma_6op_mk01"
 
+    elif benchmark_instance == "mk01_mautil":
+        model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/mk01_mautil.pth'
+        dataset_train_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01_mautil'
+
+        dataset_test_path = dataset_train_path + '_TEST'
+        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
+        checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_10j_6ma_6op_mk01.ckpt'
+        w = 64 # unsure if should be actually 60
+        h = 24
+        valid_w = 55
+        valid_h = 6
+        name = "10j_6ma_6op_mk01"
+
+
     elif benchmark_instance == "mk02":
         checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.001_10j_6ma_6op_mk02.ckpt'
         model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk02/mk02.pth'
@@ -92,15 +106,29 @@ def get_benchmark_values(benchmark_instance: str):
 
     elif benchmark_instance == "mk07":
         checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_20j_5ma_5op_mk07.ckpt'
-        model_path = None
+        model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk07/mk07_0.0001.pth'
         dataset_train_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_20j_5ma_5op_mk07'
         dataset_test_path = dataset_train_path + '_TEST'
         filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk07.txt'
+        valid_h = 5
+        valid_w = 100
+        w = 103
+        h = 24
+        name = "20j_5ma_5op_mk07"
+
+
+    elif benchmark_instance == "mk08":
+        checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_20j_10ma_14op_mk08.ckpt'
+        model_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk08/mk08_0.0001.pth'
+        dataset_train_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_20j_10ma_14op_mk08'
+        dataset_test_path = dataset_train_path + '_TEST'
+        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk08.txt'
         valid_h = None
         valid_w = None
         w = None
-        h = None 
-        name = "20j_5ma_5op_mk07"
+        h = None
+        name = "20j_10ma_14op_mk08"
+
 
 
     elif benchmark_instance == "mk10":

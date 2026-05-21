@@ -4,9 +4,11 @@ inference.py contains code for running inference with trained models
 from code.inference.inferenced_to_schedule import show_order_clear
 from code.inference.report_infeasibilities import count_infeasibilities
 from diffusers import CosineDPMSolverMultistepScheduler, DDPMScheduler
-
+import code.inference.utils as utils
 from code.inference.denoise import denoise_ddpm, get_inference_schedule
 
+import code.inference.inferenced_to_schedule
+import code.inference.report_infeasibilities
 import logging
 logging.basicConfig(
     level=logging.INFO,
@@ -33,6 +35,143 @@ def zero_unused_slots(x, ops_ma_adj, valid_h, valid_w, device):
 
 
     return x
+
+
+
+def adj_inference_ddpm_batch_replacement(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, timesteps=1000, jump=None, cos=False, smart_init=False, 
+                                         valid_h=None, valid_w=None, t_replace=None, n_ops=None, ops_sequence_order=None):
+    
+    device = "cuda"
+    print(f"Using model {model_path}, with timesteps {timesteps}, and cos: {cos}")
+
+    model = None
+    optimizer = None
+
+    try:
+        model = deepinv.models.DiffUNet(
+            in_channels=4,
+            out_channels=1,
+            pretrained=Path(model_path)
+        ).to(device)
+
+    except Exception as e:
+        print('There was an error loading with path. Loading model by dictinary instead')
+        # print(f'errir: {e}')
+        checkpoint = torch.load(model_path, map_location=device)
+
+        model = deepinv.models.DiffUNet(in_channels=4, out_channels=1, pretrained=None)
+        model = model.to(device)
+        model.load_state_dict(checkpoint["model_state_dict"])
+
+        # define optimizer BEFORE loading its state
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+
+        if "optimizer_state_dict" in checkpoint:
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logging.info(f"Amount of trainable parameters: {trainable_params}")
+
+
+    # beta start var opprinnelig 1e-4
+    beta_start = 1e-4
+    beta_end = 0.02
+    betas, alphas, alphas_cumprod, = get_inference_schedule(beta_start, beta_end, timesteps, device = "cuda")
+
+    model.eval()
+
+    scheduler = DDPMScheduler(
+        num_train_timesteps=timesteps,
+        beta_start=beta_start,
+        beta_end=beta_end,
+        beta_schedule="squaredcos_cap_v2",  # cosine schedule
+        clip_sample=True,
+        prediction_type="epsilon",
+    )
+
+
+
+    device = 'cuda'  # or 'cpu'
+
+
+
+    given_assignments = []
+    variation_over_time = []
+    
+    x = None
+    with torch.no_grad():
+        x = torch.randn(n_samples, 1, h_when_masked, w_when_masked).to(device)
+
+        features = torch.cat([            
+            proc_times,
+            job_ops_adj,
+            ops_ma_adj,
+        ], dim=1)
+
+        features = features.to(device, dtype=torch.float32)
+        features = features.repeat(n_samples, 1, 1, 1)
+        x = x.to(device, dtype=torch.float32)
+
+        # start timer
+        start_time = time.perf_counter()
+
+        for t in reversed(range(timesteps)):
+            t_tensor = torch.ones(n_samples, device=device).long() * t
+
+            inputs = torch.cat([
+                x,
+                features,
+            ], dim=1)
+
+            predicted_noise = model(inputs, t_tensor, type_t="timestep")
+
+            if cos:
+                x_t = scheduler.step(predicted_noise, t, x).prev_sample
+                diff = x_t[:, :, :6, :60] - x[:, :, :6, :60]
+                if t == 0 or t == 10 or t == 25 or t == 50 or t == 75 or t ==t ==  99:
+                    variation = diff.abs().sum(dim=-1).squeeze(1)
+                    variation_over_time.append(variation)
+                x = x_t
+            else:
+                x = denoise_ddpm(x, t, alphas, alphas_cumprod, betas, predicted_noise)
+
+            # if t % 10 == 0:
+            if t == 0:
+                given_assignments.append(x.clone())
+
+            """
+            if t % 100==0:
+                given_assignments.append(x.clone())
+            """
+
+            x = zero_unused_slots(x, ops_ma_adj, valid_h, valid_w, device)
+
+            if t_replace != None and ( t == t_replace ):
+                print(f'using valid w {valid_w} and valid h {valid_h}, batchreplace at t {t}')
+                x_copy = x[:, :, :valid_h, :valid_w].clone()
+                ops_ma_adj_copy = ops_ma_adj[:, :, :valid_h, :valid_w].clone()
+                ops_sequence_order_copy = ops_sequence_order[:valid_w].clone()
+
+                x_with_order = code.inference.inferenced_to_schedule.show_order_clear(x_copy, n_ops, ops_ma_adj_copy, r_global=True)
+                report, total_errors, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = code.inference.report_infeasibilities.count_infeasibilities(x_with_order, ops_sequence_order_copy, False, valid_h, valid_w)
+                #print(f"replacing at timestep {t}, which forward in time is {timesteps - t}")
+                #print(f"error list was: {error_list}")
+                x = utils.replace_batches_with_fittest(x, error_list)
+
+
+
+
+
+
+    # end timer
+    end_time = time.perf_counter()
+    elapsed = end_time - start_time
+
+    x = torch.clamp(x, 0, 1)
+
+    given_assignments.append(x.clone())
+    return x, elapsed, given_assignments, variation_over_time
 
 
 
@@ -298,7 +437,7 @@ def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, t, eps=0.0, sel
 
     grad_norm = (grad_b * grad_b).sum(dim=(1,2,3), keepdim=True) + 1e-8
 
-    gamma = 1.0
+    gamma = 0.0
 
 
     # gamma = 2.0 * torch.relu(-b).mean(dim=1).view(-1,1,1,1)

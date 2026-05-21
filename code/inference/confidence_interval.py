@@ -2,11 +2,24 @@ import csv
 import os
 import pandas as pd
 
+def append_ma_usage_result(csv_path, ma_usage_count_per_machine):
+
+    columns = [f"ma{i+1}" for i in range(len(ma_usage_count_per_machine))]
+    df = pd.DataFrame([ma_usage_count_per_machine.tolist()], columns=columns)
+
+    df.to_csv(
+        csv_path,
+        mode='a',
+        header=not os.path.exists(csv_path),
+        index=False
+    )
+
+
 def append_results(csv_path,
         min_makespan, avg_makespan, max_makespan, elapsed,
         total_errors, total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p,
         total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix,
-        benchmark
+        benchmark, busy_count
     ):
     
 
@@ -19,7 +32,9 @@ def append_results(csv_path,
 
         # after fixing schedule
         "total_errors_fix", "total_error_fix", "total_error_p_fix", "multi_p_fix", "seq_p_fix",
-        "infeas_rate_fix", "multi_rate_fix", "seq_rate_fix", "amf_infeas_fix", "amt_infeas_p_fix"
+        "infeas_rate_fix", "multi_rate_fix", "seq_rate_fix", "amf_infeas_fix", "amt_infeas_p_fix",
+
+        "busy_count"
     ]
 
     # Write header if file doesn't exist
@@ -44,7 +59,9 @@ def append_results(csv_path,
 
             # after fixing schedule
             total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix,
-            infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix
+            infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix,
+
+            busy_count
         ])
 
     print(f'appended results to {csv_path}')
@@ -54,23 +71,18 @@ def append_results(csv_path,
 
 
 def compute_mean():
-    folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals/'
-    csv_bench = 'batch_runs_metrics_mk01_guide_gamma1.csv'
-    df = pd.read_csv(f"{folder}/{csv_bench}")
-    field = 'total_error'
+    benches = ['mk01', 'mk10']
+    for b in benches:
+        print(b)
+        folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals/'
+        csv_bench = f'batch_runs_metrics_{b}_ddpm.csv'
+        df = pd.read_csv(f"{folder}/{csv_bench}")
+        fields = ['total_error', 'amf_infeas', 'total_error_p']
+        for field in fields:
+            mean = df[field].mean()
+            print(f'{field}: {mean}')
 
-    mean_value_gamma = df[field].mean()
-
-    folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals/'
-    csv_bench = 'batch_runs_metrics_mk01_ddpm.csv'
-    df = pd.read_csv(f"{folder}/{csv_bench}")
-
-    mean_value_ddpm = df[field].mean()
-
-    print(mean_value_gamma)
-    print(mean_value_ddpm)
-
-# compute_mean()
+compute_mean()
 
 
 def percentage_improvment():
@@ -109,7 +121,7 @@ from scipy.stats import ttest_ind
 
 
 def test_better(file_original, file_improv, output_file, field1_mean, field2_test):
-    folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals/'
+    folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals'
 
     field = field1_mean
     field2 = field2_test
@@ -224,17 +236,19 @@ for t in types:
 
 
 
-
-
+'''
 benches = ['mk01', 'mk10']
 for b in benches:
-    file_improv = f'batch_runs_metrics_mk01_guide.csv'
-    file_original = f'batch_runs_metrics_mk01_ddpm.csv'
-    output_file = f'statistic_results_mk01_guide_ddpm.csv'
+    t_improv = 'batchrep'
+    t_original = 'ddpm'
+    file_improv = f'batch_runs_metrics_{b}_{t_improv}.csv'
+    file_original = f'batch_runs_metrics_{b}_{t_original}.csv'
+    output_file = f'statistic/statistic_results_{b}_{t_improv}_{t_original}.csv'
     field1_mean = 'total_errors'
     field2_test = 'min_makespan'
 
     test_better(file_original, file_improv, output_file, field1_mean, field2_test)
 
+'''
 
 

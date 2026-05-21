@@ -156,7 +156,7 @@ def dataset_ma_util(problem_type):
 def check_benchmark_parameters():
     print("checking benchmark parameters...")
     #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
-    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
+    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk08.txt'
     #filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
@@ -169,7 +169,7 @@ def check_benchmark_parameters():
 def check_dataset():
     # --- process test image
     instance_idx = 10
-    _, _, dataset_folder, _, _, _, _, _, _, _ = get_benchmark_values('mk06')
+    _, _, dataset_folder, _, _, _, _, _, _, _ = get_benchmark_values('mk07')
     td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
 
 
@@ -213,12 +213,12 @@ def check_dataset():
 
 # mk05 er: 
 
-check_dataset()
+# check_dataset()
 #instance_type = "mk01"
 
 
 # dataset_ma_util('mk01')
-# check_benchmark_parameters()
+check_benchmark_parameters()
 
 
 

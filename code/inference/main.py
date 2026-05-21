@@ -72,8 +72,10 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
     # TODO skjekk om samme dimensjoner
     # benchmark_instance = None
     if benchmark_instance is None:
+        print('instance from dataset')
         td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
     else:
+        print('benchmark instance')
         td = benchmark_utils.make_td_from_benchmark_working(benchmark_instance)
     target_assignments, proc_times, job_ops_adj, ops_ma_adj, ops_sequence_order, opt_actions = dataset_utils.get_dataset_features(td, env, order, mask_h, mask_w, 
                                                                                                                                   include_ops_sequence=True, 
@@ -116,6 +118,8 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
 
         timesteps = None
         if problem_type == 'mk01':
+            timesteps = 100
+        if problem_type == 'mk01_mautil':
             timesteps = 100
         if problem_type == 'mk02':
             timesteps = 100
@@ -168,7 +172,6 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         ## == CACHE
         # inference_assignments, elapsed, assignments_over_time, columns_done, done_at_t = cache_inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, order, mask_h, mask_w, after_ts_check, valid_h, valid_w, n_ops, threshold )
         # ==== ERSTATTER BATCHES
-        t_replace = 92
         cos = True
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddpm_batch_influence(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, t_replace, ops_sequence_order, valid_h, valid_w, n_ops)
         #inference_assignments, elapsed, assignments_over_time = experimental.adj_inference_ddpm_batch_improvement(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, valid_h=valid_h, valid_w=valid_w, timesteps=timesteps, cos=True, t_replace=t_replace, ops_sequence_order=ops_sequence_order, n_ops=n_ops)
@@ -223,6 +226,22 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
                 valid_h=valid_h, valid_w=valid_w
             )
             eta = 0.9
+
+        # BATCH REPLACEMENT
+        if inference_type == "batchrep":
+            print("doing inference guided")
+            t_replace = 7
+            print(f'batch replace is {t_replace}')
+            inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.adj_inference_ddpm_batch_replacement(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
+                jump=None, 
+                cos=cos,
+                smart_init=False,
+                valid_h=valid_h, valid_w=valid_w, t_replace=t_replace, n_ops=n_ops, ops_sequence_order=ops_sequence_order
+            )
+            eta = 0.9
+
+
+
             """
         #inference_assignments, elapsed, assignments_over_time = inference.adj_inference_ddim(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, eta, ddim_steps)
         # === LOOK AHEAD
@@ -355,7 +374,7 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
 
 
 
-def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs, problem_type, benchmark_instance = None, inference_type = "ddpm"):
+def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs, problem_type, benchmark_instance = None, inference_type = "ddpm", result_path_name=None):
     print("inside get inference cached")
     # TODO endre hvis bruker annet
     td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path, report_file_path_fix, n_ops = get_inference_result(problem_type, instance_idx, model_type, order, benchmark_instance, inference_type)
@@ -455,7 +474,7 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     n_machines = valid_h
     print(f'n machines... {n_machines}')
     print(f'n jobs... {n_jobs}')
-    td_scheduled, min_makespan, max_makespan, avg_makespan = schedule.schedule_from_inference(inference_assignments_order, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path,
+    td_scheduled, min_makespan, max_makespan, avg_makespan, busy_count, ma_counts = schedule.schedule_from_inference(inference_assignments_order, order, env, td.copy(), graph_save_path, n_jobs, n_machines, error_list, ops_sequence_order=td["ops_sequence_order"], report_file_path=report_file_path,
                                                                                               fill_gaps=True)
     code.inference.report_infeasibilities.add_makespans_report(min_makespan, max_makespan, avg_makespan, report_file_path)
 
@@ -479,18 +498,28 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     # TODO før også inn invalid actions
     benchmark = problem_type
     print(f'benchmark is {benchmark}')
- 
-    path_before_csv = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals'
-    csv_path = f"{path_before_csv}/batch_runs_metrics_{benchmark}_{inference_type}.csv"
-    print(f'writing results to {csv_path}')
-    confidence_interval_utils.append_results(
-        csv_path,
-        min_makespan, avg_makespan, max_makespan, elapsed,
-        total_errors, total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p,
-        total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix,
-        benchmark
-    )
-   
+    
+    if result_path_name is not None:
+        path_before_csv = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals'
+        csv_path = f"{path_before_csv}/{result_path_name}"
+        print(f'writing results to {csv_path}')
+        confidence_interval_utils.append_results(
+            csv_path,
+            min_makespan, avg_makespan, max_makespan, elapsed,
+            total_errors, total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p,
+            total_errors_fix, total_error_fix, total_error_p_fix, multi_p_fix, seq_p_fix, infeas_rate_fix, multi_rate_fix, seq_rate_fix, amf_infeas_fix, amt_infeas_p_fix,
+            benchmark, busy_count
+        )
+
+        csv_path = f"{path_before_csv}/{result_path_name}"
+        csv_path = csv_path.replace(".csv", "")
+        csv_path += '_ma_usage.csv'
+        confidence_interval_utils.append_ma_usage_result(csv_path, ma_counts)
+
+
+    else: 
+        print('Not recording results, as result_path_name is set to None')
+    
 
 
 
@@ -650,13 +679,34 @@ benchmark = sys.argv[1]
 
 
 
-ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
+# ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
+ins = None
 times = 1
 if sys.argv[2] == 'inf':
-    times = 500 - 354
+    times = 500
 # ins = None
-# inference_type = random, guide, ddpm
-for i in range(times):
-    get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmark, ins, inference_type = "ddpm")
-# exit()
-# TODO hvis skal laghe intervall... Husk ta vekk exit greier, og husk å tracke skippa actions onklig..
+# inference_type = random, guide, ddpm, batchrep
+
+benchmarks = ["mk01_mautil"] # ,"mk01_mautil"
+for b in benchmarks:
+    for i in range(times):
+        # ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
+        inference_type = "ddpm"
+        result_path_name = f"batch_runs_metrics_{b}_{inference_type}.csv"
+        get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, b, ins, inference_type = inference_type, 
+                                    # result_path_name=result_path_name)
+                                    result_path_name=None)
+
+exit()
+
+benchmarks = ["mk01","mk01_mautil"]
+for i in range(2):
+    for t in range(times):
+        inference_type = "ddpm"
+        result_path_name = f"batch_runs_metrics_{benchmarks[i]}_{inference_type}_ignore.csv"
+        get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmarks[i], ins, inference_type = inference_type, result_path_name=result_path_name)
+    # exit()
+    # TODO hvis skal laghe intervall... Husk ta vekk exit greier, og husk å tracke skippa actions onklig..
+
+
+# get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs, problem_type, benchmark_instance = None, inference_type = "ddpm", result_path_name=None):

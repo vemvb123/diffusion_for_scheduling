@@ -1416,16 +1416,23 @@ def validate_actions_mautil(
         # increment AFTER checking
         job_counter[job] += 1
 
-
+# TODO men tar det nå hensyn til at oppgavene har forskjellig prioritet selv om de er på forskjellige maskiner?
+# Nå ordrer jeg kanskje bare ut ifra prioritet på forskjellige maskiner, men ikke global prioritet?
+# men burde jeg? hva hvis maskin er busy, burde man da nødvendigvis vente med å skedulere neste oppgave?
+# det vil nok øke kjøretida... men av oppgaver, burde kanskje prøve å ta den som er globalt først..?
+# kan alternativt lage en annen funksjon, som tar hensyn til slikt, bare for å se
+# da ser jeg på neste oppgave i på hver maskin, og plukker først den med høyest prioritet, så hvis ikke kan sked, så bare går jeg til neste i prioritet
+# når en oppg er skedulert, reordrer jeg etter prioritete neste oppgaver på hver maskin på nytt
 def schedule_single_instance_mautil(
     td,
     env,
     actions,
-    order=True # include ordered assignments ma_assignments, specifying in what order the assignments were done
+    order=True, # include ordered assignments ma_assignments, specifying in what order the assignments were done
+    busy_times=False # record times machine busy when scheduling
 ):
     
 
-
+    busy_times = 0
     device = td.device
 
     ops_ma_adj_before_schedule = td['ops_ma_adj'].clone()
@@ -1488,6 +1495,7 @@ def schedule_single_instance_mautil(
 
             # if the machine for the operation is not busy
             if td["busy_until"][0][machine] > td["time"]:
+                busy_times += 1
                 continue
 
             next_item = action_job_predecence[0]
@@ -1582,16 +1590,19 @@ def schedule_single_instance_mautil(
         )
     '''
     if order:
-        return td, ordered_assignments
+        if busy_times: return td, ordered_assignments, busy_times
+        return td, ordered_assignments, None
     else:
-        return td, None
+        if busy_times: return td, None, busy_times
+        return td, None, None
 
 
 def schedule_batch_instances_mautil(
     env,
     td,
     all_actions,
-    order=True
+    order=True,
+    busy_times=False
 ):
 
     batch_size = all_actions.shape[0]
@@ -1605,7 +1616,7 @@ def schedule_batch_instances_mautil(
     # -------------------------------------------------
     # Schedule ONE batch instance at a time
     # -------------------------------------------------
-
+    busy_count = 0
     for b in range(batch_size):
 
         print(
@@ -1622,13 +1633,16 @@ def schedule_batch_instances_mautil(
 
         (
             td_single,
-            ordered_assignments
+            ordered_assignments,
+            busy
         ) = schedule_single_instance_mautil(
             td_single,
             env,
             actions_single,
-            order
+            order,
+            busy_times
         )
+        busy_count += busy
 
         td_scheduled_list.append(
             td_single
@@ -1657,7 +1671,8 @@ def schedule_batch_instances_mautil(
 
     return (
         td_scheduled,
-        ordered_assignments
+        ordered_assignments,
+        busy_count
     )
 
 
@@ -2081,7 +2096,8 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     print(len(all_actions[0]))
 
 
-    if any("opt_" in key for key in td):
+    # if any("opt_" in key for key in td):
+    if any("opt_" in key for key in td.keys()):
         td.del_("opt_assignment")
         td.del_("opt_assignment_order")
         td.del_("opt_actions")
@@ -2091,6 +2107,8 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
 
         # Wrap in a TensorDict
         td = TensorDict(td, batch_size=[1])
+
+
 
     # Scheduling
     # raise Exception('Kan ikke kjøre enda, fordi out of memory (node var opptatt).. i metode: do_actions i schedule.py ... se om kan returnere invalid actions, og legge i cond rapport .. Exception raised i schedule.py schedule_from_inference')
@@ -2119,7 +2137,7 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     )
     '''
     
-    td_final, ordered_assignments = schedule_batch_instances_mautil(
+    td_final, ordered_assignments, busy_count = schedule_batch_instances_mautil(
         env,
         td_batched,
         all_actions,
@@ -2132,6 +2150,33 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
         td_final[i]
         for i in range(batch_size)
     ]
+
+    # machine utilization
+    ma_all_counts = []
+    for td_check in tds:
+        ma_assignment_check = td_check['ma_assignment']
+        ma_counts = ma_assignment_check.sum(dim=-1).squeeze()
+        ma_all_counts.append(ma_counts)
+
+    ma_all_counts = torch.stack(ma_all_counts)
+    avg_per_row = ma_all_counts.float().mean(dim=0)
+    print('MA USAGE')
+    print(avg_per_row)
+
+    # amount valid operations for each machine
+    '''
+    valids = td['ops_ma_adj']
+    # Count 1s per row
+    # Sum across width dimension (last dim)
+    row_counts = valids.sum(dim=-1)
+
+    print(row_counts.shape)  # [1, 1, H]
+    print(row_counts)
+    print('amount valids')
+    exit()
+    '''
+
+
     # TODO fjern etterpå
     '''
     print('done scheduling')
@@ -2180,10 +2225,13 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     best_index = makespans.index( min(makespans) )
     worst_index = makespans.index( max(makespans) )
     td_best = tds[ best_index ]
+    td_worst = tds[worst_index]
     # best_actions = actions_taken[makespans.index( min(makespans ))]
 
     # p = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/best_actions.pt'
     # torch.save(best_actions, p)
+
+    
 
 
     # TODO ignorer
@@ -2214,12 +2262,13 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
 
 
     # env.render(td_best) # sto tidligere env.render(td_best, 0)
-    '''
-    env.render(td_best.unsqueeze(0), 0)
+    fold = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/scheds'
+    name_sched = 'ddpm_comp_r.png'
+    path_save_image = f'{fold}/{name_sched}'
+    env.render(td_worst.unsqueeze(0), 0)
     if path_save_image:
         plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
         print(f"Saved scheduled image at path {path_save_image}")
-    '''
     # TODO ukkomenter etterpå
     '''
     denom = len(all_actions[0])
@@ -2240,7 +2289,7 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
     # print(f"invalid action counter rates: {invalid_actions_counter_rate}")
     '''
 
-    return td_best, min_makespan, max_makespan, avg_makespan
+    return td_best, min_makespan, max_makespan, avg_makespan, busy_count, avg_per_row
 
 
 
