@@ -36,54 +36,7 @@ def main(instance_type = None):
         print("done making 444")
         exit()
 
-    dataset_folder = None
-    filepath_benchmark_instance = None
-    target_model = None
-
-    if int(sys.argv[1]) == 1:
-        print("making mk15 dataset")
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk15_30j_15ma_11op'
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk15.txt'
-        # TODO har ikke target model fyllt inn her...
-
-    elif int(sys.argv[1]) == 2:
-        print("making mk10 dataset")
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk10_20j_15ma_14op'
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk10.txt'
-        target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.001_20j_15ma_14op_mk10.ckpt'
-
-    elif int(sys.argv[1]) == 3:
-        print("making 18a dataset")
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_18a_20j_10ma_25op'
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
-        target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.001_20j_10ma_25op_18a.ckpt'
-
-    elif int(sys.argv[1]) == 4:
-        print("making mk02 dataset")
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_10j_6ma_6op_mk02'
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk02.txt'
-        target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.001_10j_6ma_6op_mk02.ckpt'
-
-    elif int(sys.argv[1]) == 5:
-        print("making mk03 dataset")
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_8ma_10op_mk03'
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk03.txt'
-        target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_15j_8ma_10op_mk03.ckpt'
-
-    elif int(sys.argv[1]) == 6:
-        print("making mk04 dataset")
-        dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_15j_8ma_9op_mk04'
-        filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk04.txt'
-        target_model = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001_15j_8ma_9op_mk04.ckpt'
-
-    elif int(sys.argv[1]) == 7:
-        target_model, _, dataset_folder, _, filepath_benchmark_instance, _, _, _, _, _ = get_benchmark_values('mk05')
-
-    elif int(sys.argv[1]) == 8:
-        target_model, _, dataset_folder, _, filepath_benchmark_instance, _, _, _, _, _ = get_benchmark_values('mk06')
-
-    elif int(sys.argv[1]) == 9:
-        target_model, _, dataset_folder, _, filepath_benchmark_instance, _, _, _, _, _ = get_benchmark_values('mk07')
+    target_model, _, dataset_folder, _, filepath_benchmark_instance, _, _, _, _, _ = get_benchmark_values(sys.argv[1])
 
 
 
@@ -169,7 +122,7 @@ def check_benchmark_parameters():
 def check_dataset():
     # --- process test image
     instance_idx = 10
-    _, _, dataset_folder, _, _, _, _, _, _, _ = get_benchmark_values('mk07')
+    _, _, dataset_folder, _, _, _, _, _, _, _ = get_benchmark_values('mk08')
     td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
 
 
@@ -211,6 +164,8 @@ def check_dataset():
 # {'n_jobs': 15, 'n_machines': 8, 'min_processing_time': 1, 'max_processing_time': 9, 'fewest_operations': 3, 'most_operations': 9, 'min_machine_options': 1, 'max_machine_options': 3}
 
 
+main()
+
 # mk05 er: 
 
 # check_dataset()
@@ -218,7 +173,7 @@ def check_dataset():
 
 
 # dataset_ma_util('mk01')
-check_benchmark_parameters()
+# check_benchmark_parameters()
 
 
 
