@@ -1597,6 +1597,323 @@ def schedule_single_instance_mautil(
         return td, None, None
 
 
+
+
+def make_queue_mautil_alt(
+    actions,
+    n_machines
+):
+
+    """
+    Returns:
+
+    {
+        (
+            action,
+            job,
+            precedence_in_job,
+            machine
+        ),
+        ...
+    }
+    """
+
+    # -----------------------------------
+    # machine queues
+    # -----------------------------------
+
+    queue_machines = []
+
+    for machine in range(n_machines):
+
+        queue_machines[machine] = []
+
+    # -----------------------------------
+    # count occurrences per job
+    # -----------------------------------
+
+    job_counts = {}
+
+    # -----------------------------------
+    # process actions in order
+    # -----------------------------------
+
+    for action in actions.tolist():
+
+        if action == 0:
+            continue
+
+        # -------------------------------
+        # decode machine
+        # -------------------------------
+
+        machine = (
+            (action - 1)
+            % n_machines
+        )
+
+        # -------------------------------
+        # decode job
+        # -------------------------------
+
+        job = (
+            (action - 1)
+            // n_machines
+        )
+
+        # -------------------------------
+        # precedence in job
+        # -------------------------------
+
+        if job not in job_counts:
+
+            job_counts[job] = 0
+
+        else:
+
+            job_counts[job] += 1
+
+        precedence = job_counts[job]
+
+        # -------------------------------
+        # append
+        # -------------------------------
+
+        queue_machines.append(
+            (
+                action,
+                job,
+                precedence,
+                machine
+            )
+        )
+
+    return queue_machines
+
+
+
+# TODO:
+# X at det merkes når alle actions på en maskin gjort (kan kanskje telle på forhånd, til ta minus hver gang sked til en maskin)
+# X kun går fram i tid når alle maskiner er skedulert til
+# X når alle actions for en maskin er gjort, skal man kunne progressere selv om noe ikke er skedulert til maskin
+# X starter fra toppen av liste når en action skedulert
+# X når action skedulert, tar man den ut fra lista i queue
+# X hvis action ikke kan skeduleres, går man bare til neste action
+def schedule_single_instance_mautil_alt(
+    td,
+    env,
+    actions,
+    order=True, # include ordered assignments ma_assignments, specifying in what order the assignments were done
+    busy_times=False # record times machine busy when scheduling
+):
+    
+
+    busy_times = 0
+    device = td.device
+
+    ops_ma_adj_before_schedule = td['ops_ma_adj'].clone()
+    proc_times_before_schedule = td['proc_times'].clone()
+    job_lengths = (
+        td["job_ops_adj"][0]
+        .sum(dim=1)
+        .tolist()
+    )
+
+    _, n_machines, _ = (
+        td["ma_assignment"].shape
+    )
+
+    # used to debug if all actions are on valid machines for the operations
+    '''
+    print(ops_ma_adj_before_schedule)
+    print(job_lengths)
+    print('..')
+    validate_actions_mautil(actions, ops_ma_adj_before_schedule[0], job_lengths, n_machines)
+    '''
+
+
+    # -------------------------------------------------
+    # Build queues
+    # -------------------------------------------------
+
+    queue_machines = (
+        make_queue_mautil_alt(
+            actions,
+            n_machines
+        )
+    )
+    duplicates = check_duplicate_job_precedence(queue_machines)
+
+    num_jobs = td["job_ops_adj"].shape[1]
+    job_counter = [0 for _ in range(num_jobs)]
+
+    # track order of assignments
+    prev_adj = td["ma_assignment"].clone()
+
+    ordered_assignments = torch.zeros_like(
+        prev_adj,
+        dtype=torch.float
+    )
+
+    actions_assigned = 0
+    job_actions_done = [[] for i in range(num_jobs)]
+    is_ma_unavailable = [False for i in range(n_machines)]
+
+    # TODO Jeg lurer på om machine kanskje starter fra 1??? tror starter på 0
+    n_ops_on_ma = [0 for i in range(n_machines)]
+    for _, _, _, machine in queue_machines:
+        n_ops_on_ma[machine] += 1
+
+
+    # schedule
+    while not td['done'].all():
+
+        i = 0
+        # all machines busy, go forward in time
+        while not all(is_ma_unavailable):
+            
+            # TODO fjern hvis aldri inntreffer
+            if i >= len(queue_machines):
+                print("debug, vrfr skjer")
+                i = 0
+
+
+            action_job_precedence_machine = queue_machines[i]
+            action = action_job_precedence_machine[0]
+            job = action_job_precedence_machine[1]
+            precedence = action_job_precedence_machine[2]
+            machine = action_job_precedence_machine[3]
+
+           
+            # if all operations for machine scheduled already
+            # if n_ops_on_ma[machine] == 0:
+            #     continue
+
+            # if the machine for the operation is not busy
+            if td["busy_until"][0][machine] > td["time"]:
+                busy_times += 1
+                i+=1
+                continue
+
+            # if the predesecor of the operation has been scheduled
+            if job_counter[ job ] != precedence:
+                i+=1
+                continue
+            
+            # if another operation on the same job is currently being processed, but is still not done
+            if td["job_in_process"][0][job]:
+                i+=1
+                continue
+
+
+            popped_item = queue_machines.pop(i)
+            action = popped_item[0]
+
+            # uncomment in case debugging is needed
+            '''
+            print(
+                f'scheduling action {action} '
+                f'for machine {machine} '
+                f'busy machines: {td['busy_until'][0]}, '
+                f'at time {td["time"]} '
+                f'actions left on machine: {action_job_predecence} '
+                f', all done? {td['done'].all()} ... {td['done']}'
+            )
+            print(f'queue machines: {queue_machines}')
+            '''
+
+            td["action"] = torch.tensor([action])
+
+            td = env.step(td)["next"]
+            i = 0
+            job_actions_done[ job ].append(popped_item)
+            job_counter[ job ] += 1
+            n_ops_on_ma[machine] -= 1
+            is_ma_unavailable[machine] = True
+
+            # track order of assignments
+            if order:
+                new_adj = td["ma_assignment"]
+                diff = (
+                    (new_adj == 1)
+                    & (prev_adj == 0)
+                )
+                if diff.any():
+                    actions_assigned += 1
+                    ordered_assignments[
+                        diff
+                    ] = actions_assigned
+                prev_adj = new_adj.clone()
+
+            
+
+
+        # IMPORTANT:
+        # nothing scheduled -> let env advance time
+        # if all(is_ma_unavailable):
+        if queue_machines:
+            td["action"] = torch.tensor([0])
+            td = env.step(td)["next"]
+
+            # refreshing list of busy machines
+            is_ma_unavailable = [
+                td["busy_until"][0][i] > td["time"] # machine is currently busy
+                or n_ops_on_ma[i] == 0 # all ops on ma done. noting as scheduling so time can progress
+                for i in range(n_machines)
+            ]
+
+
+
+    # Check if there are any invalid processing times (times less or larger than the enviroment was generated with)
+    valid_proc_times = proc_times_before_schedule[ proc_times_before_schedule > 0]
+    min_processing_time = valid_proc_times.min().item()
+    max_processing_time = valid_proc_times.max().item()
+    check_processing_times(
+        td['start_times'],
+        td['finish_times'],
+        min_processing_time=min_processing_time,
+        max_processing_time=max_processing_time
+    )
+
+    # checking if any operation is assigned to a machine that cannot process it
+    invalid = (
+        (td['ma_assignment'] == 1)
+        & (ops_ma_adj_before_schedule == 0)
+    )
+    if invalid.any():
+        print("scheduled to invalid machine")
+        print(invalid.any())
+        print(torch.where(invalid))
+
+    '''
+    path_save_image = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/sched_mautil.png'
+    env.render(td, 0)
+    if path_save_image:
+        plt.savefig(
+            path_save_image,
+            dpi=150,
+            bbox_inches='tight'
+        )
+    '''
+    if order:
+        if busy_times: return td, ordered_assignments, busy_times
+        return td, ordered_assignments, None
+    else:
+        if busy_times: return td, None, busy_times
+        return td, None, None
+
+
+
+
+
+
+
+
+
+
+
+
+
 def schedule_batch_instances_mautil(
     env,
     td,

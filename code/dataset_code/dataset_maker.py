@@ -141,8 +141,8 @@ def make_instance(
     env = FJSPEnv(
         generator_params=generator_params,
         _torchrl_mode=True,
-        stepwise_reward=True,
-        mask_no_ops=False
+        stepwise_reward=True
+        # mask_no_ops=False
     )
     td = env.reset(batch_size=[batch_size])
     return env, td, generator_params

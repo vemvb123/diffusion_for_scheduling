@@ -107,9 +107,9 @@ def dataset_ma_util(problem_type):
 
 
 def check_benchmark_parameters():
-    print("checking benchmark parameters...")
+    print(f"checking benchmark parameters... {sys.argv[1]}")
     #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
-    filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk08.txt'
+    filepath_brandimarte_instance = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{sys.argv[1]}.txt'
     #filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
@@ -164,7 +164,7 @@ def check_dataset():
 # {'n_jobs': 15, 'n_machines': 8, 'min_processing_time': 1, 'max_processing_time': 9, 'fewest_operations': 3, 'most_operations': 9, 'min_machine_options': 1, 'max_machine_options': 3}
 
 
-main()
+# main()
 
 # mk05 er: 
 
@@ -173,7 +173,7 @@ main()
 
 
 # dataset_ma_util('mk01')
-# check_benchmark_parameters()
+check_benchmark_parameters()
 
 
 
