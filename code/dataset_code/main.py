@@ -164,7 +164,7 @@ def check_dataset():
 # {'n_jobs': 15, 'n_machines': 8, 'min_processing_time': 1, 'max_processing_time': 9, 'fewest_operations': 3, 'most_operations': 9, 'min_machine_options': 1, 'max_machine_options': 3}
 
 
-# main()
+main()
 
 # mk05 er: 
 
@@ -173,7 +173,7 @@ def check_dataset():
 
 
 # dataset_ma_util('mk01')
-check_benchmark_parameters()
+# check_benchmark_parameters()
 
 
 

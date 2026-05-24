@@ -676,17 +676,17 @@ h = 4
 n_jobs = 4
 
 
-benchmark = sys.argv[1]
+# benchmark = sys.argv[1]
 
 
 
 times = 1
-if sys.argv[2] == 'inf':
+if sys.argv[1] == 'inf':
     times = 500
 # ins = None
 # inference_type = random, guide, ddpm, batchrep
 
-benchmarks = ["mk01"] # ,"mk01_mautil"
+benchmarks = ['mk02', 'mk03', 'mk04', 'mk05', 'mk06', 'mk07'] # ,"mk01_mautil"
 for b in benchmarks:
     for i in range(times):
         # ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
@@ -694,10 +694,10 @@ for b in benchmarks:
         result_path_name = f"batch_runs_metrics_{b}_{inference_type}.csv"
         get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, b, 
                                     # benchmark_instance=None, 
-                                    benchmark_instance = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt',
+                                    benchmark_instance = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{b}.txt',
                                     inference_type = inference_type, 
-                                    # result_path_name=result_path_name)
-                                    result_path_name=None)
+                                    result_path_name=result_path_name)
+                                    # result_path_name=None# )
 
 exit()
 

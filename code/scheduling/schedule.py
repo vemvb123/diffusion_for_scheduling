@@ -2561,6 +2561,7 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
 
 
     # env.render(td_best) # sto tidligere env.render(td_best, 0)
+    '''
     fold = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/scheds'
     name_sched = 'new_sched_best.png'
     path_save_image = f'{fold}/{name_sched}'
@@ -2571,11 +2572,11 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
 
     name_sched = 'new_sched_worst.png'
     path_save_image = f'{fold}/{name_sched}'
-    env.render(td_best.unsqueeze(0), 0)
+    env.render(td_worst.unsqueeze(0), 0)
     if path_save_image:
         plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
         print(f"Saved scheduled image at path {path_save_image}")
-
+    '''
 
 
     # TODO ukkomenter etterpå

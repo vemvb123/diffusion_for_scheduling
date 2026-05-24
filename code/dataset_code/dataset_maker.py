@@ -137,14 +137,13 @@ def make_instance(
         "max_eligible_ma_per_op": max_eligable_ma_per_op,
     }
 
-    if schedule_manually:
-        env = FJSPEnv(
-            generator_params=generator_params,
-            _torchrl_mode=True,
-            stepwise_reward=True,
-            mask_no_ops = not schedule_manually
-        )
+    env = FJSPEnv(
+        generator_params=generator_params,
+        _torchrl_mode=True,
+        stepwise_reward=True,
+        mask_no_ops = not schedule_manually
+    )
 
 
-        td = env.reset(batch_size=[batch_size])
+    td = env.reset(batch_size=[batch_size])
     return env, td, generator_params
