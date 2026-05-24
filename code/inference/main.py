@@ -49,7 +49,8 @@ def get_problem_type(problem_type : str):
         min_proc_time=parameters['min_processing_time'], 
         max_eligable_ma_per_op=parameters['max_machine_options'], 
         min_eligable_ma_per_op=parameters['min_machine_options'], 
-        batch_size=1
+        batch_size=1, 
+        schedule_manually=True
     )
 
     print(parameters)
@@ -679,21 +680,22 @@ benchmark = sys.argv[1]
 
 
 
-# ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
-ins = None
 times = 1
 if sys.argv[2] == 'inf':
     times = 500
 # ins = None
 # inference_type = random, guide, ddpm, batchrep
 
-benchmarks = ["mk01_mautil"] # ,"mk01_mautil"
+benchmarks = ["mk01"] # ,"mk01_mautil"
 for b in benchmarks:
     for i in range(times):
         # ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
         inference_type = "ddpm"
         result_path_name = f"batch_runs_metrics_{b}_{inference_type}.csv"
-        get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, b, ins, inference_type = inference_type, 
+        get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, b, 
+                                    # benchmark_instance=None, 
+                                    benchmark_instance = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt',
+                                    inference_type = inference_type, 
                                     # result_path_name=result_path_name)
                                     result_path_name=None)
 

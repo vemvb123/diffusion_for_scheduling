@@ -121,7 +121,7 @@ def make_target_mauti_mautill():
 
 
 def make_instance(
-    n_ma, n_jobs, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, max_eligable_ma_per_op, min_eligable_ma_per_op, batch_size
+    n_ma, n_jobs, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, max_eligable_ma_per_op, min_eligable_ma_per_op, batch_size, schedule_manually=False
 ) -> Tuple[FJSPEnv, TensorDict, Dict]:
 
 
@@ -137,12 +137,14 @@ def make_instance(
         "max_eligible_ma_per_op": max_eligable_ma_per_op,
     }
 
+    if schedule_manually:
+        env = FJSPEnv(
+            generator_params=generator_params,
+            _torchrl_mode=True,
+            stepwise_reward=True,
+            mask_no_ops = not schedule_manually
+        )
 
-    env = FJSPEnv(
-        generator_params=generator_params,
-        _torchrl_mode=True,
-        stepwise_reward=True
-        # mask_no_ops=False
-    )
-    td = env.reset(batch_size=[batch_size])
+
+        td = env.reset(batch_size=[batch_size])
     return env, td, generator_params

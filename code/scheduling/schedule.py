@@ -1621,13 +1621,14 @@ def make_queue_mautil_alt(
     # -----------------------------------
     # machine queues
     # -----------------------------------
-
     queue_machines = []
 
+    '''
     for machine in range(n_machines):
 
         queue_machines[machine] = []
 
+    '''
     # -----------------------------------
     # count occurrences per job
     # -----------------------------------
@@ -1708,7 +1709,7 @@ def schedule_single_instance_mautil_alt(
 ):
     
 
-    busy_times = 0
+    amt_busy = 0
     device = td.device
 
     ops_ma_adj_before_schedule = td['ops_ma_adj'].clone()
@@ -1742,7 +1743,7 @@ def schedule_single_instance_mautil_alt(
             n_machines
         )
     )
-    duplicates = check_duplicate_job_precedence(queue_machines)
+    # duplicates = check_duplicate_job_precedence(queue_machines)
 
     num_jobs = td["job_ops_adj"].shape[1]
     job_counter = [0 for _ in range(num_jobs)]
@@ -1769,14 +1770,9 @@ def schedule_single_instance_mautil_alt(
     while not td['done'].all():
 
         i = 0
-        # all machines busy, go forward in time
-        while not all(is_ma_unavailable):
+        # while there are remaining operations in queue, and not all machines are unavalible
+        while i < len(queue_machines) and not all(is_ma_unavailable):
             
-            # TODO fjern hvis aldri inntreffer
-            if i >= len(queue_machines):
-                print("debug, vrfr skjer")
-                i = 0
-
 
             action_job_precedence_machine = queue_machines[i]
             action = action_job_precedence_machine[0]
@@ -1784,26 +1780,15 @@ def schedule_single_instance_mautil_alt(
             precedence = action_job_precedence_machine[2]
             machine = action_job_precedence_machine[3]
 
-           
-            # if all operations for machine scheduled already
-            # if n_ops_on_ma[machine] == 0:
-            #     continue
-
-            # if the machine for the operation is not busy
-            if td["busy_until"][0][machine] > td["time"]:
-                busy_times += 1
-                i+=1
+            if (
+                td["busy_until"][0][machine] > td["time"] # if machine for operation is busy
+                or job_counter[job] != precedence # or predecessor of operation not scheduled
+                or td["job_in_process"][0][job] # or a predessecor is still processing
+                or is_ma_unavailable[machine] # or machine unavailbile (scheduled to, without time having progressed yet)
+            ):
+                i += 1
                 continue
 
-            # if the predesecor of the operation has been scheduled
-            if job_counter[ job ] != precedence:
-                i+=1
-                continue
-            
-            # if another operation on the same job is currently being processed, but is still not done
-            if td["job_in_process"][0][job]:
-                i+=1
-                continue
 
 
             popped_item = queue_machines.pop(i)
@@ -1825,7 +1810,9 @@ def schedule_single_instance_mautil_alt(
             td["action"] = torch.tensor([action])
 
             td = env.step(td)["next"]
-            i = 0
+            i += 1
+            scheduled_something = True
+            # i = 0 # Trur ikke må starte fra toppen igjen... noe blir jo ikke skedulertbart, bare fordi man har skedulert noe annet på samme tidspunkt
             job_actions_done[ job ].append(popped_item)
             job_counter[ job ] += 1
             n_ops_on_ma[machine] -= 1
@@ -1847,20 +1834,15 @@ def schedule_single_instance_mautil_alt(
 
             
 
+        td["action"] = torch.tensor([0])
+        td = env.step(td)["next"]
 
-        # IMPORTANT:
-        # nothing scheduled -> let env advance time
-        # if all(is_ma_unavailable):
-        if queue_machines:
-            td["action"] = torch.tensor([0])
-            td = env.step(td)["next"]
-
-            # refreshing list of busy machines
-            is_ma_unavailable = [
-                td["busy_until"][0][i] > td["time"] # machine is currently busy
-                or n_ops_on_ma[i] == 0 # all ops on ma done. noting as scheduling so time can progress
-                for i in range(n_machines)
-            ]
+        # refreshing list of busy machines
+        is_ma_unavailable = [
+            td["busy_until"][0][i] > td["time"] # machine is currently busy
+            or n_ops_on_ma[i] == 0 # all ops on ma done. noting as scheduling so time can progress
+            for i in range(n_machines)
+        ]
 
 
 
@@ -1896,11 +1878,11 @@ def schedule_single_instance_mautil_alt(
         )
     '''
     if order:
-        if busy_times: return td, ordered_assignments, busy_times
-        return td, ordered_assignments, None
+        if busy_times: return td, ordered_assignments, amt_busy
+        return td, ordered_assignments, amt_busy
     else:
-        if busy_times: return td, None, busy_times
-        return td, None, None
+        if busy_times: return td, None, amt_busy
+        return td, None, amt_busy
 
 
 
@@ -1952,7 +1934,7 @@ def schedule_batch_instances_mautil(
             td_single,
             ordered_assignments,
             busy
-        ) = schedule_single_instance_mautil(
+        ) = schedule_single_instance_mautil_alt(
             td_single,
             env,
             actions_single,
@@ -2580,12 +2562,22 @@ def schedule_from_inference( assignments, order: bool, env, td, path_save_image:
 
     # env.render(td_best) # sto tidligere env.render(td_best, 0)
     fold = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/scheds'
-    name_sched = 'ddpm_comp_r.png'
+    name_sched = 'new_sched_best.png'
     path_save_image = f'{fold}/{name_sched}'
-    env.render(td_worst.unsqueeze(0), 0)
+    env.render(td_best.unsqueeze(0), 0)
     if path_save_image:
         plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
         print(f"Saved scheduled image at path {path_save_image}")
+
+    name_sched = 'new_sched_worst.png'
+    path_save_image = f'{fold}/{name_sched}'
+    env.render(td_best.unsqueeze(0), 0)
+    if path_save_image:
+        plt.savefig(path_save_image, dpi=150, bbox_inches='tight')
+        print(f"Saved scheduled image at path {path_save_image}")
+
+
+
     # TODO ukkomenter etterpå
     '''
     denom = len(all_actions[0])
