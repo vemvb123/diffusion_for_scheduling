@@ -1,6 +1,8 @@
 """
 inference.py contains code for running inference with trained models
 """
+
+from code.inference.utils import compute_job_lengths
 from code.inference.inferenced_to_schedule import show_order_clear
 from code.inference.report_infeasibilities import count_infeasibilities
 from diffusers import CosineDPMSolverMultistepScheduler, DDPMScheduler
@@ -176,7 +178,8 @@ def adj_inference_ddpm_batch_replacement(proc_times, job_ops_adj, ops_ma_adj, mo
 
 
 
-def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, timesteps=1000, jump=None, cos=False, smart_init=False):
+def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_samples, h_when_masked, w_when_masked, timesteps=1000, jump=None, cos=False, smart_init=False,
+                       n_ops=None, ops_sequence_order=None, td=None, valid_w=None, valid_h=None):
     
     device = "cuda"
     print(f"Using model {model_path}, with timesteps {timesteps}, and cos: {cos}")
@@ -229,9 +232,11 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
 
 
 
-    valid_h = 6   # valid rows
-    valid_w = 55  # valid columns
     device = 'cuda'  # or 'cpu'
+
+    ops_seq_order = td["ops_sequence_order"]
+    job_lengts = compute_job_lengths(ops_seq_order)
+    n_ops = sum(x for x in job_lengts if x != 1)
 
 
 
@@ -310,6 +315,21 @@ def adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, model_path, n_sample
             """
 
             x = zero_unused_slots(x, ops_ma_adj, valid_h, valid_w, device)
+
+            '''
+            if t % 10 == 0:
+                print(n_ops)
+                report_file_path = None
+                x_sc = x[:, :, :valid_h, :valid_w].clone()
+                ops_ma_adj_sc = ops_ma_adj[:, :, :valid_h, :valid_w].clone()
+
+                x_sc = show_order_clear(x_sc, n_ops, ops_ma_adj_sc, r_global=False) # tidligere order visning ... DENNE ER KLART BEDRE, far langt mindre feil for mk01
+                report, total_errors_ag, error_list,   total_error, total_error_p, multi_p, seq_p, infeas_rate, multi_rate, seq_rate, amf_infeas, amt_infeas_p = count_infeasibilities(
+                    x_sc, td["ops_sequence_order"][:valid_w], report_file_path=report_file_path, n_ops=n_ops, do_print=False)
+                
+                print(f"timestep: {t}, avg infeas: {total_errors_ag / n_ops}")
+            '''
+
 
     # end timer
     end_time = time.perf_counter()
@@ -411,7 +431,7 @@ def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, eps=0.0):
     return u_safe.detach()
 '''
 
-def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, t, eps=0.0, self_adjusting_gamma=False):
+def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, t, eps=0.0, self_adjusting_gamma=False, gamma_input=0.0):
 
     x = x.detach().clone().requires_grad_(True)
     u = u_nominal.clone()
@@ -437,16 +457,14 @@ def solve_column_qp(u_nominal, x, valid_h, valid_w, job_lengths, t, eps=0.0, sel
 
     grad_norm = (grad_b * grad_b).sum(dim=(1,2,3), keepdim=True) + 1e-8
 
-    gamma = 0.0
-
 
     # gamma = 2.0 * torch.relu(-b).mean(dim=1).view(-1,1,1,1)
     # gamma = torch.relu(-b).mean(dim=1).view(-1,1,1,1)
-    lam = torch.clamp((-violation + gamma) / grad_norm, min=0)
+    lam = torch.clamp((-violation + gamma_input) / grad_norm, min=0)
 
     u_safe = u + lam * grad_b
 
-    return u_safe.detach(), gamma
+    return u_safe.detach(), gamma_input
 
 
 def inference_guide(
@@ -463,7 +481,8 @@ def inference_guide(
         smart_init=False,
         job_lengths=None,
         td=None,
-        valid_h = 6, valid_w = 55
+        valid_h = 6, valid_w = 55,
+        gamma_input = 0.0
         ):
 
 
@@ -595,7 +614,7 @@ def inference_guide(
                         valid_w,
                         job_lengths,
                         t,
-                        eps=0.0
+                        eps=0.0, gamma_input=gamma_input
                     )
 
 

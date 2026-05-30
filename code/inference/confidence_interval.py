@@ -223,17 +223,17 @@ def compute_bounds(csv_bench, output_name):
 
     print(f"Saved 95% bounds for all metrics to {output_name}")
 
-'''
-types = ['random', 'ddpm', 'guide']
-benches = ['mk01', 'mk10']
+
+
+types = ['ddpm']
+# benches = ['mk02', 'mk03', 'mk05', 'mk06', 'mk07']
+benches = ['mk10', 'mk01']
 
 for t in types:
     for b in benches:
-        output_name = f'intervall/metric_bounds_95_{b}_{t}.csv'
-        csv_bench = f'batch_runs_metrics_{b}_{t}.csv'
+        output_name = f'intervall/metric_bounds_95_{b}_{t}_rerun.csv'
+        csv_bench = f'batch_runs_metrics_{b}_{t}_rerun.csv'
         compute_bounds(csv_bench, output_name)
-'''
-
 
 
 '''

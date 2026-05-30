@@ -272,12 +272,12 @@ def diffusion(
         # torch.save(model_adj.state_dict(), model_path_adj)
         if model_type == "f":
             torch.save(model_enc.state_dict(), model_enc)
-
+        '''
         if len(all_losses_test) >= 4:
             if all_losses_test[-1] > all_losses_test[-4]:
                 logging.info("Test loss has not gone down for 4 epochs - stopping early")
                 break
-    
+        '''
 
     logging.info("saved loss image")
     plot_losses(graph_save_folder, f"{graph_name} train", all_losses)

@@ -62,7 +62,7 @@ def get_problem_type(problem_type : str):
 
 
 # inference types: ddpm, guide, random# inference types: ddpm, guide, random
-def get_inference_result(problem_type, instance_idx, model_type, order: bool, benchmark_instance = None, inference_type = "ddpm"):
+def get_inference_result(problem_type, instance_idx, model_type, order: bool, benchmark_instance = None, inference_type = "ddpm", gamma_input = 0.0):
     print("starting inference")
     # instantiate all return values as None
     (td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, valid_h, valid_w) = (None,) * 10
@@ -119,18 +119,30 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
 
         timesteps = None
         if problem_type == 'mk01':
-            timesteps = 100
+            timesteps = 100 # opprinnelig 100
         if problem_type == 'mk01_mautil':
             timesteps = 100
         if problem_type == 'mk02':
             timesteps = 100
+        if problem_type == 'mk03':
+            timesteps = 120
         if problem_type == 'mk04':
             timesteps = 150
         if problem_type == 'mk05':
-            timesteps = 100
-        if problem_type == 'mk10':
+            timesteps = 150
+        if problem_type == 'mk06':
+            timesteps = 150
+        if problem_type == 'mk07':
+            timesteps = 150
+        if problem_type == 'mk08':
             timesteps = 170
+        if problem_type == 'mk09':
+            timesteps = 170
+        if problem_type == 'mk10':
+            timesteps = int(sys.argv[2]) # opprinnelig 170
 
+        if timesteps == None:
+            raise Exception(f'Timesteps not set for benchmark {problem_type}')
 
         #sampling_steps = 60
         ddim_eta = 1.0
@@ -199,7 +211,8 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
             inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.adj_inference_ddpm(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
                 jump=None, 
                 cos=cos,
-                smart_init=False)
+                smart_init=False,
+                n_ops=n_ops, ops_sequence_order=ops_sequence_order, td=td, valid_h=valid_h, valid_w=valid_w)
             eta = 0.9
 
             print("Saving inference results...")
@@ -217,15 +230,17 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
 
         # GUIDING
         if inference_type == "guide":
-            print("doing inference guided")
+            print(f"doing inference guided with gamma: {gamma_input}")
+            
             inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.inference_guide(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
                 jump=None, 
                 cos=cos,
                 smart_init=False,
                 job_lengths=compute_job_lengths(td["ops_sequence_order"]),
                 td=td,
-                valid_h=valid_h, valid_w=valid_w
-            )
+                valid_h=valid_h, valid_w=valid_w,
+                gamma_input=gamma_input)
+            
             eta = 0.9
 
         # BATCH REPLACEMENT
@@ -375,10 +390,10 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
 
 
 
-def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs, problem_type, benchmark_instance = None, inference_type = "ddpm", result_path_name=None):
+def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h, n_jobs, problem_type, benchmark_instance = None, inference_type = "ddpm", result_path_name=None, gamma_input = 0.0):
     print("inside get inference cached")
     # TODO endre hvis bruker annet
-    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path, report_file_path_fix, n_ops = get_inference_result(problem_type, instance_idx, model_type, order, benchmark_instance, inference_type)
+    td, env, mask_h, mask_w, target_assignments, proc_times, job_ops_adj, ops_ma_adj, inference_assignments, elapsed, assignments_over_time, valid_h, valid_w, report_file_path, adj_model_path, graph_save_path, report_file_path_fix, n_ops = get_inference_result(problem_type, instance_idx, model_type, order, benchmark_instance, inference_type, gamma_input=gamma_input)
     # CHANGING THE INFERENCED REPRESENTATION, FOR SCHEDULING AND VIZULISATION
     print("herkafaen")
     print(inference_assignments.shape)
@@ -417,6 +432,10 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     #save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis"
     #assignments_over_time.append(inference_assignments_order)
     #matrix_graph_schedule.show_sched(2, ops_ma_adj, inference_assignments_order, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
+
+    # TODO fjern
+    print("exiting")
+    exit()
 
 
 
@@ -676,7 +695,7 @@ h = 4
 n_jobs = 4
 
 
-# benchmark = sys.argv[1]
+# benchmark = sys.argv[2]
 
 
 
@@ -685,19 +704,22 @@ if sys.argv[1] == 'inf':
     times = 500
 # ins = None
 # inference_type = random, guide, ddpm, batchrep
-
-benchmarks = ['mk02', 'mk03', 'mk04', 'mk05', 'mk06', 'mk07'] # ,"mk01_mautil"
-for b in benchmarks:
-    for i in range(times):
+# if executing with guide, specify gamma_input parameter. 0.0 - 2.0 is usally a good value. Default is 0.0
+benchmarks = ['mk10']
+# gammas = [0.5, 1.0]
+for i in range(len(benchmarks)):
+    for j in range(times):
         # ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
         inference_type = "ddpm"
-        result_path_name = f"batch_runs_metrics_{b}_{inference_type}.csv"
-        get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, b, 
+        # result_path_name = f"batch_runs_metrics_{benchmarks[i]}_{inference_type}_rerun_guide_{gammas[i]}.csv"
+        result_path_name = f"batch_runs_metrics_{benchmarks[i]}_{inference_type}.csv"
+        get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmarks[i], 
+                                    # gamma_input = gammas[i],
                                     # benchmark_instance=None, 
-                                    benchmark_instance = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{b}.txt',
+                                    benchmark_instance = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmarks[i]}.txt',
                                     inference_type = inference_type, 
-                                    result_path_name=result_path_name)
-                                    # result_path_name=None# )
+                                    # result_path_name=result_path_name)
+                                    result_path_name=None)
 
 exit()
 

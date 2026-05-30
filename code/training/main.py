@@ -509,6 +509,68 @@ def mk07():
  
     return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
 
+def mk09():
+    _, model_path_adj, train_dataset_path, test_dataset_path, filepath_brandimarte_instance, valid_h, valid_w, w, h, _ = benchmark_values.get_benchmark_values("mk09")
+
+    parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+    logging.info(parameters)
+    generator_params = {
+        "num_jobs": parameters['n_jobs'],
+        "num_machines": parameters['n_machines'],
+        "min_ops_per_job": parameters['fewest_operations'],
+        "max_ops_per_job": parameters['most_operations'],
+        "min_processing_time": parameters['min_processing_time'],
+        "max_processing_time": parameters['max_processing_time'],
+        "min_eligible_ma_per_op": parameters['min_machine_options'],
+        "max_eligible_ma_per_op": parameters['max_machine_options'],
+    }
+
+    embed_size = 80
+
+    testing_epochs = 2
+    run_epochs = 50
+
+    graph_name = f"mk09"
+    full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
+    graph_save_folder = f"{full_path}/results/mk09" 
+    model_path_enc = f'{full_path}/models/mk09/mk09.pth'
+ 
+    return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
+
+
+
+
+def mk08():
+    _, model_path_adj, train_dataset_path, test_dataset_path, filepath_brandimarte_instance, valid_h, valid_w, w, h, _ = benchmark_values.get_benchmark_values("mk08")
+
+    parameters = dataset_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
+    logging.info(parameters)
+    generator_params = {
+        "num_jobs": parameters['n_jobs'],
+        "num_machines": parameters['n_machines'],
+        "min_ops_per_job": parameters['fewest_operations'],
+        "max_ops_per_job": parameters['most_operations'],
+        "min_processing_time": parameters['min_processing_time'],
+        "max_processing_time": parameters['max_processing_time'],
+        "min_eligible_ma_per_op": parameters['min_machine_options'],
+        "max_eligible_ma_per_op": parameters['max_machine_options'],
+    }
+
+    embed_size = 80
+
+    testing_epochs = 2
+    run_epochs = 50
+
+    graph_name = f"mk08"
+    full_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt'
+    graph_save_folder = f"{full_path}/results/mk08" 
+    model_path_enc = f'{full_path}/models/mk08/mk08.pth'
+ 
+    return generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w
+
+
+
+
 
 
 def mk05():
@@ -590,7 +652,9 @@ def mk10():
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk02()
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk03()
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk06()
-generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk07()
+# generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk07()
+# generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk08()
+generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk09()
 # generator_params, embed_size,h, w, testing_epochs, run_epochs, graph_name, graph_save_folder, train_dataset_path, test_dataset_path, model_path_enc, model_path_adj, valid_h, valid_w = mk04()
 '''
 train_models(model_type, order,

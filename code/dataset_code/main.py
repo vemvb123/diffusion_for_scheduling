@@ -5,6 +5,8 @@ from code.dataset_code.dataset import Dataset_RL4CO
 from code.dataset_code import benchmark_utils
 import sys
 from code.dataset_code.benchmark_values import get_benchmark_values
+from code.inference.utils import compute_job_lengths
+
 
 def main(instance_type = None):
     ### Lag dataset
@@ -106,23 +108,36 @@ def dataset_ma_util(problem_type):
 
 
 
-def check_benchmark_parameters():
-    print(f"checking benchmark parameters... {sys.argv[1]}")
+def check_benchmark_parameters(benchmark: str):
+    print(f"checking benchmark parameters... {benchmark}")
     #dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/'
-    filepath_brandimarte_instance = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{sys.argv[1]}.txt'
+    filepath_brandimarte_instance = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt'
     #filepath_brandimarte_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/dauzere/18a.txt'
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance)
     print(parameters)
+    benchmark = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmark}.txt"
+    td = code.dataset_code.benchmark_utils.make_td_from_benchmark_working(benchmark)
+    ops_seq_order = td["ops_sequence_order"]
+    job_lengts = compute_job_lengths(ops_seq_order)
+    valid_assignments = td['ops_ma_adj']
+
+    n_ops = sum(x for x in job_lengts if x != 1)
+    n_ma = valid_assignments.shape[0]
+
+    print(f"n ops: {n_ops}")
+    print(f"n ma: {n_ma}")
+    print(f"n valid assignments: {valid_assignments.sum().item()}")
+    print(f"Size: {n_ma * n_ops}")
 
 
 
 
-
-
-def check_dataset():
+# benchmark instance = "mk10" - for example
+def check_dataset(benchmark_instance: str):
+    print(f'checking: {benchmark_instance}')
     # --- process test image
     instance_idx = 10
-    _, _, dataset_folder, _, _, _, _, _, _, _ = get_benchmark_values('mk08')
+    _, _, dataset_folder, _, _, _, _, _, _, _ = get_benchmark_values(benchmark_instance)
     td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
 
 
@@ -132,6 +147,8 @@ def check_dataset():
     print(td['opt_actions'])
     print(td['opt_assignment_order'])
     print(td['opt_assignment_order'].shape)
+
+
     
     """
     filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk15.txt'
@@ -164,11 +181,19 @@ def check_dataset():
 # {'n_jobs': 15, 'n_machines': 8, 'min_processing_time': 1, 'max_processing_time': 9, 'fewest_operations': 3, 'most_operations': 9, 'min_machine_options': 1, 'max_machine_options': 3}
 
 
-main()
+# main()
+for i in range(1, 11):
+    benchmark = f"mk0{i}"
+    if i == 10: benchmark = f"mk10"
+    check_benchmark_parameters(benchmark)
+    print("____ ")
+
+
 
 # mk05 er: 
+# print('mk08:')
+# check_dataset("mk08")
 
-# check_dataset()
 #instance_type = "mk01"
 
 

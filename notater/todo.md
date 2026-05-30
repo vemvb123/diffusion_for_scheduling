@@ -5,7 +5,8 @@ ops... for mk01 ser det ut som om loss gikk til rundt 0.01-0.02 for test (litt l
 ...
 kjøringer:
 datasett mk08
-target modell mk09
+datasett mk09
+conf intervall mk02-07
 
 ..
 videre:
@@ -14,6 +15,9 @@ batch replacement mk10
 noe som kort viser mautil for trent modell der
 noe kort statistisk som viser machine busy tid = høyere makespan mk01
 trening mk07/08/09
+
+
+
 
 
 
