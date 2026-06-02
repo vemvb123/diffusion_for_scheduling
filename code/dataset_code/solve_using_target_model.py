@@ -198,11 +198,3 @@ def solve_trained_model_on_benchmark_instance_batch(instance_value: str, batch_s
 
     print(f"Saved {batch_size} results to {csv_path}")
 
-
-# TODO kan ikke ha dette her.. det kalles på når man lager target modell
-# instance = "mk01"
-# batch_size = 500
-
-# path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results'
-# csv_path = f"{path}/results_{instance}.csv"
-# solve_trained_model_on_benchmark_instance_batch(instance, batch_size=batch_size, csv_path=csv_path)

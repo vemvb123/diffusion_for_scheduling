@@ -108,13 +108,6 @@ def make_dataset(n: int, dataset_folder: str,
             max_eligable_ma_per_op=max_eligable_ma_per_op, 
             min_eligable_ma_per_op=min_eligable_ma_per_op, 
             batch_size=batch_size)
-        # fa target fra instance
-        # TODO fjern
-        # print(td.shape)
-        # print(td['ops_ma_adj'].shape)
-        # print(type(td))
-        # print("exiting")
-        # exit()
 
         td_target, actions, ordered_assignments = code.dataset_code.dataset_maker.make_target(env, td.copy(), target_model, order)
 
@@ -124,28 +117,13 @@ def make_dataset(n: int, dataset_folder: str,
         if order:
             td.set('opt_assignment_order', ordered_assignments)
 
-        # TODO hvis du vil sjekke data, for testring
-        #print_info_about_dataset(td)
-        """
-        print("ass order")
-        print(td[10]["opt_assignment"])
-        print(td[10]["opt_assignment_order"])
-        #print(td_target[10]["ops_ma_adj"])
-        #print(td[10]["ops_ma_adj"])
-        #print(td_target[10]["ops_sequence_order"])
-        print(td[10]["ops_sequence_order"])
-
-        print(td[10]["opt_actions"])
-        exit()
-        """
         torch.save(td.copy(), f'{dataset_folder}/{i}_{i+batch_size}.pt')
 
         print(f'Made instance {i} to {i+batch_size}')
 
-
     print(f'Made all {i+batch_size} instances. Done making dataset')
 
-# TODO endre batch_size tilbake til 1280
+
 def make_dataset_ma_util(n: int, dataset_folder: str, 
                  n_jobs, n_ma, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, max_eligable_ma_per_op, min_eligable_ma_per_op,
                  target_model: str, order: bool, batch_size: int = 1280, startpoint: int = 0):
@@ -179,10 +157,6 @@ def make_dataset_ma_util(n: int, dataset_folder: str,
 
 
     print(f'Made all {i+batch_size} instances. Done making dataset')
-
-
-
-
 
 
 

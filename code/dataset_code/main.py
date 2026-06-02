@@ -7,18 +7,22 @@ import sys
 from code.dataset_code.benchmark_values import get_benchmark_values
 from code.inference.utils import compute_job_lengths
 
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(filename)s:%(lineno)d - %(message)s"
+)
+
+
 
 def main(instance_type = None):
     ### Lag dataset
-    print("Beginning dataset creation...")
+    logging.info("Beginning dataset creation...")
 
     train_size = 100000
     test_size = int(train_size * 0.2)
     n = train_size + test_size
 
-
-
-    ## Lag datasett for størrelse 444
     if instance_type == "444":
 
         dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444'
@@ -35,21 +39,18 @@ def main(instance_type = None):
             target_model='/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/rl4co_model_0.0001.ckpt',
             order=True,
         )
-        print("done making 444")
+        logging.info("done making 444")
         exit()
 
     target_model, _, dataset_folder, _, filepath_benchmark_instance, _, _, _, _, _ = get_benchmark_values(sys.argv[1])
 
 
-
-
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
-    print(parameters)
+    logging.info(parameters)
 
-    print("stated making dataset")
-    print(f"dataset folder: {dataset_folder}")
-    print(f"benchmark instance: {filepath_benchmark_instance}")
-    print(f"target model: {target_model}")
+    logging.info(f"dataset folder: {dataset_folder}")
+    logging.info(f"benchmark instance: {filepath_benchmark_instance}")
+    logging.info(f"target model: {target_model}")
 
     dataset_utils.make_dataset(
         n, dataset_folder,
@@ -64,12 +65,13 @@ def main(instance_type = None):
         target_model=target_model,
         order=True
     )
-    print("Done making mk00 dataset")
+
+    logging.info("Done making dataset")
 
 
 def dataset_ma_util(problem_type):
     ### Lag dataset
-    print("Beginning dataset creation...")
+    logging.info("Beginning dataset creation...")
 
     # train_size = 100000
     train_size = 50000
@@ -80,12 +82,12 @@ def dataset_ma_util(problem_type):
     dataset_folder = dataset_folder + '_mautil'
 
     parameters = code.dataset_code.benchmark_utils.get_rl4co_parameters_from_brandimarte_instance(filepath_benchmark_instance)
-    print(parameters)
+    logging.info(parameters)
 
-    print("stated making dataset")
-    print(f"dataset folder: {dataset_folder}")
-    print(f"benchmark instance: {filepath_benchmark_instance}")
-    print(f"target model: {target_model}")
+    logging.info("stated making dataset")
+    logging.info(f"dataset folder: {dataset_folder}")
+    logging.info(f"benchmark instance: {filepath_benchmark_instance}")
+    logging.info(f"target model: {target_model}")
 
     dataset_utils.make_dataset_ma_util(
         n, dataset_folder,
@@ -100,7 +102,7 @@ def dataset_ma_util(problem_type):
         target_model=target_model,
         order=True
     )
-    print("Done making mk00 dataset")
+    logging.info("Done making dataset")
 
 
 
@@ -149,85 +151,5 @@ def check_dataset(benchmark_instance: str):
     print(td['opt_assignment_order'].shape)
 
 
-    
-    """
-    filepath_benchmark_instance = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk15.txt'
-    
-    generator_params = {
-        'n_jobs':4,
-        'n_machines':4,
-        'max_op_per_job':4,
-        'min_op_per_job':4,
-        'max_proc_time':50,
-        'min_proc_time':5,
-        'max_eligable_ma_per_op':4,
-        'min_eligable_ma_per_op':4,
-    }
 
 
-    dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_444'
-    dataset = Dataset_RL4CO(
-        folder=dataset_folder,
-        generator_params=generator_params,
-        order=True,
-        w=24,
-        h=24
-    ):w
-    dataset[0]
-    """
-
-# mk04 er: 
-# w: 8, h: 135 -> 24, 136
-# {'n_jobs': 15, 'n_machines': 8, 'min_processing_time': 1, 'max_processing_time': 9, 'fewest_operations': 3, 'most_operations': 9, 'min_machine_options': 1, 'max_machine_options': 3}
-
-
-# main()
-for i in range(1, 11):
-    benchmark = f"mk0{i}"
-    if i == 10: benchmark = f"mk10"
-    check_benchmark_parameters(benchmark)
-    print("____ ")
-
-
-
-# mk05 er: 
-# print('mk08:')
-# check_dataset("mk08")
-
-#instance_type = "mk01"
-
-
-# dataset_ma_util('mk01')
-# check_benchmark_parameters()
-
-
-
-# check_benchmark_parameters()
-
-# ins = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
-# td = benchmark_utils.make_the_stuff(ins)
-
-
-"""
-print(td['proc_times'])
-print(td['ops_ma_adj'])
-print(td['job_ops_adj'])
-print(td['ops_sequence_order'])
-#print(td.keys())
-
-print('------------------')
-
-"""
-"""
-instance_idx = 10
-dataset_folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/data/batched_mk01_10j_6ma_6op_mk01'
-td = dataset_utils.get_dataset_instance(dataset_folder, instance_idx)
-
-print(td['proc_times'])
-print(td['ops_ma_adj'])
-print(td['job_ops_adj'])
-print(td['ops_sequence_order'])
-print(td.keys())
-
-
-"""

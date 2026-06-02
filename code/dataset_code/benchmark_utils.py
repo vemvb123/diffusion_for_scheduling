@@ -13,12 +13,6 @@ import numpy as np
 
 from tensordict import from_dict
 
-'''
-use make_td_from_benchmark(file: str) to make a benchmark instance into a td
-use get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance: str) -> Dict to get parameters from a benchmark to generate a similair instance (not same)
-
-ignore the other functions
-'''
 
 
 def parse_mk01_json(json_data):
@@ -117,47 +111,6 @@ def make_rl4co_instance(jobs, num_machines):
     }
     return td
 
-def make_td_from_benchmark(file: str):
-    # load either JSON or TXT
-    if file.endswith(".json"):
-        data = json.load(open(file))
-        parsed = parse_mk01_json(data)
-        jobs = parsed["jobs"]
-        num_machines = parsed["machines"]
-    else:
-        txt_content = open(file).read()
-        parsed = parse_mk01_txt(txt_content)
-        jobs = parsed["jobs"]
-        num_machines = parsed["machines"]
-
-    # build instance dictionary
-    td = make_rl4co_instance(jobs, num_machines)
-
-    # Convert everything to tensors with explicit batch dim
-    batched_td = {}
-
-    for key, value in td.items():
-        if not isinstance(value, torch.Tensor):
-            value = torch.tensor(value)
-
-        # ensure there is a batch dimension of 1
-        # if the tensor is scalar or 1-D, we unsqueeze
-        if value.dim() == 0:
-            value = value.unsqueeze(0)  # shape [1]
-        elif value.size(0) != 1:
-            value = value.unsqueeze(0)  # shape [1, ...]
-
-        batched_td[key] = value
-
-    # Convert to TensorDict
-    batch_td = TensorDict(batched_td, batch_size=[1])
-
-    # reset the RL4CO environment
-    env = FJSPEnv(generator=None)
-    env_state = env.reset(batch_td)
-    #print(env_state)
-
-    return env_state
 
 # Lager eksempler fra benchmark... lager ikke benchmark instanse, men problemer av samme storrelse
 def get_rl4co_parameters_from_brandimarte_instance(filepath_brandimarte_instance: str) -> Dict:
@@ -281,7 +234,6 @@ def parse_mk01_txt(txt_str):
 def make_rl4co_instance(jobs, num_machines):
     num_jobs = len(jobs)
 
-    # 🔥 KEY FIX: compute padded size
     max_ops_per_job = max(len(job) for job in jobs)
     max_total_ops = num_jobs * max_ops_per_job
 
@@ -350,9 +302,7 @@ def make_rl4co_instance(jobs, num_machines):
 
 
 def make_td_from_benchmark_working(file: str, batch_size: int = 1,return_env: bool = False):
-    # -------------------------
     # load data
-    # -------------------------
     if file.endswith(".json"):
         data = json.load(open(file))
         jobs = data["jobs"]
@@ -365,9 +315,7 @@ def make_td_from_benchmark_working(file: str, batch_size: int = 1,return_env: bo
 
     td = make_rl4co_instance(jobs, num_machines)
 
-    # -------------------------
     # add batch dim (ONLY ONCE)
-    # -------------------------
     batched_td = {}
     for key, value in td.items():
         if not isinstance(value, torch.Tensor):
@@ -378,9 +326,7 @@ def make_td_from_benchmark_working(file: str, batch_size: int = 1,return_env: bo
     batch_td = TensorDict(batched_td, batch_size=[1])
 
 
-    # -------------------------
     # reset env
-    # -------------------------
     env = FJSPEnv(generator=None)
     env_state = env.reset(batch_td)
 
@@ -393,45 +339,6 @@ def make_td_from_benchmark_working(file: str, batch_size: int = 1,return_env: bo
     if return_env:
         return env_state, env
     return env_state
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

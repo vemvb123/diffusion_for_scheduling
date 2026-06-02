@@ -141,11 +141,6 @@ def get_benchmark_values(benchmark_instance: str):
         h = 24
         name = "20j_10ma_14op_mk09"
 
-
-
-
-
-
     elif benchmark_instance == "mk10":
         checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/RL/rl4co_model_0.001_20j_15ma_14op_mk10.ckpt'
         model_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk10/mk10.pth"
@@ -159,8 +154,6 @@ def get_benchmark_values(benchmark_instance: str):
         name = "20j_15ma_14op_mk10"
     else:
         raise ValueError(f"{benchmark_instance} not supported")
-
-
 
 
     return checkpoint_path, model_path, dataset_train_path, dataset_test_path, filepath_benchmark_instance, valid_h, valid_w, w, h, name

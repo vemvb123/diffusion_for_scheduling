@@ -74,52 +74,6 @@ def make_target_ma_util(env: FJSPEnv, td: TensorDict, checkpoint_path: str, orde
 
 
 
-def make_target_mauti_mautill():
-
-    checkpoint_path, _, _, _, filepath_benchmark_instance, _, _, _, _, name = \
-    benchmark_values.get_benchmark_values('mk01')
-    checkpoint_path = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/models/mk01/rl4co_model_0.01_10j_6ma_6op_mk01_limited_machine2_lr2.ckpt'
-
-    td, env = make_td_from_benchmark_working(
-        filepath_benchmark_instance,
-        return_env=True
-    )
-
-    td = TensorDict(
-    {k: v.unsqueeze(0) for k, v in td.items()},
-    batch_size=[1]
-    )
-
-    model = L2DModel.load_from_checkpoint(checkpoint_path)
-    model = model.to("cpu")
-
-    with torch.inference_mode():
-        out = model(td,
-                    decode_type="multistart_sampling",
-                    num_starts=5,
-                    select_best=True,
-                    return_actions=True)
-    actions = out["actions"]
-    order = True
-    # td_scheduled, ordered_assignments = schedule_actions_batch_mautil(env, actions, td.copy(), order)
-    td_scheduled, _ = schedule_batch_instances_mautil(env, actions, td, order)
-
-    path_save_image = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/code/inference/scheduled_by_model_lessmachilessmachine22_hmm2.png'
-    print(td_scheduled[0]['time'])
-    env.render(td_scheduled, 0)
-    if path_save_image:
-        plt.savefig(
-            path_save_image,
-            dpi=150,
-            bbox_inches='tight'
-        )
-
-
-    ##  return td_scheduled, actions, ordered_assignments
-
-# make_target_mauti_mautill()
-
-
 def make_instance(
     n_ma, n_jobs, max_op_per_job, min_op_per_job, max_proc_time, min_proc_time, max_eligable_ma_per_op, min_eligable_ma_per_op, batch_size, schedule_manually=False
 ) -> Tuple[FJSPEnv, TensorDict, Dict]:
