@@ -1,0 +1,12 @@
+0 .. {'multi': 2, 'seq': 12, 'total': 14}
+1 .. {'multi': 2, 'seq': 10, 'total': 12}
+2 .. {'multi': 1, 'seq': 14, 'total': 15}
+3 .. {'multi': 1, 'seq': 7, 'total': 8}
+4 .. {'multi': 2, 'seq': 15, 'total': 17}
+5 .. {'multi': 0, 'seq': 10, 'total': 10}
+6 .. {'multi': 0, 'seq': 11, 'total': 11}
+7 .. {'multi': 1, 'seq': 17, 'total': 18}
+Total errors: 105 - scheduled multiple times: 9, break predecessor constraint: 96
+Avg errors per instance: 13.12, scheduled multiple times: 1.12, break predecessor constraint: 12.00
+Avg error rates: 0.05585106382978723 - avg rate scheduled multi: 0.0047872340425531915, avg rate break predecessor constraint: 0.05106382978723404
+Total feasible schedules: 0 / 8: 0.00%

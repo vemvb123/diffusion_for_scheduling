@@ -1,0 +1,24 @@
+0 .. {'multi': 0, 'seq': 0, 'total': 0} .. NO ERRORS
+1 .. {'multi': 59, 'seq': 13, 'total': 72}
+2 .. {'multi': 59, 'seq': 13, 'total': 72}
+3 .. {'multi': 60, 'seq': 13, 'total': 73}
+4 .. {'multi': 59, 'seq': 13, 'total': 72}
+5 .. {'multi': 58, 'seq': 13, 'total': 71}
+6 .. {'multi': 59, 'seq': 13, 'total': 72}
+7 .. {'multi': 59, 'seq': 12, 'total': 71}
+8 .. {'multi': 59, 'seq': 13, 'total': 72}
+9 .. {'multi': 59, 'seq': 13, 'total': 72}
+10 .. {'multi': 59, 'seq': 13, 'total': 72}
+11 .. {'multi': 58, 'seq': 13, 'total': 71}
+12 .. {'multi': 59, 'seq': 12, 'total': 71}
+13 .. {'multi': 58, 'seq': 13, 'total': 71}
+14 .. {'multi': 59, 'seq': 13, 'total': 72}
+15 .. {'multi': 58, 'seq': 13, 'total': 71}
+16 .. {'multi': 59, 'seq': 13, 'total': 72}
+17 .. {'multi': 58, 'seq': 13, 'total': 71}
+18 .. {'multi': 58, 'seq': 13, 'total': 71}
+19 .. {'multi': 59, 'seq': 13, 'total': 72}
+Total errors: 1361 - scheduled multiple times: 1116, break predecessor constraint: 245
+Avg errors per instance: 68.05, scheduled multiple times: 55.80, break predecessor constraint: 12.25
+Avg error rates: 0.2895744680851063 - avg rate scheduled multi: 0.2374468085106382, avg rate break predecessor constraint: 0.05212765957446806
+Total feasible schedules: 1 / 20: 5.00%

@@ -1,0 +1,13 @@
+0 .. {'multi': 26, 'seq': 18, 'total': 44}
+1 .. {'multi': 23, 'seq': 19, 'total': 42}
+2 .. {'multi': 23, 'seq': 19, 'total': 42}
+3 .. {'multi': 18, 'seq': 17, 'total': 35}
+4 .. {'multi': 23, 'seq': 20, 'total': 43}
+5 .. {'multi': 18, 'seq': 20, 'total': 38}
+6 .. {'multi': 22, 'seq': 19, 'total': 41}
+7 .. {'multi': 30, 'seq': 19, 'total': 49}
+Total errors: 334 - scheduled multiple times: 183, break predecessor constraint: 151
+Avg errors per instance: 41.75, scheduled multiple times: 22.88, break predecessor constraint: 18.88
+Avg error rates: 0.1776595744680851 - avg rate scheduled multi: 0.0973404255319149, avg rate break predecessor constraint: 0.08031914893617022
+Total feasible schedules: 0 / 8: 0.00%
+Seconds to run inference: 9.613769604940899 s

@@ -1,0 +1,53 @@
+0 .. {'multi': 24, 'seq': 19, 'total': 43}
+1 .. {'multi': 29, 'seq': 17, 'total': 46}
+2 .. {'multi': 21, 'seq': 19, 'total': 40}
+3 .. {'multi': 23, 'seq': 20, 'total': 43}
+4 .. {'multi': 25, 'seq': 18, 'total': 43}
+5 .. {'multi': 17, 'seq': 18, 'total': 35}
+6 .. {'multi': 32, 'seq': 17, 'total': 49}
+7 .. {'multi': 22, 'seq': 20, 'total': 42}
+8 .. {'multi': 27, 'seq': 20, 'total': 47}
+9 .. {'multi': 31, 'seq': 17, 'total': 48}
+10 .. {'multi': 31, 'seq': 18, 'total': 49}
+11 .. {'multi': 22, 'seq': 19, 'total': 41}
+12 .. {'multi': 22, 'seq': 20, 'total': 42}
+13 .. {'multi': 23, 'seq': 17, 'total': 40}
+14 .. {'multi': 25, 'seq': 18, 'total': 43}
+15 .. {'multi': 19, 'seq': 16, 'total': 35}
+16 .. {'multi': 20, 'seq': 18, 'total': 38}
+17 .. {'multi': 23, 'seq': 20, 'total': 43}
+18 .. {'multi': 27, 'seq': 16, 'total': 43}
+19 .. {'multi': 32, 'seq': 15, 'total': 47}
+20 .. {'multi': 26, 'seq': 19, 'total': 45}
+21 .. {'multi': 23, 'seq': 17, 'total': 40}
+22 .. {'multi': 24, 'seq': 16, 'total': 40}
+23 .. {'multi': 20, 'seq': 19, 'total': 39}
+24 .. {'multi': 24, 'seq': 18, 'total': 42}
+25 .. {'multi': 25, 'seq': 18, 'total': 43}
+26 .. {'multi': 21, 'seq': 19, 'total': 40}
+27 .. {'multi': 17, 'seq': 17, 'total': 34}
+28 .. {'multi': 30, 'seq': 18, 'total': 48}
+29 .. {'multi': 26, 'seq': 16, 'total': 42}
+30 .. {'multi': 30, 'seq': 19, 'total': 49}
+31 .. {'multi': 23, 'seq': 18, 'total': 41}
+32 .. {'multi': 25, 'seq': 18, 'total': 43}
+33 .. {'multi': 22, 'seq': 18, 'total': 40}
+34 .. {'multi': 21, 'seq': 19, 'total': 40}
+35 .. {'multi': 21, 'seq': 19, 'total': 40}
+36 .. {'multi': 22, 'seq': 18, 'total': 40}
+37 .. {'multi': 25, 'seq': 16, 'total': 41}
+38 .. {'multi': 23, 'seq': 19, 'total': 42}
+39 .. {'multi': 20, 'seq': 19, 'total': 39}
+40 .. {'multi': 23, 'seq': 19, 'total': 42}
+41 .. {'multi': 22, 'seq': 20, 'total': 42}
+42 .. {'multi': 35, 'seq': 17, 'total': 52}
+43 .. {'multi': 24, 'seq': 18, 'total': 42}
+44 .. {'multi': 26, 'seq': 18, 'total': 44}
+45 .. {'multi': 25, 'seq': 17, 'total': 42}
+46 .. {'multi': 25, 'seq': 19, 'total': 44}
+47 .. {'multi': 32, 'seq': 18, 'total': 50}
+Total errors: 2043 - scheduled multiple times: 1175, break predecessor constraint: 868
+Avg errors per instance: 42.56, scheduled multiple times: 24.48, break predecessor constraint: 18.08
+Avg error rates: 0.1811170212765957 - avg rate scheduled multi: 0.10416666666666664, avg rate break predecessor constraint: 0.07695035460992906
+Total feasible schedules: 0 / 48: 0.00%
+Seconds to run inference: 41.86232649802696 s

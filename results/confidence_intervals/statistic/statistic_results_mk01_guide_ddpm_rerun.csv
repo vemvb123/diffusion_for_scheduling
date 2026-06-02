@@ -1,0 +1,20 @@
+
+        === total_errors ===
+        Improved mean: 7.886000
+        Original mean: 20.010000
+
+        Expected improvement:
+        Absolute: 12.124000
+        Percent:  60.59%
+
+        Statistical test:
+        t-statistic: 58.2424
+        p-value:     8.535584e-291
+
+        Effect size:
+        Cohen's d:   3.6836
+
+        === min_makespan ===
+        Improved mean min_makespan: 56.128000
+        Original mean min_makespan: 56.008000
+    

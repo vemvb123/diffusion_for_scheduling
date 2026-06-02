@@ -1,0 +1,25 @@
+0 .. {'multi': 0, 'seq': 20, 'total': 20}
+1 .. {'multi': 0, 'seq': 4, 'total': 4}
+2 .. {'multi': 0, 'seq': 4, 'total': 4}
+3 .. {'multi': 0, 'seq': 4, 'total': 4}
+4 .. {'multi': 0, 'seq': 4, 'total': 4}
+5 .. {'multi': 0, 'seq': 4, 'total': 4}
+6 .. {'multi': 0, 'seq': 4, 'total': 4}
+7 .. {'multi': 0, 'seq': 4, 'total': 4}
+8 .. {'multi': 0, 'seq': 4, 'total': 4}
+9 .. {'multi': 0, 'seq': 4, 'total': 4}
+10 .. {'multi': 0, 'seq': 4, 'total': 4}
+11 .. {'multi': 0, 'seq': 4, 'total': 4}
+12 .. {'multi': 0, 'seq': 4, 'total': 4}
+13 .. {'multi': 0, 'seq': 4, 'total': 4}
+14 .. {'multi': 0, 'seq': 4, 'total': 4}
+15 .. {'multi': 0, 'seq': 4, 'total': 4}
+16 .. {'multi': 0, 'seq': 4, 'total': 4}
+17 .. {'multi': 0, 'seq': 4, 'total': 4}
+18 .. {'multi': 0, 'seq': 4, 'total': 4}
+19 .. {'multi': 0, 'seq': 4, 'total': 4}
+Total errors: 96 - scheduled multiple times: 0, break predecessor constraint: 96
+Avg errors per instance: 4.80, scheduled multiple times: 0.00, break predecessor constraint: 4.80
+Avg error rates: 0.020425531914893626 - avg rate scheduled multi: 0.0, avg rate break predecessor constraint: 0.020425531914893626
+Total feasible schedules: 0 / 20: 0.00%
+Seconds to run inference: 0 smakespans - avg 152.0, min 152.0, max 152.0
