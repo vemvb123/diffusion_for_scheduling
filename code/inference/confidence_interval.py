@@ -68,21 +68,42 @@ def append_results(csv_path,
     print(f'appended results to line {line_num}')
     print(' ')
 
+'''
+def compute_mean():
+    benches = ['mk01', 'mk10']
+    timesteps = [400, 500, 600, 700, 800, 900, 1000]
+    methods = ['ddpm', 'batchrep']
+    for b in benches:
+        print(b)
+        for t in timesteps:
+            for m in methods:
+                folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals/runs_batchrep'
+                csv_bench = f'batch_runs_metrics_{b}_{m}_timesteps_{t}.csv'
+                df = pd.read_csv(f"{folder}/{csv_bench}")
+                fields = ['total_errors']
+                for field in fields:
+                    mean = df[field].mean()
+                    print(f'{m} {t}: {field}: {mean}')
+            print()
+        print()
+            
+'''
+
 
 
 def compute_mean():
-    benches = ['mk01', 'mk10']
+    benches = ['mk01', 'mk02', 'mk03', 'mk04', 'mk04', 'mk05', 'mk06', 'mk07', 'mk08', 'mk09', 'mk10']
     for b in benches:
         print(b)
         folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals/'
         csv_bench = f'batch_runs_metrics_{b}_ddpm.csv'
+        if b == 'mk01' or b == 'mk10':
+            csv_bench = f'batch_runs_metrics_{b}_ddpm_rerun.csv'
         df = pd.read_csv(f"{folder}/{csv_bench}")
-        fields = ['total_error', 'amf_infeas', 'total_error_p']
+        fields = ['min_makespan']
         for field in fields:
             mean = df[field].mean()
-            print(f'{field}: {mean}')
-
-compute_mean()
+            print(f'{b}: {field}: {mean}')
 
 
 def percentage_improvment():
@@ -224,31 +245,33 @@ def compute_bounds(csv_bench, output_name):
     print(f"Saved 95% bounds for all metrics to {output_name}")
 
 
-
+'''
 types = ['ddpm']
 # benches = ['mk02', 'mk03', 'mk05', 'mk06', 'mk07']
-benches = ['mk10', 'mk01']
+benches = ['mk08', 'mk09']
 
 for t in types:
     for b in benches:
-        output_name = f'intervall/metric_bounds_95_{b}_{t}_rerun.csv'
-        csv_bench = f'batch_runs_metrics_{b}_{t}_rerun.csv'
+        output_name = f'intervall/metric_bounds_95_{b}_{t}.csv'
+        csv_bench = f'batch_runs_metrics_{b}_{t}.csv'
         compute_bounds(csv_bench, output_name)
-
-
+'''
 '''
 benches = ['mk01', 'mk10']
-for b in benches:
-    t_improv = 'batchrep'
+gamma_setting = ['0.5', '1.0']
+for i in range(len(benches)):
+    b = benches[i]
+    g = gamma_setting[i]
+    t_improv = 'guide'
     t_original = 'ddpm'
-    file_improv = f'batch_runs_metrics_{b}_{t_improv}.csv'
-    file_original = f'batch_runs_metrics_{b}_{t_original}.csv'
-    output_file = f'statistic/statistic_results_{b}_{t_improv}_{t_original}.csv'
+    file_improv = f'batch_runs_metrics_{b}_{t_improv}_rerun_{t_improv}_{g}.csv'
+    file_original = f'batch_runs_metrics_{b}_{t_original}_rerun.csv'
+    output_file = f'statistic/statistic_results_{b}_{t_improv}_{t_original}_rerun.csv'
     field1_mean = 'total_errors'
     field2_test = 'min_makespan'
 
     test_better(file_original, file_improv, output_file, field1_mean, field2_test)
-
 '''
 
 
+compute_mean()

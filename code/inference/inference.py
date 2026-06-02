@@ -148,9 +148,7 @@ def adj_inference_ddpm_batch_replacement(proc_times, job_ops_adj, ops_ma_adj, mo
             """
 
             x = zero_unused_slots(x, ops_ma_adj, valid_h, valid_w, device)
-
             if t_replace != None and ( t == t_replace ):
-                print(f'using valid w {valid_w} and valid h {valid_h}, batchreplace at t {t}')
                 x_copy = x[:, :, :valid_h, :valid_w].clone()
                 ops_ma_adj_copy = ops_ma_adj[:, :, :valid_h, :valid_w].clone()
                 ops_sequence_order_copy = ops_sequence_order[:valid_w].clone()

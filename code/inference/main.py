@@ -119,7 +119,8 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
 
         timesteps = None
         if problem_type == 'mk01':
-            timesteps = 100 # opprinnelig 100
+            # timesteps = 100 # opprinnelig 100
+            timesteps = int(sys.argv[2])
         if problem_type == 'mk01_mautil':
             timesteps = 100
         if problem_type == 'mk02':
@@ -139,7 +140,8 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
         if problem_type == 'mk09':
             timesteps = 170
         if problem_type == 'mk10':
-            timesteps = int(sys.argv[2]) # opprinnelig 170
+            # timesteps = 170 # opprinnelig 170
+            timesteps = int(sys.argv[2])
 
         if timesteps == None:
             raise Exception(f'Timesteps not set for benchmark {problem_type}')
@@ -245,8 +247,8 @@ def get_inference_result(problem_type, instance_idx, model_type, order: bool, be
 
         # BATCH REPLACEMENT
         if inference_type == "batchrep":
-            print("doing inference guided")
-            t_replace = 7
+            print("doing inference batchrep")
+            t_replace = 2
             print(f'batch replace is {t_replace}')
             inference_assignments, elapsed, assignments_over_time, variation_over_time = inference.adj_inference_ddpm_batch_replacement(proc_times, job_ops_adj, ops_ma_adj, adj_model_path, n_samples, mask_h, mask_w, timesteps,
                 jump=None, 
@@ -432,10 +434,6 @@ def get_inference_result_cached(model_type: str, order: bool, instance_idx, w, h
     #save_path = f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/analysis"
     #assignments_over_time.append(inference_assignments_order)
     #matrix_graph_schedule.show_sched(2, ops_ma_adj, inference_assignments_order, assignments_over_time, td["ops_sequence_order"], n_ops, valid_h, valid_w, save_path)
-
-    # TODO fjern
-    print("exiting")
-    exit()
 
 
 
@@ -698,28 +696,38 @@ n_jobs = 4
 # benchmark = sys.argv[2]
 
 
-
+# TODO, endre times
 times = 1
 if sys.argv[1] == 'inf':
-    times = 500
+    times = 10
 # ins = None
 # inference_type = random, guide, ddpm, batchrep
 # if executing with guide, specify gamma_input parameter. 0.0 - 2.0 is usally a good value. Default is 0.0
-benchmarks = ['mk10']
+
+# man passerer inn argument for runtime. 
+# i en kjøring, kjører man da med det argumentet, og times er 20, # har også argument for inference_type
+# da skaffer den 20 eksempler for batchrep, og uten batchrep
+# kjører fra timestep 500 til 1000
+# i tabell viser jeg da mean
+
+
+benchmarks = ['mk10', 'mk01']
 # gammas = [0.5, 1.0]
 for i in range(len(benchmarks)):
     for j in range(times):
         # ins = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/mk01.txt'
-        inference_type = "ddpm"
+        inference_type = sys.argv[3]
         # result_path_name = f"batch_runs_metrics_{benchmarks[i]}_{inference_type}_rerun_guide_{gammas[i]}.csv"
-        result_path_name = f"batch_runs_metrics_{benchmarks[i]}_{inference_type}.csv"
+        # result_path_name = f"batch_runs_metrics_{benchmarks[i]}_{inference_type}.csv"
+        result_path_name = f"runs_batchrep/batch_runs_metrics_{benchmarks[i]}_{inference_type}_timesteps_{sys.argv[2]}.csv"
+        # result_path_name = f"batch_runs_metrics_mk01_mautil_{inference_type}.csv"
         get_inference_result_cached(model_type, order, instance_idx, w, h, n_jobs, benchmarks[i], 
                                     # gamma_input = gammas[i],
                                     # benchmark_instance=None, 
                                     benchmark_instance = f'/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/benchmarks/brandimarte/{benchmarks[i]}.txt',
                                     inference_type = inference_type, 
-                                    # result_path_name=result_path_name)
-                                    result_path_name=None)
+                                    result_path_name=result_path_name)
+                                    # result_path_name=None)
 
 exit()
 
