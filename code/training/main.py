@@ -2,18 +2,15 @@ import os
 from code.dataset_code import benchmark_values
 import torch
 import code.dataset_code.benchmark_utils as dataset_utils
-import logging
 
+import logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(filename)s:%(lineno)d - %(message)s"
 )
 
-from typing import Callable, Dict, List, Tuple
-import sys
 from datetime import datetime
 
-import code.training.diffusion_improv as train_improv
 import code.training.diffusion as training
 from code.dataset_code.dataset import Dataset_RL4CO
 

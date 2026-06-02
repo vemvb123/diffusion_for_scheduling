@@ -1,6 +1,10 @@
 import csv
 import os
 import pandas as pd
+import pandas as pd
+import numpy as np
+from scipy.stats import ttest_ind
+
 
 def append_ma_usage_result(csv_path, ma_usage_count_per_machine):
 
@@ -136,10 +140,6 @@ def percentage_improvment():
 # percentage_improvment()
 
 
-import pandas as pd
-import numpy as np
-from scipy.stats import ttest_ind
-
 
 def test_better(file_original, file_improv, output_file, field1_mean, field2_test):
     folder = '/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/confidence_intervals'
@@ -274,4 +274,3 @@ for i in range(len(benches)):
 '''
 
 
-compute_mean()

@@ -1,4 +1,4 @@
-from code.scheduling.schedule import schedule_actions_batch, modify_actions_batch_mautil, batched_schedule_rollout_keep_order, schedule_batch_instances_mautil
+from code.scheduling.schedule import schedule_actions_batch, modify_actions_batch_mautil, schedule_batch_instances_mautil
 
 import matplotlib
 matplotlib.use('Agg')

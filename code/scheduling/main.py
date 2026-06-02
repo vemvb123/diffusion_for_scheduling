@@ -1,7 +1,4 @@
 from code.dataset_code.dataset_maker import make_instance, make_target
-from code.scheduling.schedule import schdule_by_utilization
-
-print(1)
 
 
 def main():
@@ -83,48 +80,4 @@ def make_benchmark_instance_into_td(file_path: str):
         print(value)
         print("---")
 
-    # må mappe det til ops_ma_adj, derfra kan jeg legge inn en del info
-    """
-start_op_per_job .. trur kan lagde hvis veit job lengder
-end_op_per_job .. kan nok lage hvis veit job lengder
-proc_times .. lager funk for mappe ops_ma_adj, da kan jeg nok lett fylle inn her
-pad_mask .. bare sum av ops.. - hvor mange måtte trengt for å fylle
-ops_adj .. vettafaen, veit ikke en gang hva den sier
-job_ops_adj ... lager bare en liste med lengda av hver jobb, og bruker det til å lage
-ops_job_map .. samme som job_ops_adj
-ops_sequence_order .. lett å decode
-start_times .. fyllt med 0
-finish_times .. fyllt med 999
-ma_assignment .. fyllt med 0
-busy_until.. fyllt med 0
-num_eligible .. kan fylle ut lett hvis ved kan decode til ops_ma_adj
-next_op .. trur kan fylle ved å vita lengda til jobbene
-ops_ma_adj .. må dekode
-op_scheduled .. Bare False verdier
-job_in_process .. bare False
-reward ..0
-time .. 0
-job_done .. bare False
-done .. bare False
-action_mask .. trur jeg kan lage hvis vet lengda til hver jobb .men usikker
-lbs ... veit ikke hva betyr
-is_ready .. kan lage hvis veit lengda til hver jobb
-terminated .. False
-proc_times .. kan sikkert lett nok lage hvis klarer dekode til ops_ma_adj
-
-
-Sliter:
-lbs, action_mask, ops_adj
-
-ops_adj .. kan kanskje få gpt til å dekode hvis jeg viser jobblengder eller noe
-
-    """
-
-def testing():
-    print("Testing schdule_by_utilization")
-    schdule_by_utilization()
-
-# make_benchmark_instance_into_td("/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/brandimarte/mk01.txt")
-
-testing()
 
