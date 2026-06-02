@@ -11,7 +11,7 @@ def get_benchmark_values(benchmark_instance: str):
         dataset_test_path = dataset_train_path + '_TEST'
         filepath_benchmark_instance = None # No benchmark for this problem size
         w = 24
-        h = 16
+        h = 24
         valid_h = 4
         valid_w = 16
 

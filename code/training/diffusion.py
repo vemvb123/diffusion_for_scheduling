@@ -23,45 +23,23 @@ from tqdm import tqdm
 
 import torch
 import numpy as np
-
 import torch.nn as nn
-
-import torch.nn as nn
-# import new_dataset
-
-
 from diffusers import UNet1DModel
 
-
-
-'''
-dataset has: image of machine relations (1 for each machinbe)
-model outputs: set of coordinates, to one of the coordinates for an operation, where each coordinate in sequence gives the assignment order
-target: ideal coordinates
-'''
-
-
-
-'''
-Hvordan feature vectors...
-
-Prosseseringstid:
-    sender inn adj med prosseseringstidene (b, 1, w, h)
-    bruker output channels til å få flere dimensjoner (b, 256, w, h)
-    Flater, ved wh, så hele h inneholder alle nodene, og flater ut langs 256 som blir w
-    så shape blir (b, 1, 256, w x h)
-
-    ID tror jeg ikke er verdt noe, siden en ma eller op kan endre seg for hver instanse, så vil ikke en op eller ma bety det samme.
-    Men generelt for features, eks mengde precessors osv, kan man ha en adj matrise, så prossesere det likt som med prosseseringstid.
-
-'''
-
 import matplotlib.pyplot as plt
+
+
+
+
+
+
+
 
 def run_epoch(loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod, mode, valid_h, valid_w, 
-            scheduler=None, model_path=None, epoch_num=None):
+            scheduler=None, model_name=None, epoch_num=None,
+            loss_plot_folder=None):
 
 
     total_loss = 0.0
@@ -139,15 +117,15 @@ def run_epoch(loop, device, timesteps,
         loop.set_postfix(loss=loss_value)
 
 
-
+        # plotting loss
         ax.clear()
         ax.set_xlabel("Batch")
         ax.set_ylabel("Loss")
         ax.set_title(f"Loss {mode} (updated) epoch nr {epoch_num}")
         ax.plot(batch_losses, color="blue")
         # Save figure to disk as PNG (overwrite each batch)
-        if model_path is not None:
-            fig.savefig(f"/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/in_epoch_{mode}_{model_path}_{epoch_num}_x.png")
+        if model_name is not None and loss_plot_folder is not None:
+            fig.savefig(f"{loss_plot_folder}/{mode}_{model_name}_{epoch_num}.png")
 
  
     plt.close(fig)
@@ -175,15 +153,15 @@ def diffusion(
     device: str = "cuda",
     batch_size: int = 32,
     use_cos=True,
-    penalty=False
+    penalty=False,
+    beta_start=1e-4, beta_end=0.02
 ):
     n_base_features = train_dataset.n_base_features
 
-    beta_start = 1e-4
-    beta_end = 0.02
+    # For linear schedule
     sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod = get_diffusion_schedule(beta_start, beta_end, timesteps)
 
-
+    # For cosine schedule
     scheduler = None
     if use_cos:
         scheduler = DDPMScheduler(
@@ -195,7 +173,7 @@ def diffusion(
             prediction_type="epsilon",
         )
 
-
+    # f is experimental
     if model_type != "adj" and model_type != "f":
         raise ValueError(f"model_type must be either adj or f .kk. but value was #{model_type}#")
 
@@ -203,12 +181,12 @@ def diffusion(
     run_epoch_func = None
     if model_type == "adj":
         run_epoch_func = run_epoch
-    elif model_type == "f":
+    elif model_type == "f": # experimental
         run_epoch_func = run_epoch_feature 
-    if penalty:
+    if penalty: # experimental
         run_epoch_func = run_epoch_penalty_feasibility
 
-    train_loader, test_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size) # subset=True ... for testing med subset
+    train_loader, test_loader = get_dataset_loaders(train_dataset, test_dataset, batch_size=batch_size) # subset=True ... for testing/debugging with little data
 
     logging.info(f"N instances in train dataset: { len(train_loader.dataset) }")
     logging.info(f"N instances in test dataset: { len(test_loader.dataset) }")
@@ -234,28 +212,32 @@ def diffusion(
         )
 
 
+        model_name = model_path_adj.split('/')[-1].split('.')[0]
+        # Running on train set
         train_loop, model_adj, avg_loss = run_epoch_func(
             train_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-            "train", valid_h, valid_w, scheduler, model_path_adj.split('/')[-1].split('.')[0], epoch_num=epoch
+            "train", valid_h, valid_w, scheduler, model_name, epoch_num=epoch, 
+            loss_plot_folder=graph_save_folder
         )
-
+        
+        # Running on train set
         test_loop, model_adj, avg_loss_test = run_epoch_func(
             test_loop, device, timesteps,
             model_adj, model_enc, optimizer,
             batch_size, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod,
-            "test", valid_h, valid_w, scheduler, model_path_adj.split('/')[-1].split('.')[0], epoch_num=epoch
+            "test", valid_h, valid_w, scheduler, model_name, epoch_num=epoch,
+            loss_plot_folder=graph_save_folder
         )
 
 
-
+        # log losses
         losses_folder = "/cluster/datastore/vemundvb/diffusion/diff_project/mindre_prosjekt/results/losses"
         np.save(
             f"{losses_folder}/losses_epoch_{epoch+1}.npy",
             np.array(all_losses)
         )
-
         logging.info(
             f"Epoch [{epoch+1}/{num_epochs}], "
             f"Loss: {avg_loss:.4f}, Test Loss: {avg_loss_test:.4f}"
@@ -264,36 +246,35 @@ def diffusion(
         all_losses.append(avg_loss)
         all_losses_test.append(avg_loss_test)
 
+        # save model for current epoch
         os.makedirs(os.path.dirname(model_path_adj), exist_ok=True)
         torch.save({ 
                 'model_state_dict': model_adj.state_dict(), 
                 'optimizer_state_dict': optimizer.state_dict(), }, 
             model_path_adj)
-        # torch.save(model_adj.state_dict(), model_path_adj)
+        
+
         if model_type == "f":
             torch.save(model_enc.state_dict(), model_enc)
-        '''
+        
+        # Stopping training early, if loss stops decreasing
         if len(all_losses_test) >= 4:
             if all_losses_test[-1] > all_losses_test[-4]:
                 logging.info("Test loss has not gone down for 4 epochs - stopping early")
                 break
-        '''
-
-    logging.info("saved loss image")
-    plot_losses(graph_save_folder, f"{graph_name} train", all_losses)
-    plot_losses(graph_save_folder, f"{graph_name} test", all_losses_test)
-
+    
+    # saving final models
     torch.save({ 
                 'model_state_dict': model_adj.state_dict(), 
                 'optimizer_state_dict': optimizer.state_dict(), }, 
             model_path_adj)
-    # torch.save(model_adj.state_dict(), model_path_adj)
+
     if model_type == "f":
         torch.save(model_enc.state_dict(), model_enc)
-    print(f"done training. Saved model {model_path_adj}")
 
+    logging.info(f"done training. Saved model {model_path_adj}")
 
-
+    # return model path and last obtained loss
     return None, model_path_adj, all_losses[-1]
 
 
